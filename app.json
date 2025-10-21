@@ -2,28 +2,39 @@
   "expo": {
     "name": "Munpa",
     "slug": "munpaApp",
-    "version": "1.0.0",
+    "version": "0.0.2",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "splash": {
-      "image": "./assets/splash-icon.png",
+      "image": "./assets/logo.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#887CBC"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.munpa.app",
+      "buildNumber": "1.0.7",
+      "icon": "./assets/icon.png",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
+      "package": "com.munpa.app",
+      "versionCode": 8,
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "foregroundImage": "./assets/icon.png",
+        "backgroundColor": "#887CBC"
       },
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "icon": "./assets/icon.png"
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/favicon.png",
+      "name": "Munpa - Tu compañera de maternidad",
+      "shortName": "Munpa"
     },
     "fonts": [
       {
@@ -43,9 +54,21 @@
         "family": "Montserrat-SemiBold"
       },
       {
-        "asset": "./assets/Baby Face.otf",
-        "family": "Baby Face"
+        "asset": "./assets/IndieFlower.ttf",
+        "family": "Indie Flower",
+        "weight": "400"
+      },
+      {
+        "asset": "./assets/Hug Me Tight - TTF.ttf",
+        "family": "HugMeTight",
+        "weight": "400"
       }
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "07ff9291-f151-4077-94b9-a744a255bf24"
+      }
+    },
+    "owner": "milifusa16"
   }
 }

@@ -36,6 +36,9 @@ interface RouteParams {
   gender: 'M' | 'F';
   pregnancyStatus?: 'none' | 'pregnant';
   isMultiplePregnancy?: boolean;
+  isEditing?: boolean;
+  childData?: any;
+  childId?: string;
 }
 
 const ChildrenDataScreen: React.FC = () => {
@@ -48,12 +51,31 @@ const ChildrenDataScreen: React.FC = () => {
   const gender = routeParams?.gender || 'F';
   const pregnancyStatus = routeParams?.pregnancyStatus || 'not_pregnant';
   const isMultiplePregnancy = routeParams?.isMultiplePregnancy || false;
+  const isEditing = routeParams?.isEditing || false;
+  const childData = routeParams?.childData;
+  const childId = routeParams?.childId;
   
   const { setUser } = useAuth();
   
-  const [childrenData, setChildrenData] = useState<ChildData[]>(
-    Array(childrenCount).fill({ name: '', years: 0, months: 0, weeksOfPregnancy: 0 })
-  );
+  // Inicializar con datos del hijo si está en modo edición
+  const getInitialChildrenData = () => {
+    if (isEditing && childData) {
+      const ageInMonths = childData.currentAgeInMonths || childData.ageInMonths || 0;
+      const years = Math.floor(ageInMonths / 12);
+      const months = ageInMonths % 12;
+      
+      return [{
+        name: childData.name || '',
+        years: years,
+        months: months,
+        isUnborn: childData.isUnborn || false,
+        weeksOfPregnancy: childData.currentGestationWeeks || childData.gestationWeeks || 0,
+      }];
+    }
+    return Array(childrenCount).fill({ name: '', years: 0, months: 0, weeksOfPregnancy: 0 });
+  };
+  
+  const [childrenData, setChildrenData] = useState<ChildData[]>(getInitialChildrenData());
   const [isLoading, setIsLoading] = useState(false);
 
   const updateChildData = (index: number, field: keyof ChildData, value: any) => {
@@ -90,6 +112,44 @@ const ChildrenDataScreen: React.FC = () => {
     try {
       console.log('Guardando datos de hijos:', childrenData);
       
+      // Si estamos en modo edición, actualizar el hijo existente
+      if (isEditing && childId) {
+        const child = childrenData[0]; // Solo editamos un hijo a la vez
+        const isUnborn = child.isUnborn || false;
+        
+        const updateData: any = {
+          name: child.name,
+          isUnborn: isUnborn,
+        };
+        
+        if (isUnborn) {
+          updateData.gestationWeeks = child.weeksOfPregnancy || 0;
+          updateData.ageInMonths = 0;
+        } else {
+          const totalMonths = (child.years * 12) + child.months;
+          updateData.ageInMonths = totalMonths;
+          updateData.gestationWeeks = undefined;
+        }
+        
+        console.log('Actualizando hijo con ID:', childId, 'Datos:', updateData);
+        await childrenService.updateChild(childId, updateData);
+        
+        Alert.alert(
+          '¡Éxito!',
+          'Datos actualizados correctamente',
+          [
+            {
+              text: 'OK',
+              onPress: () => {
+                navigation.goBack();
+              },
+            },
+          ]
+        );
+        return;
+      }
+      
+      // Modo creación (código original)
       // Preparar los datos en el formato que espera el backend
       const childrenToSave: CreateChildData[] = childrenData.map((child, index) => {
         const isUnborn = isUnbornChild(index);
@@ -160,9 +220,15 @@ const ChildrenDataScreen: React.FC = () => {
               if (userData) {
                 setUser(JSON.parse(userData));
               }
-              // Navegar al Home
+              // Marcar que el usuario ya tiene hijos
+              await AsyncStorage.setItem('hasChildren', 'true');
+              console.log('✅ Marcado como usuario con hijos');
+              // Resetear la navegación al Home para limpiar el stack
               // @ts-ignore
-              navigation.navigate('MainTabs');
+              navigation.reset({
+                index: 0,
+                routes: [{ name: 'MainTabs' }],
+              });
             },
           },
         ]
@@ -189,9 +255,15 @@ const ChildrenDataScreen: React.FC = () => {
             if (userData) {
               setUser(JSON.parse(userData));
             }
-            // Navegar al Home
+            // Marcar que se omitió el registro (se considera como "ya revisado")
+            await AsyncStorage.setItem('hasChildren', 'false');
+            console.log('⏭️ Usuario omitió el registro de hijos');
+            // Resetear la navegación al Home para limpiar el stack
             // @ts-ignore
-            navigation.navigate('MainTabs');
+            navigation.reset({
+              index: 0,
+              routes: [{ name: 'MainTabs' }],
+            });
           },
         },
       ]
@@ -248,10 +320,13 @@ const ChildrenDataScreen: React.FC = () => {
         <View style={styles.header}>
           <MunpaLogo size="large" />
           <Text style={styles.title}>
-            Datos de tus hijos
+            {isEditing ? 'Editar información' : 'Datos de tus hijos'}
           </Text>
           <Text style={styles.subtitle}>
-            {gender === 'F' ? 'Mamá' : 'Papá'}, cuéntanos sobre tus hijos
+            {isEditing 
+              ? 'Actualiza la información de tu hijo'
+              : `${gender === 'F' ? 'Mamá' : 'Papá'}, cuéntanos sobre tus hijos`
+            }
           </Text>
           
           {/* Información adicional para quienes esperan bebé(s) */}
@@ -361,19 +436,24 @@ const ChildrenDataScreen: React.FC = () => {
               disabled={isLoading}
             >
               <Text style={styles.buttonText}>
-                {isLoading ? 'Guardando...' : 'Guardar datos'}
+                {isLoading 
+                  ? (isEditing ? 'Actualizando...' : 'Guardando...') 
+                  : (isEditing ? 'Actualizar datos' : 'Guardar datos')
+                }
               </Text>
             </TouchableOpacity>
 
-            <TouchableOpacity
-              style={[styles.button, styles.secondaryButton]}
-              onPress={handleSkip}
-              disabled={isLoading}
-            >
-              <Text style={styles.secondaryButtonText}>
-                Omitir por ahora
-              </Text>
-            </TouchableOpacity>
+            {!isEditing && (
+              <TouchableOpacity
+                style={[styles.button, styles.secondaryButton]}
+                onPress={handleSkip}
+                disabled={isLoading}
+              >
+                <Text style={styles.secondaryButtonText}>
+                  Omitir por ahora
+                </Text>
+              </TouchableOpacity>
+            )}
           </View>
         </View>
       </ScrollView>

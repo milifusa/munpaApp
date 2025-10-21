@@ -2,7 +2,7 @@ import React from 'react';
 import { TouchableOpacity, Text, StyleSheet, View } from 'react-native';
 
 interface SocialLoginButtonProps {
-  type: 'google' | 'facebook';
+  type: 'google' | 'facebook' | 'apple';
   onPress: () => void;
   size?: 'small' | 'medium' | 'large';
 }
@@ -32,6 +32,10 @@ const SocialLoginButton: React.FC<SocialLoginButtonProps> = ({
         borderWidth: 1,
         borderColor: '#E0E0E0',
       };
+    } else if (type === 'apple') {
+      return {
+        backgroundColor: '#000000', // Apple black
+      };
     } else {
       return {
         backgroundColor: '#1877F2', // Facebook blue
@@ -53,6 +57,12 @@ const SocialLoginButton: React.FC<SocialLoginButtonProps> = ({
     }
   };
 
+  const getIcon = () => {
+    if (type === 'google') return 'G';
+    if (type === 'apple') return '';
+    return 'f';
+  };
+
   return (
     <TouchableOpacity
       style={[
@@ -64,7 +74,7 @@ const SocialLoginButton: React.FC<SocialLoginButtonProps> = ({
       activeOpacity={0.8}
     >
       <Text style={[styles.text, getTextStyles(), { fontSize }]}>
-        {type === 'google' ? 'G' : 'f'}
+        {getIcon()}
       </Text>
     </TouchableOpacity>
   );

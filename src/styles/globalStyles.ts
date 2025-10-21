@@ -41,7 +41,7 @@ export const colors = {
   
   // Colores de texto
   text: {
-    primary: '#000000',
+    primary: '#555555',
     secondary: '#7f8c8d',
     disabled: '#bdc3c7',
     inverse: '#ffffff',
@@ -79,10 +79,10 @@ export const typography = {
   
           // Familia de fuentes
         fontFamily: {
-          primary: 'Montserrat', // Fuente personalizada Montserrat Regular
-          logo: 'Montserrat-Bold', // Logo en negrita
-          heading: 'Montserrat-Bold', // Títulos en negrita
-          body: 'Montserrat', // Texto normal
+          primary: 'Hug Me Tight', // Fuente personalizada principal
+          logo: 'Hug Me Tight', // Logo con fuente personalizada
+          heading: 'Hug Me Tight', // Títulos con fuente personalizada
+          body: 'Hug Me Tight', // Texto normal con fuente personalizada
         },
   
   // Alturas de línea

@@ -9,11 +9,13 @@ import {
   Modal,
   TextInput,
 } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../contexts/AuthContext';
 import { authService } from '../services/api';
 
 
 const ProfileScreen: React.FC = () => {
+  const navigation = useNavigation();
   const { user, logout, updateProfile, changePassword, deleteAccount } = useAuth();
   const [showEditModal, setShowEditModal] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);

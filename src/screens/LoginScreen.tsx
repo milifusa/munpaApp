@@ -30,7 +30,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const { login } = useAuth();
+  const { login, loginWithGoogle, loginWithApple } = useAuth();
 
   const validateEmail = (email: string) => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -60,6 +60,40 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
       Alert.alert(
         'Error de inicio de sesión',
         error.response?.data?.message || 'Error al iniciar sesión'
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleGoogleLogin = async () => {
+    setIsLoading(true);
+    try {
+      await loginWithGoogle();
+    } catch (error: any) {
+      if (error.message === 'Login con Google cancelado') {
+        return; // No mostrar error si el usuario canceló
+      }
+      Alert.alert(
+        'Error de inicio de sesión',
+        error.response?.data?.message || error.message || 'Error al iniciar sesión con Google'
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleAppleLogin = async () => {
+    setIsLoading(true);
+    try {
+      await loginWithApple();
+    } catch (error: any) {
+      if (error.message === 'Login con Apple cancelado') {
+        return; // No mostrar error si el usuario canceló
+      }
+      Alert.alert(
+        'Error de inicio de sesión',
+        error.response?.data?.message || error.message || 'Error al iniciar sesión con Apple'
       );
     } finally {
       setIsLoading(false);
@@ -147,15 +181,20 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
           <View style={styles.socialButtons}>
             <SocialLoginButton
               type="google"
-              onPress={() => Alert.alert('Google', 'Login con Google próximamente')}
+              onPress={handleGoogleLogin}
               size="medium"
             />
-            <View style={styles.socialSpacer} />
-            <SocialLoginButton
-              type="facebook"
-              onPress={() => Alert.alert('Facebook', 'Login con Facebook próximamente')}
-              size="medium"
-            />
+            {/* Login con Apple - solo disponible en iOS */}
+            {Platform.OS === 'ios' && (
+              <>
+                <View style={styles.socialSpacer} />
+                <SocialLoginButton
+                  type="apple"
+                  onPress={handleAppleLogin}
+                  size="medium"
+                />
+              </>
+            )}
           </View>
         </View>
       </ScrollView>

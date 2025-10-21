@@ -13,6 +13,7 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '../contexts/AuthContext';
 import MunpaLogo from '../components/MunpaLogo';
+import { profileService } from '../services/api';
 import {
   colors,
   typography,
@@ -26,6 +27,8 @@ interface SignupScreenProps {
 }
 
 const SignupScreen: React.FC<SignupScreenProps> = ({ navigation }) => {
+  const { user, signup } = useAuth();
+  const [isProfileCompletionMode, setIsProfileCompletionMode] = useState(false);
   const [displayName, setDisplayName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -35,7 +38,23 @@ const SignupScreen: React.FC<SignupScreenProps> = ({ navigation }) => {
   const [pregnancyStatus, setPregnancyStatus] = useState<'none' | 'pregnant'>('none');
   const [isMultiplePregnancy, setIsMultiplePregnancy] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const { signup } = useAuth();
+
+  // Verificar si estamos en modo "completar perfil"
+  React.useEffect(() => {
+    const checkProfileCompletionMode = async () => {
+      const needsCompletion = await AsyncStorage.getItem('needsProfileCompletion');
+      const userData = await AsyncStorage.getItem('userData');
+      
+      if (needsCompletion === 'true' && userData) {
+        console.log('📝 Modo completar perfil activado');
+        setIsProfileCompletionMode(true);
+        const parsedUser = JSON.parse(userData);
+        setDisplayName(parsedUser.name || parsedUser.displayName || '');
+        setEmail(parsedUser.email || '');
+      }
+    };
+    checkProfileCompletionMode();
+  }, []);
 
   const validateEmail = (email: string) => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -56,43 +75,45 @@ const SignupScreen: React.FC<SignupScreenProps> = ({ navigation }) => {
   };
 
   const handleSignup = async () => {
-    console.log('📝 Iniciando validación de registro...');
+    console.log('📝 Iniciando validación...');
+    console.log('🔄 Modo completar perfil:', isProfileCompletionMode);
     
-    // Validación completa de todos los campos
+    // Validación del nombre (siempre requerido)
     if (!displayName.trim()) {
       console.log('❌ Validación fallida: Nombre vacío');
       Alert.alert('Error', 'Por favor ingresa tu nombre completo');
       return;
     }
 
-    if (!email.trim()) {
-      console.log('❌ Validación fallida: Email vacío');
-      Alert.alert('Error', 'Por favor ingresa tu correo electrónico');
-      return;
+    // Validaciones de email y contraseña solo si NO estamos en modo completar perfil
+    if (!isProfileCompletionMode) {
+      if (!email.trim()) {
+        console.log('❌ Validación fallida: Email vacío');
+        Alert.alert('Error', 'Por favor ingresa tu correo electrónico');
+        return;
+      }
+
+      if (!password.trim()) {
+        console.log('❌ Validación fallida: Contraseña vacía');
+        Alert.alert('Error', 'Por favor ingresa una contraseña');
+        return;
+      }
+
+      if (!validateEmail(email)) {
+        console.log('❌ Validación fallida: Email inválido');
+        Alert.alert('Error', 'Por favor ingresa un email válido');
+        return;
+      }
+
+      if (!validatePassword(password)) {
+        console.log('❌ Validación fallida: Contraseña no cumple requisitos');
+        Alert.alert(
+          'Error',
+          'La contraseña debe tener al menos 6 caracteres, una mayúscula, una minúscula y un número'
+        );
+        return;
+      }
     }
-
-    if (!password.trim()) {
-      console.log('❌ Validación fallida: Contraseña vacía');
-      Alert.alert('Error', 'Por favor ingresa una contraseña');
-      return;
-    }
-
-    if (!validateEmail(email)) {
-      console.log('❌ Validación fallida: Email inválido');
-      Alert.alert('Error', 'Por favor ingresa un email válido');
-      return;
-    }
-
-    if (!validatePassword(password)) {
-      console.log('❌ Validación fallida: Contraseña no cumple requisitos');
-      Alert.alert(
-        'Error',
-        'La contraseña debe tener al menos 6 caracteres, una mayúscula, una minúscula y un número'
-      );
-      return;
-    }
-
-
 
     if (!gender) {
       console.log('❌ Validación fallida: Género no seleccionado');
@@ -142,15 +163,29 @@ const SignupScreen: React.FC<SignupScreenProps> = ({ navigation }) => {
       return;
     }
 
-    console.log('✅ Validación exitosa, iniciando registro...');
-    console.log('📊 Datos a enviar:', { email, displayName, gender, childrenCount, pregnancyStatus });
+    console.log('✅ Validación exitosa...');
     setIsLoading(true);
     try {
-      // Para el registro inicial, NO enviar isPregnant si está embarazada
-      // porque no tenemos las semanas de gestación aún
-      const isPregnantForSignup = pregnancyStatus === 'pregnant' ? false : false;
-      await signup(email, password, displayName.trim(), gender, childrenCount, isPregnantForSignup);
-      console.log('✅ Registro completado exitosamente');
+      if (isProfileCompletionMode) {
+        // Modo completar perfil: actualizar perfil existente
+        console.log('📊 Actualizando perfil con:', { displayName, gender, childrenCount, isPregnant: pregnancyStatus === 'pregnant' });
+        await profileService.updateProfile({
+          displayName: displayName.trim(),
+          gender,
+          childrenCount,
+          isPregnant: pregnancyStatus === 'pregnant',
+        });
+        console.log('✅ Perfil actualizado exitosamente');
+        
+        // Limpiar flag de completar perfil
+        await AsyncStorage.removeItem('needsProfileCompletion');
+      } else {
+        // Modo registro normal
+        console.log('📊 Datos a enviar:', { email, displayName, gender, childrenCount, pregnancyStatus });
+        const isPregnantForSignup = pregnancyStatus === 'pregnant' ? false : false;
+        await signup(email, password, displayName.trim(), gender, childrenCount, isPregnantForSignup);
+        console.log('✅ Registro completado exitosamente');
+      }
       
       // Si hay hijos o está embarazada/esperando, navegar a la pantalla de datos de hijos
       if (childrenCount > 0 || pregnancyStatus !== 'none') {
@@ -205,7 +240,14 @@ const SignupScreen: React.FC<SignupScreenProps> = ({ navigation }) => {
 
         {/* Título de la pantalla */}
         <View style={styles.titleContainer}>
-          <Text style={styles.screenTitle}>Crea tu cuenta</Text>
+          <Text style={styles.screenTitle}>
+            {isProfileCompletionMode ? 'Completa tu perfil' : 'Crea tu cuenta'}
+          </Text>
+          {isProfileCompletionMode && (
+            <Text style={styles.subtitle}>
+              Para comenzar, cuéntanos un poco sobre ti
+            </Text>
+          )}
         </View>
 
         {/* Formulario */}
@@ -220,63 +262,69 @@ const SignupScreen: React.FC<SignupScreenProps> = ({ navigation }) => {
               value={displayName}
               onChangeText={setDisplayName}
               autoCapitalize="words"
+              editable={!isProfileCompletionMode}
             />
           </View>
 
-          {/* Campo Email */}
-          <View style={styles.inputContainer}>
-            <Text style={styles.labelText}>Correo electrónico *</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="tu@email.com"
-              placeholderTextColor="#FFFFFF"
-              value={email}
-              onChangeText={setEmail}
-              keyboardType="email-address"
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
-          </View>
-
-          {/* Campo Contraseña */}
-          <View style={styles.inputContainer}>
-            <Text style={styles.labelText}>Contraseña *</Text>
-            <View style={styles.passwordContainer}>
-              <TextInput
-                style={[styles.input, styles.passwordInput]}
-                placeholder="Tu contraseña"
-                placeholderTextColor="#FFFFFF"
-                value={password}
-                onChangeText={setPassword}
-                secureTextEntry={!showPassword}
-                autoCapitalize="none"
-              />
-              <TouchableOpacity
-                style={styles.eyeButton}
-                onPress={() => setShowPassword(!showPassword)}
-              >
-                <Text style={styles.eyeIcon}>
-                  {showPassword ? '👁️' : '🙈'}
-                </Text>
-              </TouchableOpacity>
-            </View>
-            {password.length > 0 && (
-              <View style={styles.passwordStrength}>
-                <View style={styles.strengthBar}>
-                  <View
-                    style={[
-                      styles.strengthFill,
-                      {
-                        width: `${(passwordStrength.strength / 3) * 100}%`,
-                        backgroundColor: passwordStrength.color,
-                      },
-                    ]}
-                  />
-                </View>
-                <Text style={styles.strengthText}>{passwordStrength.text}</Text>
+          {/* Campos Email y Contraseña - solo en modo registro */}
+          {!isProfileCompletionMode && (
+            <>
+              {/* Campo Email */}
+              <View style={styles.inputContainer}>
+                <Text style={styles.labelText}>Correo electrónico *</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="tu@email.com"
+                  placeholderTextColor="#FFFFFF"
+                  value={email}
+                  onChangeText={setEmail}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
               </View>
-            )}
-          </View>
+
+              {/* Campo Contraseña */}
+              <View style={styles.inputContainer}>
+                <Text style={styles.labelText}>Contraseña *</Text>
+                <View style={styles.passwordContainer}>
+                  <TextInput
+                    style={[styles.input, styles.passwordInput]}
+                    placeholder="Tu contraseña"
+                    placeholderTextColor="#FFFFFF"
+                    value={password}
+                    onChangeText={setPassword}
+                    secureTextEntry={!showPassword}
+                    autoCapitalize="none"
+                  />
+                  <TouchableOpacity
+                    style={styles.eyeButton}
+                    onPress={() => setShowPassword(!showPassword)}
+                  >
+                    <Text style={styles.eyeIcon}>
+                      {showPassword ? '👁️' : '🙈'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+                {password.length > 0 && (
+                  <View style={styles.passwordStrength}>
+                    <View style={styles.strengthBar}>
+                      <View
+                        style={[
+                          styles.strengthFill,
+                          {
+                            width: `${(passwordStrength.strength / 3) * 100}%`,
+                            backgroundColor: passwordStrength.color,
+                          },
+                        ]}
+                      />
+                    </View>
+                    <Text style={styles.strengthText}>{passwordStrength.text}</Text>
+                  </View>
+                )}
+              </View>
+            </>
+          )}
 
 
 
@@ -413,29 +461,35 @@ const SignupScreen: React.FC<SignupScreenProps> = ({ navigation }) => {
             </View>
           )}
 
-          {/* Botón Registro */}
+          {/* Botón Registro / Continuar */}
           <TouchableOpacity
             style={[styles.signupButton, isLoading && styles.buttonDisabled]}
             onPress={handleSignup}
             disabled={isLoading}
           >
             {isLoading ? (
-              <Text style={styles.signupButtonText}>Creando cuenta...</Text>
+              <Text style={styles.signupButtonText}>
+                {isProfileCompletionMode ? 'Guardando...' : 'Creando cuenta...'}
+              </Text>
             ) : (
-              <Text style={styles.signupButtonText}>CREAR CUENTA</Text>
+              <Text style={styles.signupButtonText}>
+                {isProfileCompletionMode ? 'CONTINUAR' : 'CREAR CUENTA'}
+              </Text>
             )}
           </TouchableOpacity>
         </View>
 
-        {/* Enlaces */}
-        <View style={styles.linksContainer}>
-          <TouchableOpacity
-            style={styles.linkButton}
-            onPress={() => navigation.navigate('Login')}
-          >
-            <Text style={styles.linkText}>¿Ya tienes una cuenta? Inicia sesión</Text>
-          </TouchableOpacity>
-        </View>
+        {/* Enlaces - solo en modo registro */}
+        {!isProfileCompletionMode && (
+          <View style={styles.linksContainer}>
+            <TouchableOpacity
+              style={styles.linkButton}
+              onPress={() => navigation.navigate('Login')}
+            >
+              <Text style={styles.linkText}>¿Ya tienes una cuenta? Inicia sesión</Text>
+            </TouchableOpacity>
+          </View>
+        )}
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -467,6 +521,13 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     textAlign: 'center',
     marginBottom: spacing.sm,
+  },
+  subtitle: {
+    color: colors.white,
+    fontSize: typography.sizes.base,
+    textAlign: 'center',
+    opacity: 0.8,
+    marginTop: spacing.xs,
   },
   form: {
     backgroundColor: 'transparent',
