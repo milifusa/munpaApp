@@ -7,6 +7,7 @@ import {
   Dimensions,
   Modal,
   ScrollView,
+  Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
@@ -26,7 +27,7 @@ const GlobalMenu: React.FC<GlobalMenuProps> = ({ visible, onClose }) => {
   const menuItems = [
     {
       id: 'home',
-      title: '🏠 Inicio',
+      title: 'Inicio',
       icon: 'home',
       onPress: () => {
         onClose();
@@ -36,7 +37,7 @@ const GlobalMenu: React.FC<GlobalMenuProps> = ({ visible, onClose }) => {
     },
     {
       id: 'doula',
-      title: '💬 DOULI Chat',
+      title: 'DOULI Chat',
       icon: 'heart',
       onPress: () => {
         onClose();
@@ -46,7 +47,7 @@ const GlobalMenu: React.FC<GlobalMenuProps> = ({ visible, onClose }) => {
     },
     {
       id: 'children',
-      title: '👶 Datos de Hijos',
+      title: 'Datos de Hijos',
       icon: 'people',
       onPress: () => {
         onClose();
@@ -56,17 +57,17 @@ const GlobalMenu: React.FC<GlobalMenuProps> = ({ visible, onClose }) => {
     },
     {
       id: 'profile',
-      title: '👤 Mi Perfil',
+      title: 'Mi Perfil',
       icon: 'person',
       onPress: () => {
         onClose();
         // @ts-ignore
-        navigation.navigate('MainTabs', { screen: 'Profile' });
+        navigation.navigate('Profile');
       },
     },
     {
       id: 'settings',
-      title: '⚙️ Configuración',
+      title: 'Configuración',
       icon: 'settings',
       onPress: () => {
         onClose();
@@ -75,7 +76,7 @@ const GlobalMenu: React.FC<GlobalMenuProps> = ({ visible, onClose }) => {
     },
     {
       id: 'logout',
-      title: '🚪 Cerrar Sesión',
+      title: 'Cerrar Sesión',
       icon: 'log-out',
       onPress: () => {
         onClose();
@@ -97,9 +98,16 @@ const GlobalMenu: React.FC<GlobalMenuProps> = ({ visible, onClose }) => {
           {/* Header del menú */}
           <View style={styles.menuHeader}>
             <View style={styles.userInfo}>
-              <View style={styles.avatar}>
-                <Ionicons name="person" size={40} color="#887CBC" />
-              </View>
+              {user?.photoURL ? (
+                <Image
+                  source={{ uri: user.photoURL }}
+                  style={styles.avatar}
+                />
+              ) : (
+                <View style={styles.avatar}>
+                  <Ionicons name="person" size={40} color="#887CBC" />
+                </View>
+              )}
               <View style={styles.userDetails}>
                 <Text style={styles.userName}>
                   ¡Hola {user?.displayName || 'Mishuuu'}!
@@ -109,13 +117,6 @@ const GlobalMenu: React.FC<GlobalMenuProps> = ({ visible, onClose }) => {
             </View>
             <TouchableOpacity style={styles.closeButton} onPress={onClose}>
               <Ionicons name="close" size={24} color="#666" />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.refreshButton} onPress={() => {
-              // Recargar datos del usuario
-              console.log('🔄 Refrescando datos del usuario...');
-              console.log('👤 Usuario actual:', user);
-            }}>
-              <Ionicons name="refresh" size={20} color="#666" />
             </TouchableOpacity>
           </View>
 
@@ -191,6 +192,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 15,
+    overflow: 'hidden',
   },
   userDetails: {
     flex: 1,
@@ -209,12 +211,6 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 60,
     right: 20,
-    padding: 8,
-  },
-  refreshButton: {
-    position: 'absolute',
-    top: 60,
-    left: 20,
     padding: 8,
   },
   menuList: {

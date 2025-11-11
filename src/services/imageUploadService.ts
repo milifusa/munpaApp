@@ -1,4 +1,4 @@
-import api from './api';
+import { axiosInstance } from './api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Servicio para subir imágenes y obtener URLs
@@ -45,7 +45,7 @@ export const imageUploadService = {
       console.log('📤 [IMAGE UPLOAD] Llamando a API con FormData:', formData);
       console.log('📤 [IMAGE UPLOAD] Llamando a API con config:', config);
       
-      const response = await api.post('/api/communities/upload-photo', formData, config);
+      const response = await axiosInstance.post('/api/communities/upload-photo', formData, config);
       
       console.log('✅ [IMAGE UPLOAD] Imagen subida exitosamente a /api/communities/upload-photo:', response.data);
       console.log('🖼️ [IMAGE UPLOAD] Estructura de respuesta:', {
@@ -90,5 +90,10 @@ export const imageUploadService = {
   // Subir imagen para hijos
   uploadChildImage: async (uri: string) => {
     return await imageUploadService.uploadImage(uri, 'child');
+  },
+
+  // Subir imagen para marketplace
+  uploadMarketplaceImage: async (uri: string) => {
+    return await imageUploadService.uploadImage(uri, 'marketplace');
   }
 };

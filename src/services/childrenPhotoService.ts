@@ -1,4 +1,4 @@
-import api from './api';
+import { axiosInstance } from './api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Tipos de datos para hijos con foto
@@ -50,7 +50,7 @@ export const childrenPhotoService = {
       };
 
       // Subir foto al servidor (que la subirá a Firebase Storage)
-      const response = await api.post('/api/auth/children/upload-photo', formData, config);
+      const response = await axiosInstance.post('/api/auth/children/upload-photo', formData, config);
       
       console.log('✅ [FIREBASE] Foto subida exitosamente:', response.data);
       return response.data.data.photoUrl;
@@ -65,7 +65,7 @@ export const childrenPhotoService = {
     console.log('🗑️ [FIREBASE] Eliminando foto de hijo:', childId);
     
     try {
-      const response = await api.delete(`/api/auth/children/${childId}/photo`);
+      const response = await axiosInstance.delete(`/api/auth/children/${childId}/photo`);
       console.log('✅ [FIREBASE] Foto eliminada:', response.data);
       return response.data;
     } catch (error) {
@@ -79,7 +79,7 @@ export const childrenPhotoService = {
     console.log('📸 [FIREBASE] Actualizando foto para hijo:', childId);
     
     try {
-      const response = await api.put(`/api/auth/children/${childId}`, {
+      const response = await axiosInstance.put(`/api/auth/children/${childId}`, {
         photoUrl: photoUrl
       });
       console.log('✅ [FIREBASE] Foto actualizada:', response.data);

@@ -14,6 +14,14 @@
       },
       "oauth_client": [
         {
+          "client_id": "975014449237-860t1fdicttqsvn2dk27s1n5eo26knn8.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.munpa.app",
+            "certificate_hash": "482ffda28ed6a176b62f40a97b1a5e644cdeb398"
+          }
+        },
+        {
           "client_id": "975014449237-9crsati0bs65e787cb5no3ntu2utmqe1.apps.googleusercontent.com",
           "client_type": 3
         }
@@ -29,6 +37,14 @@
             {
               "client_id": "975014449237-9crsati0bs65e787cb5no3ntu2utmqe1.apps.googleusercontent.com",
               "client_type": 3
+            },
+            {
+              "client_id": "975014449237-1d0vk75uqm3oqd3psjmcjvc1la9232kb.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.munpa.app",
+                "app_store_id": "6754290929"
+              }
             }
           ]
         }

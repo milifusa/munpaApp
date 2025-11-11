@@ -13,14 +13,18 @@ import {
   KeyboardAvoidingView,
   Platform,
   Image,
+  Dimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '../contexts/AuthContext';
 import { listsService } from '../services/api';
 import { imageUploadService } from '../services/imageUploadService';
 import { List } from '../types/lists';
+
+const { width } = Dimensions.get('window');
 
 // Función para calcular estadísticas de lista correctamente
 const calculateListStats = (list: any) => {
@@ -76,6 +80,7 @@ const ListsScreen = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState<'my' | 'public'>('my');
+  const [hasAutoSwitched, setHasAutoSwitched] = useState(false);
 
   // Estados del modal de crear lista
   const [isCreateModalVisible, setIsCreateModalVisible] = useState(false);
@@ -193,6 +198,15 @@ const ListsScreen = () => {
     }
   }, [isAuthenticated]);
 
+  // Cambiar automáticamente a tab de públicas si no hay listas propias (solo en primera carga)
+  useEffect(() => {
+    if (!isLoading && !hasAutoSwitched && myLists.length === 0 && publicLists.length > 0 && activeTab === 'my') {
+      console.log('🔄 [LISTS SCREEN] No hay listas propias, cambiando a tab de públicas');
+      setActiveTab('public');
+      setHasAutoSwitched(true);
+    }
+  }, [myLists, publicLists, isLoading, activeTab, hasAutoSwitched]);
+
   // Funciones del modal
   const handleCreateList = async () => {
     if (!newList.title.trim()) {
@@ -237,6 +251,8 @@ const ListsScreen = () => {
             text: 'Ver Lista',
             onPress: () => {
               resetCreateForm();
+              setHasAutoSwitched(false); // Resetear flag al crear lista
+              setActiveTab('my'); // Cambiar a mis listas
               loadMyLists(); // Recargar mis listas
               // Navegar a la lista creada
               navigation.navigate('ListDetail', {
@@ -280,7 +296,7 @@ const ListsScreen = () => {
       }
 
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: ['images'],
         allowsEditing: true,
         aspect: [16, 9],
         quality: 0.8,
@@ -344,6 +360,8 @@ const ListsScreen = () => {
           {
             text: 'Ver Lista',
             onPress: () => {
+              setHasAutoSwitched(false); // Resetear flag al copiar lista
+              setActiveTab('my'); // Cambiar a mis listas
               loadMyLists();
               navigation.navigate('ListDetail', {
                 listId: result.data.listId,
@@ -351,7 +369,14 @@ const ListsScreen = () => {
               });
             }
           },
-          { text: 'OK' }
+          { 
+            text: 'OK',
+            onPress: () => {
+              setHasAutoSwitched(false); // Resetear flag
+              setActiveTab('my'); // Cambiar a mis listas
+              loadMyLists();
+            }
+          }
         ]
       );
     } catch (error: any) {
@@ -392,34 +417,67 @@ const ListsScreen = () => {
   return (
     <View style={styles.container}>
       {/* Header con tabs */}
-      <View style={styles.header}>
-        <View style={styles.tabsContainer}>
-          <TouchableOpacity
-            style={[styles.tab, activeTab === 'my' && styles.activeTab]}
-            onPress={() => setActiveTab('my')}
-          >
-            <Text style={[styles.tabText, activeTab === 'my' && styles.activeTabText]}>
-              Mis Listas ({myLists.length})
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.tab, activeTab === 'public' && styles.activeTab]}
-            onPress={() => setActiveTab('public')}
-          >
-            <Text style={[styles.tabText, activeTab === 'public' && styles.activeTabText]}>
-              Públicas ({publicLists.length})
-            </Text>
-          </TouchableOpacity>
+      <LinearGradient
+        colors={['#887CBC', '#59C6C0']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 0 }}
+        style={styles.headerGradient}
+      >
+        <View style={styles.header}>
+          <View style={styles.headerTop}>
+            <View style={styles.headerTitleContainer}>
+              <Ionicons name="list" size={28} color="white" />
+              <Text style={styles.headerTitle}>Mis Listas</Text>
+            </View>
+            {/* Botón crear lista */}
+            <TouchableOpacity
+              style={styles.createButton}
+              onPress={() => setIsCreateModalVisible(true)}
+            >
+              <Ionicons name="add-circle" size={32} color="white" />
+            </TouchableOpacity>
+          </View>
+          
+          <View style={styles.tabsContainer}>
+            <TouchableOpacity
+              style={[styles.tab, activeTab === 'my' && styles.activeTab]}
+              onPress={() => setActiveTab('my')}
+            >
+              <Ionicons 
+                name={activeTab === 'my' ? "folder" : "folder-outline"} 
+                size={18} 
+                color={activeTab === 'my' ? "white" : "rgba(255,255,255,0.7)"} 
+              />
+              <Text style={[styles.tabText, activeTab === 'my' && styles.activeTabText]}>
+                Mis Listas
+              </Text>
+              <View style={[styles.tabBadge, activeTab === 'my' && styles.activeTabBadge]}>
+                <Text style={[styles.tabBadgeText, activeTab === 'my' && styles.activeTabBadgeText]}>
+                  {myLists.length}
+                </Text>
+              </View>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.tab, activeTab === 'public' && styles.activeTab]}
+              onPress={() => setActiveTab('public')}
+            >
+              <Ionicons 
+                name={activeTab === 'public' ? "globe" : "globe-outline"} 
+                size={18} 
+                color={activeTab === 'public' ? "white" : "rgba(255,255,255,0.7)"} 
+              />
+              <Text style={[styles.tabText, activeTab === 'public' && styles.activeTabText]}>
+                Públicas
+              </Text>
+              <View style={[styles.tabBadge, activeTab === 'public' && styles.activeTabBadge]}>
+                <Text style={[styles.tabBadgeText, activeTab === 'public' && styles.activeTabBadgeText]}>
+                  {publicLists.length}
+                </Text>
+              </View>
+            </TouchableOpacity>
+          </View>
         </View>
-        
-        {/* Botón crear lista */}
-        <TouchableOpacity
-          style={styles.createButton}
-          onPress={() => setIsCreateModalVisible(true)}
-        >
-          <Ionicons name="add" size={24} color="white" />
-        </TouchableOpacity>
-      </View>
+      </LinearGradient>
 
       {/* Contenido */}
       <ScrollView
@@ -599,68 +657,101 @@ const MyListsTab = ({ lists, onListPress, onRefresh }: {
 
   return (
     <View style={styles.tabContent}>
-      {lists.map((list) => (
-        <TouchableOpacity
-          key={list.id}
-          style={styles.listCard}
-          onPress={() => onListPress(list)}
-        >
-          <View style={styles.listHeader}>
-            <View style={styles.listImageContainer}>
-              {list.imageUrl ? (
-                <Image source={{ uri: list.imageUrl }} style={styles.listImage} />
-              ) : (
-                <View style={styles.listIcon}>
-                  <Ionicons 
-                    name={list.isPublic ? "globe" : "lock-closed"} 
-                    size={20} 
-                    color={list.isPublic ? "#32CD32" : "#FF6B6B"} 
-                  />
-                </View>
-              )}
-            </View>
-            <View style={styles.listInfo}>
-              <Text style={styles.listTitle}>{list.title.charAt(0).toUpperCase() + list.title.slice(1).toLowerCase()}</Text>
-              {list.description && (
-                <Text style={styles.listDescription} numberOfLines={2}>
-                  {list.description}
-                </Text>
-              )}
-              <View style={styles.listMetadata}>
-                <View style={[styles.privacyBadge, list.isPublic ? styles.publicBadge : styles.privateBadge]}>
-                  <Ionicons 
-                    name={list.isPublic ? "globe" : "lock-closed"} 
-                    size={12} 
-                    color="white" 
-                  />
-                  <Text style={styles.privacyText}>
-                    {list.isPublic ? "Pública" : "Privada"}
-                  </Text>
-                </View>
-              </View>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color="#CCC" />
-          </View>
-          
-          <View style={styles.listStats}>
-            <View style={styles.stat}>
-              {(() => {
-                const icon = getProgressIcon(list.completedItemsCount || 0, list.itemsCount || 0);
-                return <Ionicons name={icon.name as any} size={16} color={icon.color} />;
-              })()}
-              <Text style={styles.statText}>
-                {list.completedItemsCount || 0}/{list.itemsCount || 0} completados
-              </Text>
-            </View>
-            {list.isPublic && (
-              <View style={styles.stat}>
-                <Ionicons name="star" size={16} color="#FFD700" />
-                <Text style={styles.statText}>{list.starsCount || 0} estrellas</Text>
+      {lists.map((list) => {
+        const progress = list.itemsCount ? (list.completedItemsCount || 0) / list.itemsCount : 0;
+        const progressPercent = Math.round(progress * 100);
+        
+        return (
+          <TouchableOpacity
+            key={list.id}
+            style={styles.listCard}
+            onPress={() => onListPress(list)}
+          >
+            {/* Progress bar superior */}
+            {list.itemsCount > 0 && (
+              <View style={styles.progressBarContainer}>
+                <View style={[styles.progressBar, { width: `${progressPercent}%` }]} />
               </View>
             )}
-          </View>
-        </TouchableOpacity>
-      ))}
+            
+            <View style={styles.cardContent}>
+              <View style={styles.listHeader}>
+                <View style={styles.listImageContainer}>
+                  {list.imageUrl ? (
+                    <Image source={{ uri: list.imageUrl }} style={styles.listImage} />
+                  ) : (
+                    <LinearGradient
+                      colors={list.isPublic ? ['#4CAF50', '#8BC34A'] : ['#FF6B6B', '#FF8E8E']}
+                      style={styles.listIcon}
+                    >
+                      <Ionicons 
+                        name={list.isPublic ? "globe" : "lock-closed"} 
+                        size={24} 
+                        color="white" 
+                      />
+                    </LinearGradient>
+                  )}
+                </View>
+                <View style={styles.listInfo}>
+                  <View style={styles.titleRow}>
+                    <Text style={styles.listTitle} numberOfLines={1}>
+                      {list.title.charAt(0).toUpperCase() + list.title.slice(1).toLowerCase()}
+                    </Text>
+                    {progressPercent === 100 && list.itemsCount > 0 && (
+                      <View style={styles.completedBadge}>
+                        <Ionicons name="checkmark-circle" size={20} color="#4CAF50" />
+                      </View>
+                    )}
+                  </View>
+                  {list.description && (
+                    <Text style={styles.listDescription} numberOfLines={2}>
+                      {list.description}
+                    </Text>
+                  )}
+                  <View style={styles.listMetadata}>
+                    <View style={[styles.privacyBadge, list.isPublic ? styles.publicBadge : styles.privateBadge]}>
+                      <Ionicons 
+                        name={list.isPublic ? "globe" : "lock-closed"} 
+                        size={10} 
+                        color="white" 
+                      />
+                      <Text style={styles.privacyText}>
+                        {list.isPublic ? "Pública" : "Privada"}
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+                <Ionicons name="chevron-forward" size={22} color="#CCC" />
+              </View>
+              
+              <View style={styles.listStats}>
+                <View style={styles.stat}>
+                  <View style={styles.statIconContainer}>
+                    {(() => {
+                      const icon = getProgressIcon(list.completedItemsCount || 0, list.itemsCount || 0);
+                      return <Ionicons name={icon.name as any} size={18} color={icon.color} />;
+                    })()}
+                  </View>
+                  <Text style={styles.statText}>
+                    {list.completedItemsCount || 0}/{list.itemsCount || 0}
+                  </Text>
+                  {list.itemsCount > 0 && (
+                    <Text style={styles.statPercent}>({progressPercent}%)</Text>
+                  )}
+                </View>
+                {list.isPublic && (
+                  <View style={styles.stat}>
+                    <View style={styles.statIconContainer}>
+                      <Ionicons name="star" size={18} color="#FFD700" />
+                    </View>
+                    <Text style={styles.statText}>{list.starsCount || 0}</Text>
+                  </View>
+                )}
+              </View>
+            </View>
+          </TouchableOpacity>
+        );
+      })}
     </View>
   );
 };
@@ -690,82 +781,123 @@ const PublicListsTab = ({ lists, onListPress, onCopyList, onToggleStar, onRefres
 
   return (
     <View style={styles.tabContent}>
-      {lists.map((list) => (
-        <View key={list.id} style={styles.publicListCard}>
-          <TouchableOpacity
-            style={styles.listCardContent}
-            onPress={() => onListPress(list)}
-          >
-            <View style={styles.listHeader}>
-              <View style={styles.listImageContainer}>
-                {list.imageUrl ? (
-                  <Image source={{ uri: list.imageUrl }} style={styles.listImage} />
-                ) : (
-                  <View style={styles.publicListIcon}>
-                    <Ionicons name="globe" size={20} color="#32CD32" />
-                  </View>
-                )}
+      {lists.map((list) => {
+        const progress = list.itemsCount ? (list.completedItemsCount || 0) / list.itemsCount : 0;
+        const progressPercent = Math.round(progress * 100);
+        
+        return (
+          <View key={list.id} style={styles.publicListCard}>
+            {/* Progress bar superior */}
+            {list.itemsCount > 0 && (
+              <View style={styles.progressBarContainer}>
+                <View style={[styles.progressBar, { width: `${progressPercent}%`, backgroundColor: '#4CAF50' }]} />
               </View>
-              <View style={styles.listInfo}>
-                <Text style={styles.listTitle}>{list.title.charAt(0).toUpperCase() + list.title.slice(1).toLowerCase()}</Text>
-                <Text style={styles.listAuthor}>por {list.creatorName}</Text>
-                {list.description && (
-                  <Text style={styles.listDescription} numberOfLines={2}>
-                    {list.description}
-                  </Text>
-                )}
-                <View style={styles.listMetadata}>
-                  <View style={[styles.privacyBadge, styles.publicBadge]}>
-                    <Ionicons name="globe" size={12} color="white" />
-                    <Text style={styles.privacyText}>Pública</Text>
+            )}
+            
+            <TouchableOpacity
+              style={styles.listCardContent}
+              onPress={() => onListPress(list)}
+            >
+              <View style={styles.cardContent}>
+                <View style={styles.listHeader}>
+                  <View style={styles.listImageContainer}>
+                    {list.imageUrl ? (
+                      <Image source={{ uri: list.imageUrl }} style={styles.listImage} />
+                    ) : (
+                      <LinearGradient
+                        colors={['#4CAF50', '#8BC34A']}
+                        style={styles.listIcon}
+                      >
+                        <Ionicons name="globe" size={24} color="white" />
+                      </LinearGradient>
+                    )}
+                  </View>
+                  <View style={styles.listInfo}>
+                    <View style={styles.titleRow}>
+                      <Text style={styles.listTitle} numberOfLines={1}>
+                        {list.title.charAt(0).toUpperCase() + list.title.slice(1).toLowerCase()}
+                      </Text>
+                      {progressPercent === 100 && list.itemsCount > 0 && (
+                        <View style={styles.completedBadge}>
+                          <Ionicons name="checkmark-circle" size={20} color="#4CAF50" />
+                        </View>
+                      )}
+                    </View>
+                    <Text style={styles.listAuthor}>
+                      <Ionicons name="person" size={12} color="#59C6C0" /> {list.creatorName}
+                    </Text>
+                    {list.description && (
+                      <Text style={styles.listDescription} numberOfLines={2}>
+                        {list.description}
+                      </Text>
+                    )}
+                    <View style={styles.listMetadata}>
+                      <View style={[styles.privacyBadge, styles.publicBadge]}>
+                        <Ionicons name="globe" size={10} color="white" />
+                        <Text style={styles.privacyText}>Pública</Text>
+                      </View>
+                    </View>
+                  </View>
+                </View>
+                
+                <View style={styles.listStats}>
+                  <View style={styles.stat}>
+                    <View style={styles.statIconContainer}>
+                      {(() => {
+                        const icon = getProgressIcon(list.completedItemsCount || 0, list.itemsCount || 0);
+                        return <Ionicons name={icon.name as any} size={18} color={icon.color} />;
+                      })()}
+                    </View>
+                    <Text style={styles.statText}>
+                      {list.completedItemsCount || 0}/{list.itemsCount || 0}
+                    </Text>
+                    {list.itemsCount > 0 && (
+                      <Text style={styles.statPercent}>({progressPercent}%)</Text>
+                    )}
+                  </View>
+                  <View style={styles.stat}>
+                    <View style={styles.statIconContainer}>
+                      <Ionicons name="star" size={18} color="#FFD700" />
+                    </View>
+                    <Text style={styles.statText}>{list.starsCount || 0}</Text>
+                  </View>
+                  <View style={styles.stat}>
+                    <View style={styles.statIconContainer}>
+                      <Ionicons name="chatbubble" size={18} color="#59C6C0" />
+                    </View>
+                    <Text style={styles.statText}>{list.commentsCount || 0}</Text>
                   </View>
                 </View>
               </View>
-            </View>
-            
-            <View style={styles.listStats}>
-              <View style={styles.stat}>
-                {(() => {
-                  const icon = getProgressIcon(list.completedItemsCount || 0, list.itemsCount || 0);
-                  return <Ionicons name={icon.name as any} size={16} color={icon.color} />;
-                })()}
-                <Text style={styles.statText}>
-                  {list.completedItemsCount || 0}/{list.itemsCount || 0} completados
-                </Text>
-              </View>
-              <View style={styles.stat}>
-                <Ionicons name="star" size={16} color="#FFD700" />
-                <Text style={styles.statText}>{list.starsCount || 0}</Text>
-              </View>
-              <View style={styles.stat}>
-                <Ionicons name="chatbubble" size={16} color="#59C6C0" />
-                <Text style={styles.statText}>{list.commentsCount || 0}</Text>
-              </View>
-            </View>
-          </TouchableOpacity>
+            </TouchableOpacity>
 
-          {/* Botones de acción */}
-          <View style={styles.publicListActions}>
-            <TouchableOpacity
-              style={[styles.actionButton, list.isStarred && styles.starredButton]}
-              onPress={() => onToggleStar(list.id)}
-            >
-              <Ionicons 
-                name={list.isStarred ? "star" : "star-outline"} 
-                size={18} 
-                color={list.isStarred ? "#FFD700" : "#666"} 
-              />
-            </TouchableOpacity>
-            
-            <TouchableOpacity
-              style={styles.actionButton}
-              onPress={() => onCopyList(list)}
-            >
-              <Ionicons name="copy-outline" size={18} color="#59C6C0" />
-            </TouchableOpacity>
+            {/* Botones de acción */}
+            <View style={styles.publicListActions}>
+              <TouchableOpacity
+                style={[styles.actionButton, list.isStarred && styles.starredButton]}
+                onPress={() => onToggleStar(list.id)}
+              >
+                <Ionicons 
+                  name={list.isStarred ? "star" : "star-outline"} 
+                  size={20} 
+                  color={list.isStarred ? "#FFD700" : "#999"} 
+                />
+                <Text style={[styles.actionButtonText, list.isStarred && styles.starredText]}>
+                  {list.isStarred ? 'Destacada' : 'Destacar'}
+                </Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={styles.addListButton}
+                onPress={() => onCopyList(list)}
+              >
+                <Ionicons name="add-circle" size={20} color="white" />
+                <Text style={styles.addListButtonText}>Agregar Lista</Text>
+              </TouchableOpacity>
+            </View>
           </View>
-        </View>
-      ))}
+        );
+      })}
     </View>
   );
 };
@@ -773,10 +905,11 @@ const PublicListsTab = ({ lists, onListPress, onCopyList, onToggleStar, onRefres
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#F5F7FA',
   },
   scrollView: {
     flex: 1,
+    backgroundColor: '#F5F7FA',
   },
   
   // Loading
@@ -784,7 +917,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#F5F7FA',
   },
   loadingText: {
     marginTop: 10,
@@ -793,116 +926,178 @@ const styles = StyleSheet.create({
   },
 
   // Header con tabs
+  headerGradient: {
+    paddingTop: 50,
+    paddingBottom: 20,
+  },
   header: {
-    backgroundColor: '#F8F9FA',
-    paddingTop: 10,
-    paddingBottom: 15,
     paddingHorizontal: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E0E0E0',
+  },
+  headerTop: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    marginBottom: 20,
+  },
+  headerTitleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  headerTitle: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: 'white',
   },
   tabsContainer: {
     flexDirection: 'row',
-    flex: 1,
+    gap: 10,
   },
   tab: {
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    marginRight: 15,
-    borderRadius: 20,
-    backgroundColor: 'transparent',
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    gap: 8,
   },
   activeTab: {
-    backgroundColor: '#59C6C0',
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
   },
   tabText: {
     fontSize: 14,
-    fontWeight: '500',
-    color: '#666',
+    fontWeight: '600',
+    color: 'rgba(255, 255, 255, 0.8)',
   },
   activeTabText: {
+    color: '#887CBC',
+  },
+  tabBadge: {
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+    minWidth: 24,
+    alignItems: 'center',
+  },
+  activeTabBadge: {
+    backgroundColor: '#887CBC',
+  },
+  tabBadgeText: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: 'rgba(255, 255, 255, 0.9)',
+  },
+  activeTabBadgeText: {
     color: 'white',
   },
   createButton: {
-    backgroundColor: '#59C6C0',
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 5,
   },
 
   // Contenido de tabs
   tabContent: {
     padding: 20,
+    backgroundColor: '#F5F7FA',
   },
   
   // Lista cards
   listCard: {
     backgroundColor: 'white',
-    borderRadius: 15,
-    padding: 20,
-    marginBottom: 15,
-    shadowColor: '#000',
+    borderRadius: 18,
+    marginBottom: 20,
+    marginHorizontal: 2,
+    borderWidth: 1,
+    borderColor: '#E8ECEF',
+    shadowColor: '#887CBC',
     shadowOffset: {
       width: 0,
-      height: 2,
+      height: 6,
     },
-    shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 3,
+    shadowOpacity: 0.2,
+    shadowRadius: 10,
+    elevation: 8,
+    overflow: 'hidden',
   },
   publicListCard: {
     backgroundColor: 'white',
-    borderRadius: 15,
-    marginBottom: 15,
-    shadowColor: '#000',
+    borderRadius: 18,
+    marginBottom: 20,
+    marginHorizontal: 2,
+    borderWidth: 1,
+    borderColor: '#E8ECEF',
+    shadowColor: '#59C6C0',
     shadowOffset: {
       width: 0,
-      height: 2,
+      height: 6,
     },
-    shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 3,
+    shadowOpacity: 0.2,
+    shadowRadius: 10,
+    elevation: 8,
     overflow: 'hidden',
   },
-  listCardContent: {
+  progressBarContainer: {
+    height: 4,
+    backgroundColor: '#F0F0F0',
+    width: '100%',
+  },
+  progressBar: {
+    height: '100%',
+    backgroundColor: '#59C6C0',
+  },
+  cardContent: {
     padding: 20,
+    paddingBottom: 18,
+  },
+  listCardContent: {
+    padding: 0,
   },
   listHeader: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    marginBottom: 12,
+    marginBottom: 14,
   },
   listIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#F8F9FA',
+    width: 50,
+    height: 50,
+    borderRadius: 25,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
+    marginRight: 14,
   },
   publicListIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 50,
+    height: 50,
+    borderRadius: 25,
     backgroundColor: '#E8F5E8',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
+    marginRight: 14,
   },
   listInfo: {
     flex: 1,
   },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 6,
+  },
   listTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 4,
+    fontSize: 17,
+    fontWeight: '700',
+    color: '#2C3E50',
+    flex: 1,
+  },
+  completedBadge: {
+    marginLeft: 8,
   },
   listAuthor: {
     fontSize: 12,
@@ -960,45 +1155,95 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     flexWrap: 'wrap',
+    gap: 16,
+    marginTop: 8,
   },
   stat: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginRight: 20,
+    backgroundColor: '#F8F9FA',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    gap: 6,
+  },
+  statIconContainer: {
+    width: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   statText: {
-    fontSize: 12,
-    color: '#666',
-    marginLeft: 4,
+    fontSize: 13,
+    color: '#2C3E50',
+    fontWeight: '600',
+  },
+  statPercent: {
+    fontSize: 11,
+    color: '#59C6C0',
+    fontWeight: '600',
   },
 
   // Listas públicas - acciones
   publicListActions: {
     flexDirection: 'row',
-    backgroundColor: '#F8F9FA',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    justifyContent: 'flex-end',
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 18,
+    paddingVertical: 14,
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderTopWidth: 1,
+    borderTopColor: '#F0F0F0',
   },
   actionButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: 'white',
-    justifyContent: 'center',
+    flexDirection: 'row',
     alignItems: 'center',
-    marginLeft: 10,
+    backgroundColor: '#F8F9FA',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    gap: 6,
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
       height: 1,
     },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.05,
     shadowRadius: 2,
-    elevation: 2,
+    elevation: 1,
   },
   starredButton: {
     backgroundColor: '#FFF8DC',
+  },
+  actionButtonText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#666',
+  },
+  starredText: {
+    color: '#FFB800',
+  },
+  addListButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#59C6C0',
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    borderRadius: 22,
+    shadowColor: '#59C6C0',
+    shadowOffset: {
+      width: 0,
+      height: 3,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 4,
+    gap: 8,
+  },
+  addListButtonText: {
+    color: 'white',
+    fontSize: 15,
+    fontWeight: '700',
   },
 
   // Estados vacíos
@@ -1006,34 +1251,42 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: 60,
+    paddingVertical: 80,
     paddingHorizontal: 40,
   },
   emptyTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#333',
-    marginTop: 20,
-    marginBottom: 10,
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#2C3E50',
+    marginTop: 24,
+    marginBottom: 12,
     textAlign: 'center',
   },
   emptySubtitle: {
-    fontSize: 14,
-    color: '#666',
+    fontSize: 15,
+    color: '#7F8C8D',
     textAlign: 'center',
-    lineHeight: 20,
-    marginBottom: 30,
+    lineHeight: 22,
+    marginBottom: 32,
   },
   emptyButton: {
     backgroundColor: '#59C6C0',
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 20,
+    paddingHorizontal: 28,
+    paddingVertical: 14,
+    borderRadius: 25,
+    shadowColor: '#59C6C0',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 5,
+    elevation: 5,
   },
   emptyButtonText: {
     color: 'white',
-    fontSize: 14,
-    fontWeight: '500',
+    fontSize: 16,
+    fontWeight: '700',
   },
 
   // Modal estilos

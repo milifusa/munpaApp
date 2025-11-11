@@ -35,3 +35,6 @@ yarn-error.*
 
 # typescript
 *.tsbuildinfo
+
+# Google Service Account Key (sensitive)
+google-service-account-key.json

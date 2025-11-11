@@ -14,10 +14,20 @@
       "autoIncrement": true
     },
     "production": {
-      "android": { 
-        "buildType": "apk"
+      "distribution": "store",
+      "android": {
+        "buildType": "app-bundle",
+        "gradleCommand": ":app:bundleRelease"
       },
       "autoIncrement": true
+    }
+  },
+  "submit": {
+    "production": {
+      "android": {
+        "serviceAccountKeyPath": "./google-service-account-key.json",
+        "track": "internal"
+      }
     }
   }
 }

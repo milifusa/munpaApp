@@ -88,12 +88,19 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
     try {
       await loginWithApple();
     } catch (error: any) {
-      if (error.message === 'Login con Apple cancelado') {
-        return; // No mostrar error si el usuario canceló
+      // No mostrar error si el usuario canceló
+      if (error.message === 'Login con Apple cancelado' || 
+          error.message?.includes('cancelado') ||
+          error.code === '1000' || 
+          error.code === 1000) {
+        console.log('👤 Usuario canceló el login con Apple');
+        return;
       }
+      
+      // Para otros errores, mostrar alert
       Alert.alert(
         'Error de inicio de sesión',
-        error.response?.data?.message || error.message || 'Error al iniciar sesión con Apple'
+        error.response?.data?.message || error.message || 'Error al iniciar sesión con Apple. Por favor intenta nuevamente.'
       );
     } finally {
       setIsLoading(false);
@@ -178,24 +185,25 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
         {/* Login Social */}
         <View style={styles.socialContainer}>
           <Text style={styles.socialText}>O ingresa con:</Text>
-          <View style={styles.socialButtons}>
-            <SocialLoginButton
-              type="google"
-              onPress={handleGoogleLogin}
-              size="medium"
-            />
-            {/* Login con Apple - solo disponible en iOS */}
-            {Platform.OS === 'ios' && (
-              <>
-                <View style={styles.socialSpacer} />
-                <SocialLoginButton
-                  type="apple"
-                  onPress={handleAppleLogin}
-                  size="medium"
-                />
-              </>
-            )}
-          </View>
+          
+          {/* Login con Apple - solo disponible en iOS - PRIMERO según Apple Guidelines */}
+          {Platform.OS === 'ios' && (
+            <TouchableOpacity
+              style={[styles.socialLoginButton, styles.appleButton]}
+              onPress={handleAppleLogin}
+              disabled={isLoading}
+            >
+              <Text style={styles.appleButtonText}>  Continuar con Apple</Text>
+            </TouchableOpacity>
+          )}
+          
+          <TouchableOpacity
+            style={[styles.socialLoginButton, styles.googleButton]}
+            onPress={handleGoogleLogin}
+            disabled={isLoading}
+          >
+            <Text style={styles.googleButtonText}>G  Continuar con Google</Text>
+          </TouchableOpacity>
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -272,12 +280,48 @@ const styles = StyleSheet.create({
   },
   socialContainer: {
     alignItems: 'center',
+    width: '100%',
   },
   socialText: {
     color: colors.white,
     fontSize: typography.sizes.sm,
-    // fontFamily: 'Montserrat' // Temporalmente comentado,
     marginBottom: spacing.md,
+    textAlign: 'center',
+  },
+  // Botones de login social - Tamaño completo y equivalentes
+  socialLoginButton: {
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    marginBottom: 12,
+    minHeight: 48,
+    ...shadows.base,
+  },
+  // Botón de Apple - Negro (Apple guidelines)
+  appleButton: {
+    backgroundColor: '#000000',
+    borderWidth: 0,
+  },
+  appleButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  // Botón de Google - Blanco con borde
+  googleButton: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+  },
+  googleButtonText: {
+    color: '#000000',
+    fontSize: 16,
+    fontWeight: '600',
     textAlign: 'center',
   },
   socialButtons: {

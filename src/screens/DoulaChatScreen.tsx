@@ -15,6 +15,8 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import learningService from '../services/learning-service';
+import { useAuth } from '../contexts/AuthContext';
+import { useChat } from '../contexts/ChatContext';
 
 interface Message {
   id: number;
@@ -28,15 +30,15 @@ interface Message {
 }
 
 const DouliChat = () => {
-  const [messages, setMessages] = useState<Message[]>([]);
+  const { user } = useAuth();
+  const { messages, setMessages, conversationId, initializeChat } = useChat();
   const [inputText, setInputText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [conversationId, setConversationId] = useState<string | null>(null);
   const flatListRef = useRef<FlatList<Message>>(null);
 
-  // Generar ID de conversación único
+  // Inicializar chat solo la primera vez
   useEffect(() => {
-    setConversationId(`conv_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`);
+    initializeChat();
   }, []);
 
   // Función para enviar mensaje
@@ -121,11 +123,18 @@ const DouliChat = () => {
         item.sender === 'user' ? styles.userAvatar : styles.douliMessageAvatar
       ]}>
         {item.sender === 'user' ? (
-          <Ionicons 
-            name="person" 
-            size={20} 
-            color="white" 
-          />
+          user?.photoURL ? (
+            <Image
+              source={{ uri: user.photoURL }}
+              style={styles.userAvatarImage}
+            />
+          ) : (
+            <Ionicons 
+              name="person" 
+              size={20} 
+              color="white" 
+            />
+          )
         ) : (
           <Image 
             source={require('../../assets/douli.png')} 
@@ -202,22 +211,6 @@ const DouliChat = () => {
       behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
     >
-      {/* Header */}
-      <View style={styles.header}>
-        <View style={styles.douliInfo}>
-          <View style={styles.douliAvatar}>
-            <Image 
-              source={require('../../assets/douli.png')} 
-              style={styles.douliAvatarImage} 
-            />
-          </View>
-          <View>
-            <Text style={styles.douliName}>DOULI</Text>
-            <Text style={styles.douliSubtitle}>Tu doula virtual</Text>
-          </View>
-        </View>
-      </View>
-
       {/* Lista de mensajes */}
       <FlatList
         ref={flatListRef}
@@ -275,43 +268,6 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f5f5f5',
   },
-  header: {
-    backgroundColor: 'white',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  douliInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  douliAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#887CBC',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
-    overflow: 'hidden', // Para que la imagen respete el borderRadius
-  },
-  douliAvatarImage: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-  },
-  douliName: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  douliSubtitle: {
-    fontSize: 14,
-    color: '#666',
-  },
   messagesList: {
     flex: 1,
   },
@@ -339,6 +295,12 @@ const styles = StyleSheet.create({
   },
   userAvatar: {
     backgroundColor: '#887CBC',
+    overflow: 'hidden', // Para que la imagen respete el borderRadius
+  },
+  userAvatarImage: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
   },
   douliMessageAvatar: {
     backgroundColor: '#887CBC',

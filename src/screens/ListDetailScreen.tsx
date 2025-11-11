@@ -14,8 +14,11 @@ import {
   RefreshControl,
   Image,
   KeyboardAvoidingView,
+  StatusBar,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRoute, useNavigation, useFocusEffect } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '../contexts/AuthContext';
@@ -47,6 +50,7 @@ const formatDate = (timestamp: any): string => {
 const ListDetailScreen = () => {
   const navigation = useNavigation();
   const route = useRoute();
+  const insets = useSafeAreaInsets();
   const { user, isAuthenticated } = useAuth();
   
   // Parámetros de navegación
@@ -314,7 +318,7 @@ const ListDetailScreen = () => {
       }
 
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: ['images'],
         allowsEditing: true,
         aspect: [1, 1],
         quality: 0.8,
@@ -559,8 +563,13 @@ const ListDetailScreen = () => {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      {/* Header personalizado */}
-      <View style={styles.header}>
+      <StatusBar barStyle="light-content" backgroundColor="#59C6C0" />
+      <View style={styles.contentWrapper}>
+        {/* Header personalizado */}
+        <LinearGradient
+          colors={['#59C6C0', '#4DB8B3']}
+          style={[styles.header, { paddingTop: Math.max(insets.top, Platform.OS === 'ios' ? 10 : 20) }]}
+        >
         <TouchableOpacity
           style={styles.headerBackButton}
           onPress={() => navigation.goBack()}
@@ -601,7 +610,7 @@ const ListDetailScreen = () => {
             </TouchableOpacity>
           )}
         </View>
-      </View>
+      </LinearGradient>
 
       {/* Contenido */}
       <ScrollView
@@ -942,6 +951,7 @@ const ListDetailScreen = () => {
           </View>
         </KeyboardAvoidingView>
       </Modal>
+      </View>
     </SafeAreaView>
   );
 };
@@ -1123,6 +1133,10 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#59C6C0',
   },
+  contentWrapper: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+  },
   
   // Loading y error
   loadingContainer: {
@@ -1173,7 +1187,6 @@ const styles = StyleSheet.create({
   // Header personalizado
   header: {
     backgroundColor: '#59C6C0',
-    paddingTop: Platform.OS === 'ios' ? 10 : 20,
     paddingBottom: 15,
     paddingHorizontal: 20,
     flexDirection: 'row',

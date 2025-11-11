@@ -14,7 +14,7 @@ interface AuthContextType {
   loginWithApple: () => Promise<void>;
   signup: (email: string, password: string, displayName?: string, gender?: 'M' | 'F', childrenCount?: number, isPregnant?: boolean) => Promise<void>;
   logout: () => Promise<void>;
-  updateProfile: (data: { name?: string; email?: string; gender?: 'M' | 'F'; childrenCount?: number; isPregnant?: boolean; gestationWeeks?: number }) => Promise<void>;
+  updateProfile: (data: { name?: string; email?: string; gender?: 'M' | 'F'; childrenCount?: number; isPregnant?: boolean; gestationWeeks?: number; photoURL?: string }) => Promise<void>;
   changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
   deleteAccount: () => Promise<void>;
   forgotPassword: (email: string) => Promise<any>;
@@ -242,6 +242,18 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
     
     try {
+      // Verificar que Apple Auth está disponible en el dispositivo
+      // isSupported es una propiedad booleana, no una función
+      const isSupported = appleAuth.isSupported;
+      console.log('📱 [APPLE AUTH] isSupported:', isSupported);
+      
+      if (!isSupported) {
+        console.error('❌ Apple Sign-In no está soportado en este dispositivo');
+        throw new Error('Apple Sign-In no está disponible en este dispositivo. Requiere iOS 13 o superior.');
+      }
+      
+      console.log('✅ Apple Sign-In está soportado, procediendo...');
+      
       // Realizar sign in con Apple
       const appleAuthRequestResponse = await appleAuth.performRequest({
         requestedOperation: appleAuth.Operation.LOGIN,
@@ -315,12 +327,22 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setUser(userData);
     } catch (error: any) {
       console.error('❌ Error en login con Apple:', error);
+      console.error('📋 Error code:', error.code);
+      console.error('📋 Error message:', error.message);
       
-      // Si el usuario canceló
-      if (error.code === appleAuth.Error.CANCELED) {
+      // Si el usuario canceló (código 1000 o CANCELED)
+      if (error.code === '1000' || error.code === 1000 || error.code === appleAuth.Error.CANCELED) {
+        console.log('👤 Usuario canceló el login con Apple');
         throw new Error('Login con Apple cancelado');
       }
       
+      // Error de credenciales o configuración
+      if (error.code === '1001' || error.code === 1001) {
+        console.error('❌ Error de credenciales con Apple');
+        throw new Error('Error de autenticación con Apple. Por favor intenta nuevamente.');
+      }
+      
+      // Para cualquier otro error
       throw error;
     }
   };
@@ -384,7 +406,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
-  const updateProfile = async (data: { name?: string; email?: string; gender?: 'M' | 'F'; childrenCount?: number; isPregnant?: boolean; gestationWeeks?: number }) => {
+  const updateProfile = async (data: { name?: string; email?: string; gender?: 'M' | 'F'; childrenCount?: number; isPregnant?: boolean; gestationWeeks?: number; photoURL?: string }) => {
     console.log('✏️ Iniciando actualización de perfil...');
     try {
       if (user) {
@@ -396,6 +418,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           childrenCount: data.childrenCount || user.childrenCount,
           isPregnant: data.isPregnant || user.isPregnant,
           gestationWeeks: data.gestationWeeks || user.gestationWeeks,
+          photoURL: data.photoURL !== undefined ? data.photoURL : user.photoURL,
           updatedAt: new Date().toISOString(),
         };
         
@@ -431,13 +454,39 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   const forgotPassword = async (email: string) => {
-    console.log('🔑 Iniciando solicitud de restablecimiento de contraseña...');
+    console.log('🔑 [AUTH CONTEXT] Iniciando solicitud de restablecimiento de contraseña...');
+    console.log('📧 [AUTH CONTEXT] Email para recuperación:', email);
+    
     try {
-      // Simular envío exitoso
-      console.log('✅ Solicitud de restablecimiento enviada');
-      return { success: true };
-    } catch (error) {
-      console.error('❌ Error solicitando restablecimiento:', error);
+      console.log('📡 [AUTH CONTEXT] Llamando a authService.forgotPassword...');
+      
+      const response = await authService.forgotPassword(email);
+      
+      console.log('📦 [AUTH CONTEXT] === RESPUESTA DEL SERVICIO ===');
+      console.log('📦 [AUTH CONTEXT] Tipo de respuesta:', typeof response);
+      console.log('📦 [AUTH CONTEXT] Respuesta completa:', JSON.stringify(response, null, 2));
+      console.log('📦 [AUTH CONTEXT] Propiedades de la respuesta:', Object.keys(response || {}));
+      
+      if (response) {
+        console.log('✅ [AUTH CONTEXT] Success:', response.success);
+        console.log('✅ [AUTH CONTEXT] Message:', response.message);
+        console.log('✅ [AUTH CONTEXT] Data:', response.data);
+      }
+      
+      console.log('✅ [AUTH CONTEXT] Solicitud de restablecimiento enviada exitosamente');
+      return response;
+    } catch (error: any) {
+      console.error('❌ [AUTH CONTEXT] === ERROR EN forgotPassword ===');
+      console.error('❌ [AUTH CONTEXT] Tipo de error:', typeof error);
+      console.error('❌ [AUTH CONTEXT] Error completo:', error);
+      console.error('❌ [AUTH CONTEXT] Error message:', error.message);
+      
+      if (error.response) {
+        console.error('❌ [AUTH CONTEXT] Response status:', error.response.status);
+        console.error('❌ [AUTH CONTEXT] Response data:', JSON.stringify(error.response.data, null, 2));
+      }
+      
+      console.error('❌ [AUTH CONTEXT] Error solicitando restablecimiento:', error);
       throw error;
     }
   };

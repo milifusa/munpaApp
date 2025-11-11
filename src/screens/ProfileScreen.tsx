@@ -10,8 +10,10 @@ import {
   TextInput,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
+import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../contexts/AuthContext';
 import { authService } from '../services/api';
+import ProfilePhoto from '../components/ProfilePhoto';
 
 
 const ProfileScreen: React.FC = () => {
@@ -164,13 +166,29 @@ const ProfileScreen: React.FC = () => {
 
   return (
     <View style={styles.mainContainer}>
-      <ScrollView style={styles.container}>
+      <ScrollView 
+        style={styles.container} 
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
       {/* Header */}
       <View style={styles.header}>
-        <View style={styles.avatar}>
-          <Text style={styles.avatarText}>
-            {profile?.displayName?.charAt(0) || user?.name?.charAt(0) || 'U'}
-          </Text>
+        <View style={styles.photoContainer}>
+          <ProfilePhoto
+            photoURL={profile?.photoURL || user?.photoURL}
+            onPhotoUpdated={async (newPhotoURL) => {
+              setProfile({ ...profile, photoURL: newPhotoURL });
+              // Actualizar el contexto de autenticación
+              await updateProfile({ photoURL: newPhotoURL || '' });
+              // Recargar perfil después de actualizar foto
+              loadProfile();
+            }}
+            size={110}
+            editable={true}
+          />
+          <View style={styles.editPhotoIndicator}>
+            <Ionicons name="camera" size={18} color="white" />
+          </View>
         </View>
         <Text style={styles.name}>
           {profile?.displayName || user?.name || 'Usuario'}
@@ -178,29 +196,49 @@ const ProfileScreen: React.FC = () => {
         <Text style={styles.email}>
           {profile?.email || user?.email || 'usuario@email.com'}
         </Text>
+        {profile?.isPregnant && (
+          <View style={styles.pregnantBadge}>
+            <Ionicons name="heart" size={16} color="#E91E63" />
+            <Text style={styles.pregnantBadgeText}>
+              {profile?.gender === 'F' ? 'Embarazada' : 'Esperando bebé'}
+            </Text>
+          </View>
+        )}
       </View>
 
       {/* Información del perfil */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Información Personal</Text>
+        <View style={styles.sectionHeader}>
+          <Ionicons name="person-circle" size={24} color="#887CBC" />
+          <Text style={styles.sectionTitle}>Información Personal</Text>
+        </View>
         
         <View style={styles.infoCard}>
           <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Nombre:</Text>
+            <View style={styles.infoLeft}>
+              <Ionicons name="person-outline" size={20} color="#887CBC" />
+              <Text style={styles.infoLabel}>Nombre</Text>
+            </View>
             <Text style={styles.infoValue}>
               {profile?.displayName || user?.name || 'No especificado'}
             </Text>
           </View>
           
           <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Email:</Text>
+            <View style={styles.infoLeft}>
+              <Ionicons name="mail-outline" size={20} color="#887CBC" />
+              <Text style={styles.infoLabel}>Email</Text>
+            </View>
             <Text style={styles.infoValue}>
               {profile?.email || user?.email || 'No especificado'}
             </Text>
           </View>
           
           <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Género:</Text>
+            <View style={styles.infoLeft}>
+              <Ionicons name={profile?.gender === 'M' ? 'male' : profile?.gender === 'F' ? 'female' : 'male-female'} size={20} color="#887CBC" />
+              <Text style={styles.infoLabel}>Género</Text>
+            </View>
             <Text style={styles.infoValue}>
               {profile?.gender === 'M' ? 'Papá' : 
                profile?.gender === 'F' ? 'Mamá' : 'No especificado'}
@@ -208,25 +246,34 @@ const ProfileScreen: React.FC = () => {
           </View>
           
           <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Número de hijos:</Text>
+            <View style={styles.infoLeft}>
+              <Ionicons name="people-outline" size={20} color="#887CBC" />
+              <Text style={styles.infoLabel}>Hijos</Text>
+            </View>
             <Text style={styles.infoValue}>
               {profile?.childrenCount || 0}
             </Text>
           </View>
           
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Estado:</Text>
-            <Text style={styles.infoValue}>
+          <View style={[styles.infoRow, !profile?.isPregnant && styles.lastInfoRow]}>
+            <View style={styles.infoLeft}>
+              <Ionicons name={profile?.isPregnant ? 'heart' : 'heart-outline'} size={20} color={profile?.isPregnant ? '#E91E63' : '#887CBC'} />
+              <Text style={styles.infoLabel}>Estado</Text>
+            </View>
+            <Text style={[styles.infoValue, profile?.isPregnant && styles.pregnantText]}>
               {profile?.isPregnant ? 
-                (profile?.gender === 'F' ? 'Embarazada' : 'Esperando bebé(s)') : 
-                'No embarazado'}
+                (profile?.gender === 'F' ? '🤰 Embarazada' : '👶 Esperando bebé') : 
+                'Sin embarazo'}
             </Text>
           </View>
           
           {profile?.isPregnant && (
-            <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>Semanas de gestación:</Text>
-              <Text style={styles.infoValue}>
+            <View style={[styles.infoRow, styles.lastInfoRow]}>
+              <View style={styles.infoLeft}>
+                <Ionicons name="calendar-outline" size={20} color="#E91E63" />
+                <Text style={styles.infoLabel}>Gestación</Text>
+              </View>
+              <Text style={[styles.infoValue, styles.pregnantText]}>
                 {profile?.gestationWeeks || 0} semanas
               </Text>
             </View>
@@ -236,41 +283,53 @@ const ProfileScreen: React.FC = () => {
 
       {/* Acciones */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Acciones</Text>
+        <View style={styles.sectionHeader}>
+          <Ionicons name="settings" size={24} color="#887CBC" />
+          <Text style={styles.sectionTitle}>Configuración</Text>
+        </View>
         
         <TouchableOpacity
           style={styles.actionButton}
           onPress={() => setShowEditModal(true)}
         >
-          <Text style={styles.actionButtonText}>Editar Perfil</Text>
+          <View style={styles.actionButtonContent}>
+            <Ionicons name="create-outline" size={22} color="white" />
+            <Text style={styles.actionButtonText}>Editar Perfil</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={20} color="white" />
         </TouchableOpacity>
 
         <TouchableOpacity
           style={styles.actionButton}
           onPress={() => setShowPasswordModal(true)}
         >
-          <Text style={styles.actionButtonText}>Cambiar Contraseña</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.actionButton}
-          onPress={loadProfile}
-        >
-          <Text style={styles.actionButtonText}>Actualizar Datos</Text>
+          <View style={styles.actionButtonContent}>
+            <Ionicons name="key-outline" size={22} color="white" />
+            <Text style={styles.actionButtonText}>Cambiar Contraseña</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={20} color="white" />
         </TouchableOpacity>
 
         <TouchableOpacity
           style={[styles.actionButton, styles.logoutButton]}
           onPress={logout}
         >
-          <Text style={styles.logoutButtonText}>Cerrar Sesión</Text>
+          <View style={styles.actionButtonContent}>
+            <Ionicons name="log-out-outline" size={22} color="white" />
+            <Text style={styles.logoutButtonText}>Cerrar Sesión</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={20} color="white" />
         </TouchableOpacity>
 
         <TouchableOpacity
           style={[styles.actionButton, styles.dangerButton]}
           onPress={handleDeleteAccount}
         >
-          <Text style={styles.dangerButtonText}>Eliminar Cuenta</Text>
+          <View style={styles.actionButtonContent}>
+            <Ionicons name="trash-outline" size={22} color="white" />
+            <Text style={styles.dangerButtonText}>Eliminar Cuenta</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={20} color="white" />
         </TouchableOpacity>
       </View>
 
@@ -516,11 +575,31 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#887CBC',
   },
+  scrollContent: {
+    paddingBottom: 30,
+  },
   header: {
     alignItems: 'center',
     paddingTop: 60,
     paddingBottom: 40,
     paddingHorizontal: 20,
+  },
+  photoContainer: {
+    position: 'relative',
+    marginBottom: 16,
+  },
+  editPhotoIndicator: {
+    position: 'absolute',
+    bottom: 5,
+    right: 5,
+    backgroundColor: '#887CBC',
+    borderRadius: 20,
+    width: 36,
+    height: 36,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 3,
+    borderColor: '#7A6BB1',
   },
   avatar: {
     width: 80,
@@ -537,15 +616,32 @@ const styles = StyleSheet.create({
     color: 'white',
   },
   name: {
-    fontSize: 24,
+    fontSize: 26,
     fontWeight: 'bold',
     color: '#FFFFFF',
     marginBottom: 4,
+    marginTop: 8,
   },
   email: {
-    fontSize: 16,
+    fontSize: 15,
     color: '#FFFFFF',
-    opacity: 0.9,
+    opacity: 0.95,
+    marginBottom: 8,
+  },
+  pregnantBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    marginTop: 8,
+    gap: 6,
+  },
+  pregnantBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
   },
   section: {
     backgroundColor: 'white',
@@ -562,24 +658,37 @@ const styles = StyleSheet.create({
     shadowRadius: 3.84,
     elevation: 5,
   },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+    gap: 8,
+  },
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
     color: '#2c3e50',
-    marginBottom: 16,
   },
   infoCard: {
     backgroundColor: '#f8f9fa',
-    borderRadius: 8,
+    borderRadius: 12,
     padding: 16,
   },
   infoRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 8,
+    paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: '#e1e8ed',
+  },
+  lastInfoRow: {
+    borderBottomWidth: 0,
+  },
+  infoLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
   },
   infoLabel: {
     fontSize: 14,
@@ -589,14 +698,35 @@ const styles = StyleSheet.create({
   infoValue: {
     fontSize: 14,
     color: '#2c3e50',
-    fontWeight: '500',
+    fontWeight: '600',
+    flex: 1,
+    textAlign: 'right',
+  },
+  pregnantText: {
+    color: '#E91E63',
+    fontWeight: 'bold',
   },
   actionButton: {
-    backgroundColor: '#3498db',
-    borderRadius: 8,
+    backgroundColor: '#887CBC',
+    borderRadius: 12,
     padding: 16,
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 3,
+  },
+  actionButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
   },
   actionButtonText: {
     color: 'white',

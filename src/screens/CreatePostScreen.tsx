@@ -10,10 +10,12 @@ import {
   Image,
   Platform,
   KeyboardAvoidingView,
+  StatusBar,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { TextInput } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { communitiesService } from '../services/api';
@@ -32,6 +34,7 @@ const CreatePostScreen: React.FC = () => {
   const route = useRoute<any>();
   const { communityId, communityName } = route.params;
   const navigation = useNavigation();
+  const insets = useSafeAreaInsets();
   
   // Log de prueba para verificar que imageUploadService esté disponible
   console.log('🔍 [CREATE POST] imageUploadService disponible:', !!imageUploadService);
@@ -58,7 +61,7 @@ const CreatePostScreen: React.FC = () => {
 
       // Abrir selector de imagen
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: ['images'],
         allowsEditing: true,
         aspect: [16, 9],
         quality: 0.8,
@@ -217,11 +220,15 @@ const CreatePostScreen: React.FC = () => {
     console.log('📝 [CREATE POST] createPost llamado con imageUrl:', imageUrl);
     console.log('📝 [CREATE POST] Tipo de imageUrl:', typeof imageUrl);
     
-    // Preparar datos del post
-    const postData = {
+    // Preparar datos del post - solo incluir imageUrl si existe y no es undefined
+    const postData: { content: string; imageUrl?: string } = {
       content: content.trim(),
-      ...(imageUrl && { imageUrl }),
     };
+    
+    // Solo agregar imageUrl si tiene un valor válido
+    if (imageUrl && imageUrl !== 'undefined' && imageUrl.trim() !== '') {
+      postData.imageUrl = imageUrl;
+    }
 
     console.log('📝 [CREATE POST] === DEBUG DATOS DEL POST ===');
     console.log('📝 [CREATE POST] Contenido:', content.trim());
@@ -273,8 +280,9 @@ const CreatePostScreen: React.FC = () => {
 
   return (
     <SafeAreaView style={styles.safeArea}>
+      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: Math.max(insets.top, Platform.OS === 'ios' ? 15 : 10) }]}>
         <TouchableOpacity 
           style={styles.cancelButton}
           onPress={handleCancel}
@@ -388,7 +396,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
-    paddingTop: Platform.OS === 'ios' ? 15 : 10,
     paddingBottom: 15,
     borderBottomWidth: 1,
     borderBottomColor: '#E5E5E5',

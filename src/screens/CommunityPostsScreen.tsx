@@ -10,10 +10,13 @@ import {
   RefreshControl,
   Image,
   Platform,
+  StatusBar,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../contexts/AuthContext';
 import { communitiesService } from '../services/api';
 import LikeButton from '../components/LikeButton';
@@ -49,11 +52,13 @@ const CommunityPostsScreen: React.FC = () => {
   const { communityId, communityName } = route.params;
   const navigation = useNavigation();
   const { isAuthenticated } = useAuth();
+  const insets = useSafeAreaInsets();
   
   const [posts, setPosts] = useState<Post[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [likingPostId, setLikingPostId] = useState<string | null>(null);
+  const [showMenu, setShowMenu] = useState(false);
 
   // Cargar posts al montar el componente
   useEffect(() => {
@@ -198,6 +203,58 @@ const CommunityPostsScreen: React.FC = () => {
     });
   };
 
+  // Función para salir de la comunidad
+  const handleLeaveCommunity = () => {
+    Alert.alert(
+      'Salir de Comunidad',
+      `¿Estás seguro de que quieres salir de "${communityName}"?`,
+      [
+        {
+          text: 'Cancelar',
+          style: 'cancel'
+        },
+        {
+          text: 'Salir',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              console.log('🚪 [POSTS] Saliendo de la comunidad:', communityId);
+              setIsLoading(true);
+              
+              const response = await communitiesService.leaveCommunity(communityId);
+              
+              if (response.success) {
+                Alert.alert(
+                  'Éxito',
+                  'Has salido de la comunidad exitosamente',
+                  [
+                    {
+                      text: 'OK',
+                      onPress: () => {
+                        // Navegar de vuelta a la pantalla anterior
+                        navigation.goBack();
+                      }
+                    }
+                  ]
+                );
+              }
+            } catch (error: any) {
+              console.error('❌ [POSTS] Error saliendo de la comunidad:', error);
+              
+              const errorMessage = 
+                error.response?.data?.message || 
+                error.message ||
+                'No se pudo salir de la comunidad. Por favor intenta nuevamente.';
+              
+              Alert.alert('Error', errorMessage, [{ text: 'OK' }]);
+              setIsLoading(false);
+            }
+          }
+        }
+      ]
+    );
+  };
+
   // Función para manejar likes en posts
   const handleLikePost = async (post: Post) => {
     if (!isAuthenticated) {
@@ -245,7 +302,8 @@ const CommunityPostsScreen: React.FC = () => {
   if (!isAuthenticated) {
     return (
       <SafeAreaView style={styles.safeArea}>
-        <View style={styles.header}>
+        <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+        <View style={[styles.header, { paddingTop: Math.max(insets.top, Platform.OS === 'ios' ? 15 : 10) }]}>
         <TouchableOpacity 
           style={styles.backButton}
           onPress={() => navigation.goBack()}
@@ -268,22 +326,57 @@ const CommunityPostsScreen: React.FC = () => {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      {/* Header */}
-      <View style={styles.header}>
+      <StatusBar barStyle="light-content" backgroundColor="#59C6C0" />
+      <View style={styles.contentWrapper}>
+        {/* Header */}
+        <LinearGradient
+          colors={['#59C6C0', '#4DB8B3']}
+          style={[styles.header, { paddingTop: Math.max(insets.top, Platform.OS === 'ios' ? 15 : 10) }]}
+        >
         <TouchableOpacity 
           style={styles.backButton}
           onPress={() => navigation.goBack()}
         >
-          <Ionicons name="arrow-back" size={24} color="#333" />
+          <Ionicons name="arrow-back" size={24} color="white" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Posts de la Comunidad</Text>
-        <TouchableOpacity 
-          style={styles.createPostButton}
-          onPress={handleCreatePost}
-        >
-          <Ionicons name="add" size={24} color="#59C6C0" />
-        </TouchableOpacity>
-      </View>
+        <View style={styles.headerActions}>
+          <TouchableOpacity 
+            style={styles.createPostButton}
+            onPress={handleCreatePost}
+          >
+            <Ionicons name="add" size={24} color="white" />
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={styles.menuButton}
+            onPress={() => setShowMenu(!showMenu)}
+          >
+            <Ionicons name="ellipsis-vertical" size={24} color="white" />
+          </TouchableOpacity>
+        </View>
+      </LinearGradient>
+
+      {/* Menú desplegable */}
+      {showMenu && (
+        <View style={styles.menuOverlay}>
+          <TouchableOpacity 
+            style={styles.menuBackdrop}
+            onPress={() => setShowMenu(false)}
+          />
+          <View style={styles.menuContainer}>
+            <TouchableOpacity 
+              style={styles.menuItem}
+              onPress={() => {
+                setShowMenu(false);
+                handleLeaveCommunity();
+              }}
+            >
+              <Ionicons name="exit-outline" size={20} color="#F44336" />
+              <Text style={styles.menuItemTextDanger}>Salir de la Comunidad</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
 
       {/* Información de la comunidad */}
       <View style={styles.communityInfo}>
@@ -416,6 +509,7 @@ const CommunityPostsScreen: React.FC = () => {
           </View>
         )}
       </ScrollView>
+      </View>
     </SafeAreaView>
   );
 };
@@ -427,6 +521,10 @@ const styles = StyleSheet.create({
   },
   safeArea: {
     flex: 1,
+    backgroundColor: '#59C6C0',
+  },
+  contentWrapper: {
+    flex: 1,
     backgroundColor: '#FFFFFF',
   },
   header: {
@@ -434,11 +532,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
-    paddingTop: Platform.OS === 'ios' ? 15 : 10,
     paddingBottom: 15,
     borderBottomWidth: 1,
-    borderBottomColor: '#E5E5E5',
-    backgroundColor: '#FFFFFF',
+    borderBottomColor: 'rgba(255, 255, 255, 0.3)',
   },
   backButton: {
     padding: 10,
@@ -448,13 +544,65 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#333',
+    color: 'white',
   },
   placeholder: {
     width: 34,
   },
   createPostButton: {
     padding: 5,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  menuButton: {
+    padding: 5,
+  },
+  menuOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 1000,
+  },
+  menuBackdrop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+  },
+  menuContainer: {
+    position: 'absolute',
+    top: Platform.OS === 'ios' ? 60 : 55,
+    right: 20,
+    backgroundColor: 'white',
+    borderRadius: 8,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+    minWidth: 200,
+  },
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    gap: 12,
+  },
+  menuItemTextDanger: {
+    fontSize: 14,
+    color: '#F44336',
+    fontWeight: '500',
   },
   communityInfo: {
     flexDirection: 'row',

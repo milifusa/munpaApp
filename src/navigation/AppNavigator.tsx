@@ -21,6 +21,12 @@ import ResetPasswordScreen from '../screens/ResetPasswordScreen';
 import ChildrenDataScreen from '../screens/ChildrenDataScreen';
 import ChildProfileScreen from '../screens/ChildProfileScreen';
 import DoulaChatScreen from '../screens/DoulaChatScreen';
+import MunpaMarketScreen from '../screens/MunpaMarketScreen';
+import ProductDetailScreen from '../screens/ProductDetailScreen';
+import CreateProductScreen from '../screens/CreateProductScreen';
+import MyProductsScreen from '../screens/MyProductsScreen';
+import MarketplaceFavoritesScreen from '../screens/MarketplaceFavoritesScreen';
+import MarketplaceMessagesScreen from '../screens/MarketplaceMessagesScreen';
 import CommunitiesScreen from '../screens/CommunitiesScreen';
 import CommunityRequestsScreen from '../screens/CommunityRequestsScreen';
 import CommunityPostsScreen from '../screens/CommunityPostsScreen';
@@ -30,6 +36,11 @@ import ListsScreen from '../screens/ListsScreen';
 import ListDetailScreen from '../screens/ListDetailScreen';
 import ItemCommentsScreen from '../screens/ItemCommentsScreen';
 import RecommendationsScreen from '../screens/RecommendationsScreen';
+import CategoryRecommendationsScreen from '../screens/CategoryRecommendationsScreen';
+import RecommendationDetailScreen from '../screens/RecommendationDetailScreen';
+import FavoritesScreen from '../screens/FavoritesScreen';
+import FavoritesMapScreen from '../screens/FavoritesMapScreen';
+import WishlistScreen from '../screens/WishlistScreen';
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -57,13 +68,20 @@ const ProfileButton = () => {
     <TouchableOpacity
       style={styles.profileButton}
       onPress={() => {
-        // Navegar al Profile desde el stack navigator principal
+        // Navegar a Profile (fuera de tabs)
         navigation.navigate('Profile');
       }}
     >
-      <View style={styles.profilePlaceholder}>
-        <Ionicons name="person" size={20} color="white" />
-      </View>
+      {user?.photoURL ? (
+        <Image
+          source={{ uri: user.photoURL }}
+          style={styles.profileImage}
+        />
+      ) : (
+        <View style={styles.profilePlaceholder}>
+          <Ionicons name="person" size={20} color="white" />
+        </View>
+      )}
     </TouchableOpacity>
   );
 };
@@ -255,6 +273,65 @@ const AuthenticatedNavigator = () => {
           headerShown: true,
         }}
       />
+      <Stack.Screen
+        name="Doula"
+        component={DoulaChatScreen}
+        options={({ navigation }) => ({
+          title: 'DOULI',
+          headerShown: true,
+          headerStyle: {
+            backgroundColor: '#59C6C0',
+          },
+          headerTintColor: 'white',
+          headerTitleStyle: {
+            fontWeight: 'bold',
+          },
+          headerLeft: () => null,
+          headerRight: () => (
+            <TouchableOpacity
+              style={styles.closeButton}
+              onPress={() => navigation.goBack()}
+            >
+              <Ionicons name="close" size={28} color="white" />
+            </TouchableOpacity>
+          ),
+        })}
+      />
+      <Stack.Screen
+        name="ProductDetail"
+        component={ProductDetailScreen}
+        options={{
+          headerShown: false,
+        }}
+      />
+      <Stack.Screen
+        name="CreateProduct"
+        component={CreateProductScreen}
+        options={{
+          headerShown: false,
+        }}
+      />
+      <Stack.Screen
+        name="MyProducts"
+        component={MyProductsScreen}
+        options={{
+          headerShown: false,
+        }}
+      />
+      <Stack.Screen
+        name="MarketplaceFavorites"
+        component={MarketplaceFavoritesScreen}
+        options={{
+          headerShown: false,
+        }}
+      />
+      <Stack.Screen
+        name="MarketplaceMessages"
+        component={MarketplaceMessagesScreen}
+        options={{
+          headerShown: false,
+        }}
+      />
     </Stack.Navigator>
   );
 };
@@ -415,6 +492,74 @@ const ListsStackNavigator = () => {
   );
 };
 
+// Stack Navigator para Recommendations con sus sub-pantallas
+const RecommendationsStackNavigator = () => {
+  return (
+    <Stack.Navigator
+      screenOptions={{
+        headerStyle: {
+          backgroundColor: '#59C6C0',
+        },
+        headerTintColor: 'white',
+        headerTitleStyle: {
+          fontWeight: 'bold',
+        },
+        headerLeft: () => <MenuButton />,
+        headerRight: () => <ProfileButton />,
+      }}
+    >
+      <Stack.Screen
+        name="RecommendationsMain"
+        component={RecommendationsScreen}
+        options={{
+          title: 'Recomendaciones',
+          headerShown: true,
+        }}
+      />
+      <Stack.Screen
+        name="CategoryRecommendations"
+        component={CategoryRecommendationsScreen}
+        options={{
+          title: 'Recomendaciones',
+          headerShown: false, // Usamos header personalizado en la pantalla
+        }}
+      />
+      <Stack.Screen
+        name="RecommendationDetail"
+        component={RecommendationDetailScreen}
+        options={{
+          title: 'Detalle',
+          headerShown: false, // Usamos header personalizado en la pantalla
+        }}
+      />
+      <Stack.Screen
+        name="Favorites"
+        component={FavoritesScreen}
+        options={{
+          title: 'Favoritos',
+          headerShown: false, // Usamos header personalizado en la pantalla
+        }}
+      />
+      <Stack.Screen
+        name="FavoritesMap"
+        component={FavoritesMapScreen}
+        options={{
+          title: 'Mapa de Favoritos',
+          headerShown: false, // Usamos header personalizado en la pantalla
+        }}
+      />
+      <Stack.Screen
+        name="Wishlist"
+        component={WishlistScreen}
+        options={{
+          title: 'Lista de Deseos',
+          headerShown: false, // Usamos header personalizado en la pantalla
+        }}
+      />
+    </Stack.Navigator>
+  );
+};
+
 // Navegador de tabs principal
 const MainTabNavigator = () => {
   const { user } = useAuth();
@@ -476,12 +621,12 @@ const MainTabNavigator = () => {
         }}
       />
       <Tab.Screen
-        name="Doula"
-        component={DoulaChatScreen}
+        name="MunpaMarket"
+        component={MunpaMarketScreen}
         options={{
           tabBarLabel: () => null,
           headerShown: true,
-          headerTitle: 'DOULI',
+          headerTitle: 'MUNPA MARKET',
           headerStyle: {
             backgroundColor: '#59C6C0',
           },
@@ -496,9 +641,10 @@ const MainTabNavigator = () => {
               styles.doulaIconContainer,
               focused && styles.doulaIconActive
             ]}>
-              <Image 
-                source={require('../../assets/douli.png')} 
-                style={styles.doulaIconImage} 
+              <Ionicons 
+                name="cart" 
+                size={50} 
+                color="white"
               />
             </View>
           ),
@@ -532,20 +678,9 @@ const MainTabNavigator = () => {
       />
       <Tab.Screen
         name="Recommendations"
-        component={RecommendationsScreen}
+        component={RecommendationsStackNavigator}
         options={{
           tabBarLabel: 'Recomendaciones',
-          headerShown: true,
-          headerTitle: 'Recomendaciones',
-          headerStyle: {
-            backgroundColor: '#59C6C0',
-          },
-          headerTintColor: 'white',
-          headerTitleStyle: {
-            fontWeight: 'bold',
-          },
-          headerLeft: () => <MenuButton />,
-          headerRight: () => <ProfileButton />,
           tabBarIcon: ({ color, size, focused }) => (
             <Image 
               source={require('../../assets/recomendaciones.png')} 
@@ -743,6 +878,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 2,
     borderColor: 'white',
+  },
+  closeButton: {
+    padding: 8,
+    marginRight: 8,
   },
 });
 

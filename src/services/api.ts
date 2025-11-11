@@ -222,6 +222,20 @@ export const authService = {
     }
   },
 
+  // Actualizar foto de perfil (usando el endpoint de actualización de perfil)
+  updateProfilePhoto: async (photoURL: string) => {
+    console.log('📸 Actualizando foto de perfil...');
+    console.log('📤 photoURL:', photoURL);
+    try {
+      const response = await api.put('/api/auth/profile', { photoURL });
+      console.log('✅ Foto de perfil actualizada:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('❌ Error actualizando foto de perfil:', error);
+      throw error;
+    }
+  },
+
   // Cambiar contraseña
   changePassword: async (data: ChangePasswordData) => {
     console.log('🔒 Cambiando contraseña...');
@@ -312,13 +326,54 @@ export const authService = {
 
   // Función para solicitar restablecimiento de contraseña
   forgotPassword: async (email: string) => {
-    console.log('🔑 [FORGOT-PASSWORD] Solicitando restablecimiento para:', email);
+    console.log('🔑 [API SERVICE] === INICIANDO FORGOT PASSWORD ===');
+    console.log('📧 [API SERVICE] Email:', email);
+    console.log('🌐 [API SERVICE] Endpoint: POST /api/auth/forgot-password');
+    console.log('📦 [API SERVICE] Payload:', JSON.stringify({ email }, null, 2));
+    
     try {
       const response = await api.post('/api/auth/forgot-password', { email });
-      console.log('✅ [FORGOT-PASSWORD] Solicitud enviada:', response.data);
+      
+      console.log('✅ [API SERVICE] === RESPUESTA EXITOSA DE LA API ===');
+      console.log('✅ [API SERVICE] Status:', response.status);
+      console.log('✅ [API SERVICE] Status Text:', response.statusText);
+      console.log('✅ [API SERVICE] Headers:', JSON.stringify(response.headers, null, 2));
+      console.log('✅ [API SERVICE] Data completa:', JSON.stringify(response.data, null, 2));
+      console.log('✅ [API SERVICE] Tipo de data:', typeof response.data);
+      console.log('✅ [API SERVICE] Propiedades de data:', Object.keys(response.data || {}));
+      
+      if (response.data) {
+        console.log('✅ [API SERVICE] Success:', response.data.success);
+        console.log('✅ [API SERVICE] Message:', response.data.message);
+        console.log('✅ [API SERVICE] Data:', response.data.data);
+      }
+      
       return response.data;
-    } catch (error) {
-      console.error('❌ [FORGOT-PASSWORD] Error:', error);
+    } catch (error: any) {
+      console.error('❌ [API SERVICE] === ERROR EN LA API ===');
+      console.error('❌ [API SERVICE] Tipo de error:', typeof error);
+      console.error('❌ [API SERVICE] Error name:', error.name);
+      console.error('❌ [API SERVICE] Error message:', error.message);
+      console.error('❌ [API SERVICE] Error completo:', error);
+      
+      if (error.response) {
+        console.error('❌ [API SERVICE] Response Status:', error.response.status);
+        console.error('❌ [API SERVICE] Response Status Text:', error.response.statusText);
+        console.error('❌ [API SERVICE] Response Headers:', JSON.stringify(error.response.headers, null, 2));
+        console.error('❌ [API SERVICE] Response Data:', JSON.stringify(error.response.data, null, 2));
+      } else if (error.request) {
+        console.error('❌ [API SERVICE] Request enviado pero sin respuesta');
+        console.error('❌ [API SERVICE] Request:', error.request);
+      } else {
+        console.error('❌ [API SERVICE] Error al configurar el request:', error.message);
+      }
+      
+      if (error.config) {
+        console.error('❌ [API SERVICE] Config URL:', error.config.url);
+        console.error('❌ [API SERVICE] Config Method:', error.config.method);
+        console.error('❌ [API SERVICE] Config Data:', error.config.data);
+      }
+      
       throw error;
     }
   },
@@ -379,13 +434,21 @@ export interface Child {
 
 export interface CreateChildData {
   name: string;
-  ageInMonths: number;
+  // Nuevo sistema de fechas
+  birthDate?: string; // Formato YYYY-MM-DD para hijos nacidos
+  dueDate?: string; // Formato YYYY-MM-DD para bebés no nacidos
+  // Sistema antiguo (compatible)
+  ageInMonths?: number;
   isUnborn: boolean;
   gestationWeeks?: number;
 }
 
 export interface UpdateChildData {
   name?: string;
+  // Nuevo sistema de fechas
+  birthDate?: string; // Formato YYYY-MM-DD
+  dueDate?: string; // Formato YYYY-MM-DD
+  // Sistema antiguo (compatible)
   ageInMonths?: number;
   isUnborn?: boolean;
   gestationWeeks?: number;
@@ -683,8 +746,19 @@ export const communitiesService = {
     console.log('📝 [COMMUNITIES] Creando nuevo post en comunidad:', communityId);
     console.log('📝 [COMMUNITIES] Datos del post:', postData);
     
+    // Limpiar objeto removiendo propiedades undefined
+    const cleanPostData = Object.entries(postData).reduce((acc, [key, value]) => {
+      if (value !== undefined && value !== null) {
+        acc[key] = value;
+      }
+      return acc;
+    }, {} as any);
+    
+    console.log('📝 [COMMUNITIES] Datos limpios del post:', cleanPostData);
+    console.log('📝 [COMMUNITIES] Campos finales:', Object.keys(cleanPostData));
+    
     try {
-      const response = await api.post(`/api/communities/${communityId}/posts`, postData);
+      const response = await api.post(`/api/communities/${communityId}/posts`, cleanPostData);
       console.log('✅ [COMMUNITIES] Post creado exitosamente:', response.data);
       return response.data;
     } catch (error: any) {
@@ -810,6 +884,20 @@ export const communitiesService = {
       return response.data;
     } catch (error: any) {
       console.error('❌ [SEARCH] Error buscando comunidades:', error.response?.data || error.message);
+      throw error;
+    }
+  },
+
+  // Salir de una comunidad
+  leaveCommunity: async (communityId: string) => {
+    console.log('🚪 [COMMUNITIES] Saliendo de la comunidad:', communityId);
+    
+    try {
+      const response = await api.post(`/api/communities/${communityId}/leave`);
+      console.log('✅ [COMMUNITIES] Salida exitosa de la comunidad:', response.data);
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ [COMMUNITIES] Error saliendo de la comunidad:', error.response?.data || error.message);
       throw error;
     }
   }
@@ -1020,4 +1108,553 @@ export const listsService = {
   },
 };
 
-export default api;
+// ============================================
+// CATEGORÍAS DE RECOMENDACIONES
+// ============================================
+
+export const categoriesService = {
+  // Obtener todas las categorías activas
+  getCategories: async () => {
+    console.log('📂 [CATEGORIES] Obteniendo todas las categorías');
+    try {
+      const response = await api.get('/api/categories');
+      
+      console.log('✅ [CATEGORIES] Categorías obtenidas exitosamente');
+      console.log('📦 [CATEGORIES] Total de categorías:', response.data?.data?.length || 0);
+      console.log('📦 [CATEGORIES] Datos:', JSON.stringify(response.data, null, 2));
+      
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ [CATEGORIES] Error obteniendo categorías');
+      console.error('❌ [CATEGORIES] Error:', error.response?.data || error.message);
+      throw error;
+    }
+  },
+
+  // Obtener una categoría específica por ID
+  getCategoryById: async (categoryId: string) => {
+    console.log('📂 [CATEGORIES] Obteniendo categoría:', categoryId);
+    try {
+      const response = await api.get(`/api/categories/${categoryId}`);
+      
+      console.log('✅ [CATEGORIES] Categoría obtenida exitosamente');
+      console.log('📦 [CATEGORIES] Datos:', JSON.stringify(response.data, null, 2));
+      
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ [CATEGORIES] Error obteniendo categoría:', categoryId);
+      console.error('❌ [CATEGORIES] Error:', error.response?.data || error.message);
+      throw error;
+    }
+  },
+};
+
+// ============================================
+// RECOMENDACIONES
+// ============================================
+
+export const recommendationsService = {
+  // Obtener todas las recomendaciones o filtradas por categoría
+  getRecommendations: async (categoryId?: string) => {
+    const queryParam = categoryId ? `?categoryId=${categoryId}` : '';
+    console.log('⭐ [RECOMMENDATIONS] Obteniendo recomendaciones', categoryId ? `para categoría: ${categoryId}` : '');
+    
+    try {
+      const response = await api.get(`/api/recommendations${queryParam}`);
+      
+      console.log('✅ [RECOMMENDATIONS] Recomendaciones obtenidas exitosamente');
+      console.log('📦 [RECOMMENDATIONS] Total:', response.data?.data?.length || 0);
+      console.log('📦 [RECOMMENDATIONS] Datos:', JSON.stringify(response.data, null, 2));
+      
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ [RECOMMENDATIONS] Error obteniendo recomendaciones');
+      console.error('❌ [RECOMMENDATIONS] Error:', error.response?.data || error.message);
+      throw error;
+    }
+  },
+
+  // Obtener recomendaciones por categoría (alias más específico)
+  getRecommendationsByCategory: async (categoryId: string) => {
+    console.log('⭐ [RECOMMENDATIONS] Obteniendo recomendaciones por categoría:', categoryId);
+    return recommendationsService.getRecommendations(categoryId);
+  },
+
+  // Obtener una recomendación específica por ID
+  getRecommendationById: async (recommendationId: string) => {
+    console.log('⭐ [RECOMMENDATIONS] Obteniendo recomendación:', recommendationId);
+    
+    try {
+      const response = await api.get(`/api/recommendations/${recommendationId}`);
+      
+      console.log('✅ [RECOMMENDATIONS] Recomendación obtenida exitosamente');
+      console.log('📦 [RECOMMENDATIONS] Datos:', JSON.stringify(response.data, null, 2));
+      
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ [RECOMMENDATIONS] Error obteniendo recomendación:', recommendationId);
+      console.error('❌ [RECOMMENDATIONS] Error:', error.response?.data || error.message);
+      throw error;
+    }
+  },
+
+  // Obtener reviews de una recomendación
+  getRecommendationReviews: async (recommendationId: string, page: number = 1, limit: number = 20) => {
+    console.log('⭐ [RECOMMENDATIONS] Obteniendo reviews:', recommendationId, `Página: ${page}`);
+    
+    try {
+      const response = await api.get(`/api/recommendations/${recommendationId}/reviews`, {
+        params: { page, limit }
+      });
+      
+      console.log('✅ [RECOMMENDATIONS] Reviews obtenidas exitosamente');
+      console.log('📦 [RECOMMENDATIONS] Total reviews:', response.data?.stats?.totalReviews || 0);
+      console.log('📦 [RECOMMENDATIONS] Rating promedio:', response.data?.stats?.averageRating || 0);
+      
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ [RECOMMENDATIONS] Error obteniendo reviews:', recommendationId);
+      console.error('❌ [RECOMMENDATIONS] Error:', error.response?.data || error.message);
+      throw error;
+    }
+  },
+
+  // Obtener mi review para una recomendación
+  getMyReview: async (recommendationId: string) => {
+    console.log('⭐ [RECOMMENDATIONS] Obteniendo mi review:', recommendationId);
+    
+    try {
+      const response = await api.get(`/api/recommendations/${recommendationId}/reviews/my-review`);
+      
+      console.log('✅ [RECOMMENDATIONS] Mi review obtenida');
+      console.log('📦 [RECOMMENDATIONS] Datos:', response.data?.data);
+      
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ [RECOMMENDATIONS] Error obteniendo mi review:', recommendationId);
+      console.error('❌ [RECOMMENDATIONS] Error:', error.response?.data || error.message);
+      throw error;
+    }
+  },
+
+  // Crear o actualizar review (MEJORADO con fotos y contexto)
+  createOrUpdateReview: async (
+    recommendationId: string, 
+    rating: number, 
+    comment?: string,
+    photos?: string[],
+    childAge?: string,
+    visitedWith?: 'Solo' | 'Pareja' | 'Familia' | 'Amigos'
+  ) => {
+    console.log('⭐ [RECOMMENDATIONS] Creando/actualizando review:', recommendationId, `Rating: ${rating}`);
+    
+    try {
+      const reviewData: any = {
+        rating,
+        comment: comment || ''
+      };
+
+      // Agregar campos opcionales solo si están presentes
+      if (photos && photos.length > 0) reviewData.photos = photos;
+      if (childAge) reviewData.childAge = childAge;
+      if (visitedWith) reviewData.visitedWith = visitedWith;
+
+      console.log('📦 [RECOMMENDATIONS] Review data:', reviewData);
+
+      const response = await api.post(`/api/recommendations/${recommendationId}/reviews`, reviewData);
+      
+      console.log('✅ [RECOMMENDATIONS] Review guardada exitosamente');
+      console.log('📦 [RECOMMENDATIONS] Datos:', response.data);
+      
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ [RECOMMENDATIONS] Error guardando review:', recommendationId);
+      console.error('❌ [RECOMMENDATIONS] Error:', error.response?.data || error.message);
+      throw error;
+    }
+  },
+
+  // Subir foto individual de review
+  uploadReviewPhoto: async (recommendationId: string, photoFile: any) => {
+    console.log('📸 [RECOMMENDATIONS] Subiendo foto de review:', recommendationId);
+    
+    try {
+      const formData = new FormData();
+      formData.append('photo', {
+        uri: photoFile.uri,
+        type: photoFile.type || 'image/jpeg',
+        name: photoFile.fileName || 'photo.jpg',
+      } as any);
+
+      const response = await api.post(
+        `/api/recommendations/${recommendationId}/reviews/upload-photo`,
+        formData,
+        {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+        }
+      );
+      
+      console.log('✅ [RECOMMENDATIONS] Foto subida:', response.data.data.photoUrl);
+      
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ [RECOMMENDATIONS] Error subiendo foto:', error.response?.data || error.message);
+      throw error;
+    }
+  },
+
+  // Subir múltiples fotos de review (máx 5)
+  uploadReviewPhotos: async (recommendationId: string, photoFiles: any[]) => {
+    console.log('📸 [RECOMMENDATIONS] Subiendo', photoFiles.length, 'fotos de review:', recommendationId);
+    
+    try {
+      const formData = new FormData();
+      
+      photoFiles.forEach((file, index) => {
+        formData.append('photos', {
+          uri: file.uri,
+          type: file.type || 'image/jpeg',
+          name: file.fileName || `photo${index}.jpg`,
+        } as any);
+      });
+
+      const response = await api.post(
+        `/api/recommendations/${recommendationId}/reviews/upload-photos`,
+        formData,
+        {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+        }
+      );
+      
+      console.log('✅ [RECOMMENDATIONS] Fotos subidas:', response.data.data.photoUrls.length);
+      
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ [RECOMMENDATIONS] Error subiendo fotos:', error.response?.data || error.message);
+      throw error;
+    }
+  },
+
+  // Toggle "útil" en una review
+  toggleReviewHelpful: async (recommendationId: string, reviewId: string) => {
+    console.log('👍 [RECOMMENDATIONS] Toggle útil en review:', reviewId);
+    
+    try {
+      const response = await api.post(
+        `/api/recommendations/${recommendationId}/reviews/${reviewId}/helpful`
+      );
+      
+      console.log('✅ [RECOMMENDATIONS] Toggle útil exitoso:', response.data.isHelpful);
+      
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ [RECOMMENDATIONS] Error toggle útil:', error.response?.data || error.message);
+      throw error;
+    }
+  },
+
+  // Verificar si marqué como útil
+  checkReviewHelpful: async (recommendationId: string, reviewId: string) => {
+    try {
+      const response = await api.get(
+        `/api/recommendations/${recommendationId}/reviews/${reviewId}/helpful`
+      );
+      
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ [RECOMMENDATIONS] Error verificando útil:', error.response?.data || error.message);
+      throw error;
+    }
+  },
+
+  // Eliminar mi review
+  deleteMyReview: async (recommendationId: string) => {
+    console.log('🗑️ [RECOMMENDATIONS] Eliminando mi review:', recommendationId);
+    
+    try {
+      const response = await api.delete(`/api/recommendations/${recommendationId}/reviews/my-review`);
+      
+      console.log('✅ [RECOMMENDATIONS] Review eliminada exitosamente');
+      
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ [RECOMMENDATIONS] Error eliminando review:', recommendationId);
+      console.error('❌ [RECOMMENDATIONS] Error:', error.response?.data || error.message);
+      throw error;
+    }
+  },
+
+  // Obtener mis favoritos
+  getFavorites: async () => {
+    console.log('❤️ [RECOMMENDATIONS] Obteniendo favoritos');
+    
+    try {
+      const response = await api.get('/api/recommendations/favorites');
+      
+      console.log('✅ [RECOMMENDATIONS] Favoritos obtenidos exitosamente');
+      console.log('📦 [RECOMMENDATIONS] Total favoritos:', response.data?.data?.length || 0);
+      
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ [RECOMMENDATIONS] Error obteniendo favoritos');
+      console.error('❌ [RECOMMENDATIONS] Error:', error.response?.data || error.message);
+      throw error;
+    }
+  },
+
+  // Verificar si es favorito
+  isFavorite: async (recommendationId: string) => {
+    console.log('❤️ [RECOMMENDATIONS] Verificando favorito:', recommendationId);
+    
+    try {
+      const response = await api.get(`/api/recommendations/${recommendationId}/favorite`);
+      
+      console.log('✅ [RECOMMENDATIONS] Estado de favorito:', response.data?.isFavorite);
+      
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ [RECOMMENDATIONS] Error verificando favorito:', recommendationId);
+      console.error('❌ [RECOMMENDATIONS] Error:', error.response?.data || error.message);
+      throw error;
+    }
+  },
+
+  // Toggle favorito (agregar/quitar)
+  toggleFavorite: async (recommendationId: string) => {
+    console.log('❤️ [RECOMMENDATIONS] Toggle favorito:', recommendationId);
+    
+    try {
+      const response = await api.post(`/api/recommendations/${recommendationId}/favorite`);
+      
+      console.log('✅ [RECOMMENDATIONS] Favorito actualizado:', response.data?.isFavorite);
+      
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ [RECOMMENDATIONS] Error con favorito:', recommendationId);
+      console.error('❌ [RECOMMENDATIONS] Error:', error.response?.data || error.message);
+      throw error;
+    }
+  },
+
+  // Obtener recomendaciones recientes
+  getRecentRecommendations: async (limit: number = 10) => {
+    console.log('🆕 [RECOMMENDATIONS] Obteniendo recomendaciones recientes, límite:', limit);
+    
+    try {
+      const response = await api.get('/api/recommendations/recent', {
+        params: { limit }
+      });
+      
+      console.log('✅ [RECOMMENDATIONS] Recomendaciones recientes obtenidas exitosamente');
+      console.log('📦 [RECOMMENDATIONS] Total recientes:', response.data?.data?.length || 0);
+      console.log('📦 [RECOMMENDATIONS] Datos:', JSON.stringify(response.data, null, 2));
+      
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ [RECOMMENDATIONS] Error obteniendo recomendaciones recientes');
+      console.error('❌ [RECOMMENDATIONS] Error:', error.response?.data || error.message);
+      throw error;
+    }
+  },
+
+  // ============================================
+  // NUEVAS FUNCIONES - FEATURES AVANZADAS
+  // ============================================
+
+  // Obtener recomendaciones cercanas (geolocalización)
+  getNearbyRecommendations: async (
+    latitude: number, 
+    longitude: number, 
+    radius: number = 10, 
+    categoryId?: string
+  ) => {
+    console.log('📍 [RECOMMENDATIONS] Obteniendo recomendaciones cercanas');
+    console.log(`📍 Ubicación: ${latitude}, ${longitude}, Radio: ${radius}km`);
+    
+    try {
+      const response = await api.get('/api/recommendations/nearby', {
+        params: { latitude, longitude, radius, categoryId }
+      });
+      
+      console.log('✅ [RECOMMENDATIONS] Recomendaciones cercanas obtenidas');
+      console.log('📦 [RECOMMENDATIONS] Total cercanas:', response.data?.data?.length || 0);
+      
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ [RECOMMENDATIONS] Error obteniendo recomendaciones cercanas');
+      console.error('❌ [RECOMMENDATIONS] Error:', error.response?.data || error.message);
+      throw error;
+    }
+  },
+
+  // Agregar a lista de deseos
+  addToWishlist: async (recommendationId: string, notes?: string, priority?: string) => {
+    console.log('💝 [RECOMMENDATIONS] Agregando a lista de deseos:', recommendationId);
+    
+    try {
+      const response = await api.post('/api/recommendations/wishlist', {
+        recommendationId,
+        notes,
+        priority
+      });
+      
+      console.log('✅ [RECOMMENDATIONS] Agregado a lista de deseos');
+      
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ [RECOMMENDATIONS] Error agregando a wishlist');
+      console.error('❌ [RECOMMENDATIONS] Error:', error.response?.data || error.message);
+      throw error;
+    }
+  },
+
+  // Obtener mi lista de deseos
+  getWishlist: async (priority?: string) => {
+    console.log('💝 [RECOMMENDATIONS] Obteniendo lista de deseos');
+    
+    try {
+      const response = await api.get('/api/recommendations/wishlist', {
+        params: { priority }
+      });
+      
+      console.log('✅ [RECOMMENDATIONS] Lista de deseos obtenida');
+      console.log('📦 [RECOMMENDATIONS] Total en wishlist:', response.data?.data?.length || 0);
+      
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ [RECOMMENDATIONS] Error obteniendo wishlist');
+      console.error('❌ [RECOMMENDATIONS] Error:', error.response?.data || error.message);
+      throw error;
+    }
+  },
+
+  // Quitar de lista de deseos
+  removeFromWishlist: async (wishlistId: string) => {
+    console.log('💔 [RECOMMENDATIONS] Quitando de lista de deseos:', wishlistId);
+    
+    try {
+      const response = await api.delete(`/api/recommendations/wishlist/${wishlistId}`);
+      
+      console.log('✅ [RECOMMENDATIONS] Quitado de lista de deseos');
+      
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ [RECOMMENDATIONS] Error quitando de wishlist');
+      console.error('❌ [RECOMMENDATIONS] Error:', error.response?.data || error.message);
+      throw error;
+    }
+  },
+  
+  // Verificar si está en wishlist
+  isInWishlist: async (recommendationId: string) => {
+    console.log('💝 [RECOMMENDATIONS] Verificando si está en wishlist:', recommendationId);
+    
+    try {
+      const response = await api.get(`/api/recommendations/${recommendationId}/wishlist`);
+      
+      console.log('✅ [RECOMMENDATIONS] Estado wishlist:', response.data?.data?.inWishlist);
+      
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ [RECOMMENDATIONS] Error verificando wishlist');
+      console.error('❌ [RECOMMENDATIONS] Error:', error.response?.data || error.message);
+      throw error;
+    }
+  },
+
+  // Registrar visita a una recomendación
+  registerVisit: async (recommendationId: string, childId?: string, visitDate?: Date) => {
+    console.log('👣 [RECOMMENDATIONS] Registrando visita:', recommendationId);
+    
+    try {
+      const response = await api.post(`/api/recommendations/${recommendationId}/visits`, {
+        childId,
+        visitDate: visitDate || new Date()
+      });
+      
+      console.log('✅ [RECOMMENDATIONS] Visita registrada');
+      
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ [RECOMMENDATIONS] Error registrando visita');
+      console.error('❌ [RECOMMENDATIONS] Error:', error.response?.data || error.message);
+      throw error;
+    }
+  },
+
+  // Obtener recomendaciones de una comunidad
+  getCommunityRecommendations: async (communityId: string, categoryId?: string, limit: number = 20) => {
+    console.log('👥 [RECOMMENDATIONS] Obteniendo recomendaciones de comunidad:', communityId);
+    
+    try {
+      const response = await api.get(`/api/communities/${communityId}/recommendations`, {
+        params: { categoryId, limit }
+      });
+      
+      console.log('✅ [RECOMMENDATIONS] Recomendaciones de comunidad obtenidas');
+      console.log('📦 [RECOMMENDATIONS] Total:', response.data?.data?.length || 0);
+      
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ [RECOMMENDATIONS] Error obteniendo recomendaciones de comunidad');
+      console.error('❌ [RECOMMENDATIONS] Error:', error.response?.data || error.message);
+      throw error;
+    }
+  },
+
+  // Comparar recomendaciones
+  compareRecommendations: async (recommendationIds: string[]) => {
+    console.log('⚖️ [RECOMMENDATIONS] Comparando recomendaciones:', recommendationIds);
+    
+    try {
+      const response = await api.get('/api/recommendations/compare', {
+        params: { ids: recommendationIds.join(',') }
+      });
+      
+      console.log('✅ [RECOMMENDATIONS] Comparación obtenida');
+      
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ [RECOMMENDATIONS] Error comparando recomendaciones');
+      console.error('❌ [RECOMMENDATIONS] Error:', error.response?.data || error.message);
+      throw error;
+    }
+  },
+
+  // Obtener recomendaciones personalizadas según perfil del bebé
+  getPersonalizedRecommendations: async (childId?: string) => {
+    console.log('🎯 [RECOMMENDATIONS] Obteniendo recomendaciones personalizadas');
+    
+    try {
+      const response = await api.get('/api/recommendations/personalized', {
+        params: { childId }
+      });
+      
+      console.log('✅ [RECOMMENDATIONS] Recomendaciones personalizadas obtenidas');
+      
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ [RECOMMENDATIONS] Error obteniendo recomendaciones personalizadas');
+      console.error('❌ [RECOMMENDATIONS] Error:', error.response?.data || error.message);
+      throw error;
+    }
+  },
+};
+
+// Export de la instancia de axios para uso en otros servicios
+export { api as axiosInstance };
+
+// Export default con todos los servicios agrupados
+export default {
+  ...authService,
+  ...childrenService,
+  ...profileService,
+  ...communitiesService,
+  ...listsService,
+  ...categoriesService,
+  ...recommendationsService,
+};

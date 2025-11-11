@@ -9,7 +9,11 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  Modal,
+  Button,
 } from 'react-native';
+// @ts-ignore
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '../contexts/AuthContext';
@@ -25,8 +29,12 @@ import {
 
 interface ChildData {
   name: string;
-  years: number;
-  months: number;
+  // Nuevo sistema de fechas
+  birthDate?: Date; // Para hijos nacidos
+  dueDate?: Date; // Para bebés no nacidos
+  // Sistema antiguo (mantener para retrocompatibilidad)
+  years?: number;
+  months?: number;
   isUnborn?: boolean;
   weeksOfPregnancy?: number;
 }
@@ -60,23 +68,49 @@ const ChildrenDataScreen: React.FC = () => {
   // Inicializar con datos del hijo si está en modo edición
   const getInitialChildrenData = () => {
     if (isEditing && childData) {
-      const ageInMonths = childData.currentAgeInMonths || childData.ageInMonths || 0;
-      const years = Math.floor(ageInMonths / 12);
-      const months = ageInMonths % 12;
-      
-      return [{
+      const initialData: ChildData = {
         name: childData.name || '',
-        years: years,
-        months: months,
         isUnborn: childData.isUnborn || false,
-        weeksOfPregnancy: childData.currentGestationWeeks || childData.gestationWeeks || 0,
-      }];
+      };
+      
+      if (childData.isUnborn) {
+        // Para bebés no nacidos, usar dueDate si existe, si no calcular desde gestationWeeks
+        if (childData.dueDate) {
+          initialData.dueDate = new Date(childData.dueDate);
+        } else {
+          // Fallback: calcular fecha de parto desde semanas de gestación
+          const weeksRemaining = 40 - (childData.currentGestationWeeks || childData.gestationWeeks || 0);
+          const dueDate = new Date();
+          dueDate.setDate(dueDate.getDate() + (weeksRemaining * 7));
+          initialData.dueDate = dueDate;
+        }
+      } else {
+        // Para hijos nacidos, usar birthDate si existe, si no calcular desde ageInMonths
+        if (childData.birthDate) {
+          initialData.birthDate = new Date(childData.birthDate);
+        } else {
+          // Fallback: calcular fecha de nacimiento desde edad en meses
+          const ageInMonths = childData.currentAgeInMonths || childData.ageInMonths || 0;
+          const birthDate = new Date();
+          birthDate.setMonth(birthDate.getMonth() - ageInMonths);
+          initialData.birthDate = birthDate;
+        }
+      }
+      
+      return [initialData];
     }
-    return Array(childrenCount).fill({ name: '', years: 0, months: 0, weeksOfPregnancy: 0 });
+    return Array(childrenCount).fill({ 
+      name: '', 
+      birthDate: new Date(), 
+      dueDate: new Date(),
+      isUnborn: false 
+    });
   };
   
   const [childrenData, setChildrenData] = useState<ChildData[]>(getInitialChildrenData());
   const [isLoading, setIsLoading] = useState(false);
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [selectedChildIndex, setSelectedChildIndex] = useState<number | null>(null);
 
   const updateChildData = (index: number, field: keyof ChildData, value: any) => {
     const newChildrenData = [...childrenData];
@@ -92,17 +126,56 @@ const ChildrenDataScreen: React.FC = () => {
         return false;
       }
       
-      // Si es un bebé por nacer, no validar edad
-      if (child.isUnborn) continue;
-      
-      // Validar que la edad sea razonable (0-18 años)
-      const totalMonths = (child.years * 12) + child.months;
-      if (totalMonths > 216) { // 18 años = 216 meses
-        Alert.alert('Error', `La edad del hijo ${i + 1} no puede ser mayor a 18 años`);
-        return false;
+      if (child.isUnborn) {
+        // Validar fecha de parto
+        if (!child.dueDate) {
+          Alert.alert('Error', `Por favor selecciona la fecha esperada de parto para ${child.name}`);
+          return false;
+        }
+        
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const twoWeeksAgo = new Date(today);
+        twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14);
+        
+        if (child.dueDate < twoWeeksAgo) {
+          Alert.alert('Error', `La fecha de parto para ${child.name} no puede ser hace más de 2 semanas`);
+          return false;
+        }
+      } else {
+        // Validar fecha de nacimiento
+        if (!child.birthDate) {
+          Alert.alert('Error', `Por favor selecciona la fecha de nacimiento para ${child.name}`);
+          return false;
+        }
+        
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const birthDate = new Date(child.birthDate);
+        birthDate.setHours(0, 0, 0, 0);
+        
+        if (birthDate > today) {
+          Alert.alert('Error', `La fecha de nacimiento de ${child.name} no puede ser en el futuro`);
+          return false;
+        }
+        
+        const eighteenYearsAgo = new Date(today);
+        eighteenYearsAgo.setFullYear(eighteenYearsAgo.getFullYear() - 18);
+        
+        if (birthDate < eighteenYearsAgo) {
+          Alert.alert('Error', `La fecha de nacimiento de ${child.name} no puede ser hace más de 18 años`);
+          return false;
+        }
       }
     }
     return true;
+  };
+
+  const formatDateToYYYYMMDD = (date: Date): string => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
   };
 
   const handleSave = async () => {
@@ -122,13 +195,12 @@ const ChildrenDataScreen: React.FC = () => {
           isUnborn: isUnborn,
         };
         
-        if (isUnborn) {
-          updateData.gestationWeeks = child.weeksOfPregnancy || 0;
-          updateData.ageInMonths = 0;
-        } else {
-          const totalMonths = (child.years * 12) + child.months;
-          updateData.ageInMonths = totalMonths;
-          updateData.gestationWeeks = undefined;
+        if (isUnborn && child.dueDate) {
+          // Usar nuevo sistema de fechas para bebés no nacidos
+          updateData.dueDate = formatDateToYYYYMMDD(child.dueDate);
+        } else if (!isUnborn && child.birthDate) {
+          // Usar nuevo sistema de fechas para hijos nacidos
+          updateData.birthDate = formatDateToYYYYMMDD(child.birthDate);
         }
         
         console.log('Actualizando hijo con ID:', childId, 'Datos:', updateData);
@@ -149,27 +221,30 @@ const ChildrenDataScreen: React.FC = () => {
         return;
       }
       
-      // Modo creación (código original)
-      // Preparar los datos en el formato que espera el backend
+      // Modo creación
+      // Preparar los datos en el formato del nuevo sistema de fechas
       const childrenToSave: CreateChildData[] = childrenData.map((child, index) => {
         const isUnborn = isUnbornChild(index);
         
-        if (isUnborn) {
-          // Para bebé por nacer
+        if (isUnborn && child.dueDate) {
+          // Para bebé por nacer - usar nuevo sistema de fechas
           return {
             name: child.name,
-            ageInMonths: 0,
+            dueDate: formatDateToYYYYMMDD(child.dueDate),
             isUnborn: true,
-            gestationWeeks: child.weeksOfPregnancy || 0
+          };
+        } else if (!isUnborn && child.birthDate) {
+          // Para hijo nacido - usar nuevo sistema de fechas
+          return {
+            name: child.name,
+            birthDate: formatDateToYYYYMMDD(child.birthDate),
+            isUnborn: false,
           };
         } else {
-          // Para hijo nacido
-          const totalMonths = (child.years * 12) + child.months;
+          // Fallback por si acaso (no debería llegar aquí si la validación funciona)
           return {
             name: child.name,
-            ageInMonths: totalMonths,
-            isUnborn: false,
-            gestationWeeks: undefined
+            isUnborn: isUnborn,
           };
         }
       });
@@ -300,12 +375,60 @@ const ChildrenDataScreen: React.FC = () => {
     return false;
   };
 
-  const getPregnancyInfo = (weeks: number) => {
-    if (weeks < 12) return 'Primer trimestre';
-    if (weeks < 28) return 'Segundo trimestre';
-    if (weeks < 37) return 'Tercer trimestre';
-    if (weeks < 40) return 'A término';
-    return 'Postérmino';
+  const getPregnancyInfo = (dueDate: Date) => {
+    const today = new Date();
+    const diffTime = dueDate.getTime() - today.getTime();
+    const diffWeeks = Math.ceil(diffTime / (1000 * 60 * 60 * 24 * 7));
+    const currentWeeks = 40 - diffWeeks;
+    
+    if (currentWeeks < 12) return `Semana ${currentWeeks} - Primer trimestre`;
+    if (currentWeeks < 28) return `Semana ${currentWeeks} - Segundo trimestre`;
+    if (currentWeeks < 37) return `Semana ${currentWeeks} - Tercer trimestre`;
+    if (currentWeeks < 40) return `Semana ${currentWeeks} - A término`;
+    return `Semana ${currentWeeks} - Postérmino`;
+  };
+
+  const calculateAge = (birthDate: Date): string => {
+    const today = new Date();
+    const years = today.getFullYear() - birthDate.getFullYear();
+    const months = today.getMonth() - birthDate.getMonth();
+    
+    let totalMonths = (years * 12) + months;
+    if (today.getDate() < birthDate.getDate()) {
+      totalMonths--;
+    }
+    
+    const ageYears = Math.floor(totalMonths / 12);
+    const ageMonths = totalMonths % 12;
+    
+    if (ageYears > 0) {
+      return `${ageYears} ${ageYears === 1 ? 'año' : 'años'}${ageMonths > 0 ? ` y ${ageMonths} ${ageMonths === 1 ? 'mes' : 'meses'}` : ''}`;
+    }
+    return `${ageMonths} ${ageMonths === 1 ? 'mes' : 'meses'}`;
+  };
+
+  const handleDateChange = (event: any, selectedDate?: Date) => {
+    if (Platform.OS === 'android') {
+      setShowDatePicker(false);
+    }
+    
+    if (selectedDate && selectedChildIndex !== null) {
+      const child = childrenData[selectedChildIndex];
+      if (child.isUnborn) {
+        updateChildData(selectedChildIndex, 'dueDate', selectedDate);
+      } else {
+        updateChildData(selectedChildIndex, 'birthDate', selectedDate);
+      }
+    }
+    
+    if (Platform.OS === 'ios' && event.type === 'dismissed') {
+      setSelectedChildIndex(null);
+    }
+  };
+
+  const openDatePicker = (index: number) => {
+    setSelectedChildIndex(index);
+    setShowDatePicker(true);
   };
 
   return (
@@ -361,69 +484,59 @@ const ChildrenDataScreen: React.FC = () => {
               </View>
 
               {!isUnbornChild(index) ? (
-                <View style={styles.ageContainer}>
-                  <Text style={styles.label}>Edad</Text>
-                  <View style={styles.ageInputs}>
-                    <View style={styles.ageInputGroup}>
-                      <Text style={styles.ageLabel}>Años</Text>
-                      <View style={styles.ageSelector}>
-                        <TouchableOpacity
-                          style={styles.ageButton}
-                          onPress={() => updateChildData(index, 'years', Math.max(0, child.years - 1))}
-                        >
-                          <Text style={styles.ageButtonText}>-</Text>
-                        </TouchableOpacity>
-                        <Text style={styles.ageValue}>{child.years}</Text>
-                        <TouchableOpacity
-                          style={styles.ageButton}
-                          onPress={() => updateChildData(index, 'years', child.years + 1)}
-                        >
-                          <Text style={styles.ageButtonText}>+</Text>
-                        </TouchableOpacity>
-                      </View>
+                <View style={styles.dateContainer}>
+                  <Text style={styles.label}>Fecha de nacimiento</Text>
+                  <TouchableOpacity
+                    style={styles.dateButton}
+                    onPress={() => openDatePicker(index)}
+                  >
+                    <Text style={styles.dateButtonText}>
+                      {child.birthDate 
+                        ? child.birthDate.toLocaleDateString('es-ES', { 
+                            year: 'numeric', 
+                            month: 'long', 
+                            day: 'numeric' 
+                          })
+                        : 'Seleccionar fecha'}
+                    </Text>
+                    <Text style={styles.dateIcon}>📅</Text>
+                  </TouchableOpacity>
+                  
+                  {child.birthDate && (
+                    <View style={styles.calculatedAgeContainer}>
+                      <Text style={styles.calculatedAgeLabel}>Edad actual:</Text>
+                      <Text style={styles.calculatedAgeValue}>
+                        {calculateAge(child.birthDate)}
+                      </Text>
                     </View>
-
-                    <View style={styles.ageInputGroup}>
-                      <Text style={styles.ageLabel}>Meses</Text>
-                      <View style={styles.ageSelector}>
-                        <TouchableOpacity
-                          style={styles.ageButton}
-                          onPress={() => updateChildData(index, 'months', child.months === 0 ? 11 : child.months - 1)}
-                        >
-                          <Text style={styles.ageButtonText}>-</Text>
-                        </TouchableOpacity>
-                        <Text style={styles.ageValue}>{child.months}</Text>
-                        <TouchableOpacity
-                          style={styles.ageButton}
-                          onPress={() => updateChildData(index, 'months', (child.months + 1) % 12)}
-                        >
-                          <Text style={styles.ageButtonText}>+</Text>
-                        </TouchableOpacity>
-                      </View>
-                    </View>
-                  </View>
+                  )}
                 </View>
               ) : (
-                <View style={styles.pregnancyContainer}>
-                  <Text style={styles.label}>Semanas de gestación</Text>
-                  <View style={styles.weeksSelector}>
-                    <TouchableOpacity
-                      style={styles.weeksButton}
-                      onPress={() => updateChildData(index, 'weeksOfPregnancy', Math.max(1, (child.weeksOfPregnancy || 0) - 1))}
-                    >
-                      <Text style={styles.weeksButtonText}>-</Text>
-                    </TouchableOpacity>
-                    <Text style={styles.weeksValue}>{child.weeksOfPregnancy || 0}</Text>
-                    <TouchableOpacity
-                      style={styles.weeksButton}
-                      onPress={() => updateChildData(index, 'weeksOfPregnancy', Math.min(42, (child.weeksOfPregnancy || 0) + 1))}
-                    >
-                      <Text style={styles.weeksButtonText}>+</Text>
-                    </TouchableOpacity>
-                  </View>
-                  <Text style={styles.weeksInfo}>
-                    {getPregnancyInfo(child.weeksOfPregnancy || 0)}
-                  </Text>
+                <View style={styles.dateContainer}>
+                  <Text style={styles.label}>Fecha esperada de parto</Text>
+                  <TouchableOpacity
+                    style={styles.dateButton}
+                    onPress={() => openDatePicker(index)}
+                  >
+                    <Text style={styles.dateButtonText}>
+                      {child.dueDate 
+                        ? child.dueDate.toLocaleDateString('es-ES', { 
+                            year: 'numeric', 
+                            month: 'long', 
+                            day: 'numeric' 
+                          })
+                        : 'Seleccionar fecha'}
+                    </Text>
+                    <Text style={styles.dateIcon}>📅</Text>
+                  </TouchableOpacity>
+                  
+                  {child.dueDate && (
+                    <View style={styles.pregnancyInfoContainer}>
+                      <Text style={styles.pregnancyInfoText}>
+                        {getPregnancyInfo(child.dueDate)}
+                      </Text>
+                    </View>
+                  )}
                 </View>
               )}
             </View>
@@ -457,6 +570,103 @@ const ChildrenDataScreen: React.FC = () => {
           </View>
         </View>
       </ScrollView>
+
+      {/* Date Picker Modal */}
+      {showDatePicker && selectedChildIndex !== null && (
+        Platform.OS === 'ios' ? (
+          <Modal
+            transparent={true}
+            animationType="slide"
+            visible={showDatePicker}
+            onRequestClose={() => {
+              setShowDatePicker(false);
+              setSelectedChildIndex(null);
+            }}
+          >
+            <View style={styles.modalOverlay}>
+              <View style={styles.datePickerContainer}>
+                <View style={styles.datePickerHeader}>
+                  <Text style={styles.datePickerTitle}>
+                    {childrenData[selectedChildIndex]?.isUnborn 
+                      ? 'Selecciona la fecha de parto' 
+                      : 'Selecciona la fecha de nacimiento'}
+                  </Text>
+                </View>
+                <DateTimePicker
+                  value={
+                    childrenData[selectedChildIndex]?.isUnborn 
+                      ? (childrenData[selectedChildIndex]?.dueDate || new Date())
+                      : (childrenData[selectedChildIndex]?.birthDate || new Date())
+                  }
+                  mode="date"
+                  display="spinner"
+                  onChange={handleDateChange}
+                  maximumDate={
+                    childrenData[selectedChildIndex]?.isUnborn 
+                      ? undefined 
+                      : new Date()
+                  }
+                  minimumDate={
+                    childrenData[selectedChildIndex]?.isUnborn 
+                      ? new Date()
+                      : (() => {
+                          const minDate = new Date();
+                          minDate.setFullYear(minDate.getFullYear() - 18);
+                          return minDate;
+                        })()
+                  }
+                  locale="es-ES"
+                />
+                <View style={styles.datePickerButtons}>
+                  <TouchableOpacity 
+                    style={[styles.datePickerButton, styles.cancelButton]}
+                    onPress={() => {
+                      setShowDatePicker(false);
+                      setSelectedChildIndex(null);
+                    }}
+                  >
+                    <Text style={styles.cancelButtonText}>Cancelar</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity 
+                    style={[styles.datePickerButton, styles.confirmButton]}
+                    onPress={() => {
+                      setShowDatePicker(false);
+                      setSelectedChildIndex(null);
+                    }}
+                  >
+                    <Text style={styles.confirmButtonText}>Confirmar</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          </Modal>
+        ) : (
+          <DateTimePicker
+            value={
+              childrenData[selectedChildIndex]?.isUnborn 
+                ? (childrenData[selectedChildIndex]?.dueDate || new Date())
+                : (childrenData[selectedChildIndex]?.birthDate || new Date())
+            }
+            mode="date"
+            display="default"
+            onChange={handleDateChange}
+            maximumDate={
+              childrenData[selectedChildIndex]?.isUnborn 
+                ? undefined 
+                : new Date()
+            }
+            minimumDate={
+              childrenData[selectedChildIndex]?.isUnborn 
+                ? new Date()
+                : (() => {
+                    const minDate = new Date();
+                    minDate.setFullYear(minDate.getFullYear() - 18);
+                    return minDate;
+                  })()
+            }
+          />
+        )
+      )}
     </KeyboardAvoidingView>
   );
 };
@@ -533,91 +743,111 @@ const styles = StyleSheet.create({
     backgroundColor: '#f8f9fa',
     color: '#2c3e50',
   },
-  ageContainer: {
+  // Nuevos estilos para el sistema de fechas
+  dateContainer: {
     marginBottom: 16,
   },
-  ageInputs: {
+  dateButton: {
     flexDirection: 'row',
-    gap: 20,
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#f8f9fa',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#e1e8ed',
+    padding: 16,
   },
-  ageInputGroup: {
+  dateButtonText: {
+    fontSize: 16,
+    color: '#2c3e50',
+    fontWeight: '500',
     flex: 1,
   },
-  ageLabel: {
+  dateIcon: {
+    fontSize: 20,
+    marginLeft: 8,
+  },
+  calculatedAgeContainer: {
+    marginTop: 12,
+    padding: 12,
+    backgroundColor: '#E8F5E9',
+    borderRadius: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  calculatedAgeLabel: {
     fontSize: 14,
     fontWeight: '600',
     color: '#2c3e50',
-    marginBottom: 8,
+  },
+  calculatedAgeValue: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#4CAF50',
+  },
+  pregnancyInfoContainer: {
+    marginTop: 12,
+    padding: 12,
+    backgroundColor: '#FFF3E0',
+    borderRadius: 8,
+  },
+  pregnancyInfoText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#F57C00',
     textAlign: 'center',
   },
-  ageSelector: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#f8f9fa',
-    borderRadius: 8,
-    padding: 8,
+  // Estilos para el modal del date picker
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
   },
-  ageButton: {
-    width: 36,
-    height: 36,
+  datePickerContainer: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingBottom: 20,
+  },
+  datePickerHeader: {
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E0E0E0',
+  },
+  datePickerTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#2c3e50',
+    textAlign: 'center',
+  },
+  datePickerButtons: {
+    flexDirection: 'row',
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    gap: 12,
+  },
+  datePickerButton: {
+    flex: 1,
+    padding: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  cancelButton: {
+    backgroundColor: '#F0F0F0',
+  },
+  confirmButton: {
     backgroundColor: '#B4C14B',
-    borderRadius: 18,
-    justifyContent: 'center',
-    alignItems: 'center',
   },
-  ageButtonText: {
-    color: 'white',
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-  ageValue: {
-    fontSize: 18,
+  cancelButtonText: {
+    fontSize: 16,
     fontWeight: 'bold',
     color: '#2c3e50',
-    marginHorizontal: 16,
-    minWidth: 20,
-    textAlign: 'center',
   },
-  pregnancyContainer: {
-    marginBottom: 16,
-  },
-  weeksSelector: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#f8f9fa',
-    borderRadius: 8,
-    padding: 8,
-    marginBottom: 12,
-  },
-  weeksButton: {
-    width: 36,
-    height: 36,
-    backgroundColor: '#F08EB7',
-    borderRadius: 18,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  weeksButtonText: {
-    color: 'white',
-    fontSize: 18,
+  confirmButtonText: {
+    fontSize: 16,
     fontWeight: 'bold',
-  },
-  weeksValue: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#2c3e50',
-    marginHorizontal: 16,
-    minWidth: 20,
-    textAlign: 'center',
-  },
-  weeksInfo: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#F08EB7',
-    textAlign: 'center',
-    fontStyle: 'italic',
+    color: '#FFFFFF',
   },
   infoContainer: {
     backgroundColor: 'rgba(255, 255, 255, 0.1)',

@@ -19,7 +19,11 @@ const ForgotPasswordScreen: React.FC<{ navigation: any }> = ({ navigation }) => 
   const [isLoading, setIsLoading] = useState(false);
 
   const handleForgotPassword = async () => {
+    console.log('🔐 [FORGOT PASSWORD] Iniciando proceso de recuperación de contraseña');
+    console.log('📧 [FORGOT PASSWORD] Email ingresado:', email);
+    
     if (!email.trim()) {
+      console.log('❌ [FORGOT PASSWORD] Error: Email vacío');
       Alert.alert('Error', 'Por favor ingresa tu email');
       return;
     }
@@ -27,28 +31,67 @@ const ForgotPasswordScreen: React.FC<{ navigation: any }> = ({ navigation }) => 
     // Validación básica de email
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email.trim())) {
+      console.log('❌ [FORGOT PASSWORD] Error: Email inválido:', email.trim());
       Alert.alert('Error', 'Por favor ingresa un email válido');
       return;
     }
 
+    console.log('✅ [FORGOT PASSWORD] Email válido, enviando solicitud a la API...');
     setIsLoading(true);
+    
     try {
-      await forgotPassword(email.trim());
+      const result = await forgotPassword(email.trim());
+      
+      console.log('📦 [FORGOT PASSWORD] === RESPUESTA DE LA API ===');
+      console.log('📦 [FORGOT PASSWORD] Tipo de resultado:', typeof result);
+      console.log('📦 [FORGOT PASSWORD] Resultado completo:', JSON.stringify(result, null, 2));
+      console.log('📦 [FORGOT PASSWORD] Propiedades del resultado:', Object.keys(result || {}));
+      
+      if (result) {
+        console.log('✅ [FORGOT PASSWORD] Success:', result.success);
+        console.log('✅ [FORGOT PASSWORD] Message:', result.message);
+        console.log('✅ [FORGOT PASSWORD] Data:', result.data);
+      }
+      
+      console.log('✅ [FORGOT PASSWORD] Email de recuperación enviado exitosamente');
+      
       Alert.alert(
         'Email enviado',
         'Se ha enviado un enlace de restablecimiento a tu email. Por favor revisa tu bandeja de entrada.',
         [
           {
             text: 'OK',
-            onPress: () => navigation.navigate('Login'),
+            onPress: () => {
+              console.log('🔄 [FORGOT PASSWORD] Usuario navega de vuelta al Login');
+              navigation.navigate('Login');
+            },
           },
         ]
       );
     } catch (error: any) {
+      console.log('❌ [FORGOT PASSWORD] === ERROR EN LA API ===');
+      console.log('❌ [FORGOT PASSWORD] Tipo de error:', typeof error);
+      console.log('❌ [FORGOT PASSWORD] Error completo:', error);
+      console.log('❌ [FORGOT PASSWORD] Error message:', error.message);
+      console.log('❌ [FORGOT PASSWORD] Error response:', error.response);
+      
+      if (error.response) {
+        console.log('❌ [FORGOT PASSWORD] Response status:', error.response.status);
+        console.log('❌ [FORGOT PASSWORD] Response data:', JSON.stringify(error.response.data, null, 2));
+        console.log('❌ [FORGOT PASSWORD] Response headers:', error.response.headers);
+      }
+      
+      if (error.request) {
+        console.log('❌ [FORGOT PASSWORD] Request data:', error.request);
+      }
+      
       const errorMessage = error.response?.data?.message || 'Error al enviar el email de restablecimiento';
+      console.log('❌ [FORGOT PASSWORD] Mensaje de error mostrado al usuario:', errorMessage);
+      
       Alert.alert('Error', errorMessage);
     } finally {
       setIsLoading(false);
+      console.log('🏁 [FORGOT PASSWORD] Proceso finalizado');
     }
   };
 

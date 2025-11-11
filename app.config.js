@@ -2,7 +2,7 @@ module.exports = ({ config }) => ({
   ...config,
   name: 'Munpa',
   slug: 'munpaApp',
-  version: '0.0.2',
+  version: '0.0.3',
   orientation: 'portrait',
   icon: './assets/icon.png',
   userInterfaceStyle: 'light',
@@ -17,7 +17,8 @@ module.exports = ({ config }) => ({
     bundleIdentifier: 'com.munpa.app',
     icon: './assets/icon.png',
     infoPlist: {
-      ITSAppUsesNonExemptEncryption: false
+      ITSAppUsesNonExemptEncryption: false,
+      NSUserTrackingUsageDescription: 'Munpa utiliza esta información para mostrarte contenido relevante y mejorar tu experiencia en la comunidad de padres. Tus datos nunca se comparten con terceros para publicidad.'
     },
     googleServicesFile: './GoogleService-Info.plist'
   },
@@ -45,7 +46,25 @@ module.exports = ({ config }) => ({
         cameraPermission: 'La aplicación necesita acceso a tu cámara para tomar fotos de comunidades.'
       }
     ],
-    '@react-native-google-signin/google-signin'
+    [
+      'expo-location',
+      {
+        locationAlwaysAndWhenInUsePermission: 'Munpa necesita acceso a tu ubicación para mostrarte recomendaciones cercanas y lugares de interés para padres cerca de ti.',
+        locationAlwaysPermission: 'Munpa necesita acceso a tu ubicación para mostrarte recomendaciones cercanas.',
+        locationWhenInUsePermission: 'Munpa necesita acceso a tu ubicación para mostrarte recomendaciones cercanas y lugares de interés para padres cerca de ti.',
+        isAndroidBackgroundLocationEnabled: false,
+        isIosBackgroundLocationEnabled: false
+      }
+    ],
+    '@react-native-google-signin/google-signin',
+    [
+      'expo-maps',
+      {
+        // Google Maps API Key (opcional, pero recomendado para producción)
+        // Obtén tu API key en: https://developers.google.com/maps/documentation/android-sdk/get-api-key
+        googleMapsApiKey: process.env.GOOGLE_MAPS_API_KEY || ''
+      }
+    ]
   ],
   fonts: [
     {

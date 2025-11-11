@@ -13,9 +13,11 @@ import {
   Platform,
   RefreshControl,
   Image,
+  StatusBar,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRoute, useNavigation, useFocusEffect } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { listsService } from '../services/api';
 import { ListComment } from '../types/lists';
 
@@ -32,6 +34,7 @@ interface ItemCommentsScreenProps {
 const ItemCommentsScreen = () => {
   const route = useRoute<any>();
   const navigation = useNavigation<any>();
+  const insets = useSafeAreaInsets();
   const { listId, itemId, itemText } = route.params;
 
   const [comments, setComments] = useState<ListComment[]>([]);
@@ -175,8 +178,9 @@ const ItemCommentsScreen = () => {
   if (isLoading) {
     return (
       <SafeAreaView style={styles.container}>
+        <StatusBar barStyle="light-content" backgroundColor="#59C6C0" />
         {/* Header */}
-        <View style={styles.header}>
+        <View style={[styles.header, { paddingTop: Math.max(insets.top, Platform.OS === 'ios' ? 15 : 10) }]}>
           <TouchableOpacity
             style={styles.backButton}
             onPress={() => navigation.goBack()}
@@ -197,8 +201,9 @@ const ItemCommentsScreen = () => {
 
   return (
     <SafeAreaView style={styles.container}>
+      <StatusBar barStyle="light-content" backgroundColor="#59C6C0" />
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: Math.max(insets.top, Platform.OS === 'ios' ? 15 : 10) }]}>
         <TouchableOpacity
           style={styles.backButton}
           onPress={() => navigation.goBack()}
@@ -286,7 +291,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     backgroundColor: '#59C6C0',
     paddingHorizontal: 20,
-    paddingTop: Platform.OS === 'ios' ? 15 : 10,
     paddingBottom: 15,
   },
   backButton: {

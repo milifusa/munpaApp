@@ -34,6 +34,7 @@ import {
   shadows,
 } from "../styles/globalStyles";
 import { useFonts } from "../hooks/useFonts";
+import BannerCarousel from "../components/BannerCarousel";
 
 interface Child {
   id: string;
@@ -71,6 +72,12 @@ interface List {
   isPublic: boolean;
   itemCount?: number;
 }
+
+// Constantes para las caritas por defecto (fuera del componente para mejor rendimiento)
+const CARITA_1 = require("../../assets/caritas 1.png");
+const CARITA_2 = require("../../assets/caritas 2.png");
+const CARITA_3 = require("../../assets/caritas 3.png");
+const CARITAS = [CARITA_1, CARITA_2, CARITA_3];
 
 const HomeScreen: React.FC = () => {
   const { user, setUser } = useAuth();
@@ -330,18 +337,27 @@ const HomeScreen: React.FC = () => {
   };
 
   const getChildAvatar = (child: Child, index: number) => {
-    // Si el hijo tiene foto del backend y no ha fallado, usarla
-    if (child.photoUrl && !imageErrors.has(child.id)) {
+    // Si el hijo tiene foto válida del backend y no ha fallado, usarla
+    if (child.photoUrl && typeof child.photoUrl === 'string' && child.photoUrl.trim() !== '' && !imageErrors.has(child.id)) {
+      console.log('✅ [AVATAR] Usando foto del backend para:', child.name, child.photoUrl);
       return { uri: child.photoUrl };
     }
 
     // Si no tiene foto o la imagen falló, usar las caritas por defecto
-    const caritas = [
-      require("../../assets/caritas 1.png"),
-      require("../../assets/caritas 2.png"),
-      require("../../assets/caritas 3.png"),
-    ];
-    return caritas[index % 3];
+    const caritaIndex = index % 3;
+    console.log('🎨 [AVATAR] Usando carita por defecto para:', child.name, 'índice:', caritaIndex);
+    
+    // Retornar directamente el require según el índice
+    switch (caritaIndex) {
+      case 0:
+        return CARITA_1;
+      case 1:
+        return CARITA_2;
+      case 2:
+        return CARITA_3;
+      default:
+        return CARITA_1;
+    }
   };
 
   const handleImageError = (childId: string) => {
@@ -524,7 +540,7 @@ const HomeScreen: React.FC = () => {
       }
 
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: ['images'],
         allowsEditing: true,
         aspect: [1, 1],
         quality: 0.8,
@@ -617,6 +633,9 @@ const HomeScreen: React.FC = () => {
           </View>
         </View>
 
+        {/* Carrusel de Banners */}
+        <BannerCarousel />
+
         {/* Sección de Hijos */}
         <View style={styles.childrenSection}>
           <View style={styles.communitiesHeader}>
@@ -653,7 +672,16 @@ const HomeScreen: React.FC = () => {
                   <Image
                     source={getChildAvatar(child, index)}
                     style={styles.childImage}
-                    onError={() => handleImageError(child.id)}
+                    resizeMode="cover"
+                    onError={(error) => {
+                      console.log('❌ [IMAGE ERROR] Para:', child.name, error.nativeEvent);
+                      // Solo manejar error si la imagen es de URL (no recurso local)
+                      if (child.photoUrl && typeof child.photoUrl === 'string') {
+                        handleImageError(child.id);
+                      }
+                    }}
+                    defaultSource={CARITA_1}
+                    onLoad={() => console.log('✅ [IMAGE LOADED] Para:', child.name)}
                   />
                   <Text
                     style={styles.childName}
@@ -751,7 +779,7 @@ const HomeScreen: React.FC = () => {
                             </Text>
                           )}
                         </View>
-                        <Text style={styles.communityName} numberOfLines={2}>
+                        <Text style={styles.communityName} numberOfLines={1} ellipsizeMode="tail">
                           {community.name.charAt(0).toUpperCase() + community.name.slice(1).toLowerCase()}
                         </Text>
                       </TouchableOpacity>
@@ -782,7 +810,7 @@ const HomeScreen: React.FC = () => {
                           </Text>
                         )}
                       </View>
-                      <Text style={styles.communityName} numberOfLines={2}>
+                      <Text style={styles.communityName} numberOfLines={1} ellipsizeMode="tail">
                         {community.name.charAt(0).toUpperCase() + community.name.slice(1).toLowerCase()}
                       </Text>
                     </TouchableOpacity>
@@ -873,7 +901,7 @@ const HomeScreen: React.FC = () => {
                       </View>
                       <Text
                         style={styles.childName}
-                        numberOfLines={2}
+                        numberOfLines={1}
                         ellipsizeMode="tail"
                       >
                         {list.title.charAt(0).toUpperCase() + list.title.slice(1).toLowerCase()}
@@ -905,7 +933,7 @@ const HomeScreen: React.FC = () => {
                       </View>
                       <Text
                         style={styles.childName}
-                        numberOfLines={2}
+                        numberOfLines={1}
                         ellipsizeMode="tail"
                       >
                         {list.title.charAt(0).toUpperCase() + list.title.slice(1).toLowerCase()}
@@ -1134,27 +1162,6 @@ const styles = StyleSheet.create({
     position: "relative",
   },
 
-  // Header Teal
-  header: {
-    backgroundColor: "#59C6C0",
-    paddingTop: Platform.OS === "ios" ? 50 : 20,
-    paddingBottom: 20,
-    paddingHorizontal: 20,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  headerIcon: {
-    padding: 8,
-  },
-  headerProfileImage: {
-    width: 45,
-    height: 45,
-    borderRadius: 22.5,
-  },
-  notificationButton: {
-    padding: 8,
-  },
 
   // Scroll principal
   scrollView: {

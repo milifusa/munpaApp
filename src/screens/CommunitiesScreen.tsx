@@ -15,6 +15,7 @@ import {
   RefreshControl,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
 import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../contexts/AuthContext';
@@ -42,7 +43,6 @@ const CommunitiesScreen = () => {
   const [communities, setCommunities] = useState<Community[]>([]);
   const [userCommunities, setUserCommunities] = useState<Community[]>([]);
   const [publicCommunities, setPublicCommunities] = useState<Community[]>([]);
-  const [recommendedCommunities, setRecommendedCommunities] = useState<Community[]>([]);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [filteredCommunities, setFilteredCommunities] = useState<Community[]>([]);
@@ -214,10 +214,6 @@ const CommunitiesScreen = () => {
       const allCommunities = [...userCommunitiesData, ...publicCommunitiesData];
       setCommunities(allCommunities);
       setFilteredCommunities(allCommunities);
-      
-      // Calcular comunidades recomendadas
-      const recommended = getRecommendedCommunities(allCommunities);
-      setRecommendedCommunities(recommended);
     } catch (error) {
       console.error('Error cargando comunidades:', error);
       // En caso de error, usar datos de ejemplo
@@ -399,7 +395,7 @@ const CommunitiesScreen = () => {
       }
       
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: ['images'],
         allowsEditing: true,
         aspect: [1, 1],
         quality: 0.8,
@@ -635,7 +631,7 @@ const CommunitiesScreen = () => {
     
     return (
       <View style={[styles.categoryIcon, { backgroundColor: getCategoryColor(community.category || 'general') }]}>
-        <Ionicons name={getCategoryIcon(community.category || 'general') as any} size={20} color="white" />
+        <Ionicons name={getCategoryIcon(community.category || 'general') as any} size={40} color="white" />
       </View>
     );
   };
@@ -784,46 +780,6 @@ const CommunitiesScreen = () => {
           </TouchableOpacity>
         </View>
 
-        {/* Comunidades Recomendadas */}
-        {!showSearchResults && !isLoading && recommendedCommunities.length > 0 && activeFilter === 'all' && (
-          <View style={styles.recommendedSection}>
-            <View style={styles.recommendedHeader}>
-              <Ionicons name="sparkles" size={20} color="#FFD700" />
-              <Text style={styles.recommendedTitle}>Recomendadas para ti</Text>
-            </View>
-            <ScrollView 
-              horizontal 
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.recommendedScrollContent}
-            >
-              {recommendedCommunities.map((community, index) => (
-                <TouchableOpacity
-                  key={community.id}
-                  style={[
-                    styles.recommendedCard,
-                    index === 0 && styles.firstCard,
-                    index === recommendedCommunities.length - 1 && styles.lastCard
-                  ]}
-                  onPress={() => handleJoinCommunity(community)}
-                >
-                  <CommunityIcon community={community} />
-                  <Text style={styles.recommendedName} numberOfLines={2}>{community.name}</Text>
-                  <Text style={styles.recommendedCategory}>{community.category}</Text>
-                  <View style={styles.recommendedStats}>
-                    <Ionicons name="people" size={12} color="#666" />
-                    <Text style={styles.recommendedMemberCount}>{community.memberCount}</Text>
-                  </View>
-                  {community.lastActivity && (
-                    <View style={styles.recommendedActivity}>
-                      <Ionicons name="pulse" size={12} color="#32CD32" />
-                      <Text style={styles.recommendedActivityText}>Activa</Text>
-                    </View>
-                  )}
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View>
-        )}
 
         {/* Skeleton Screens durante carga */}
         {isLoading && (
@@ -1234,97 +1190,107 @@ const CommunitiesScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#F5F7FA',
   },
   
   scrollView: {
     flex: 1,
+    backgroundColor: '#F5F7FA',
   },
 
   // Sección de búsqueda
   searchSection: {
     padding: 20,
-    backgroundColor: '#F8F9FA',
+    paddingTop: 60,
+    backgroundColor: 'transparent',
   },
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: 'white',
-    borderRadius: 25,
-    paddingHorizontal: 15,
-    paddingVertical: 12,
-    shadowColor: '#000',
+    borderRadius: 28,
+    paddingHorizontal: 18,
+    paddingVertical: 14,
+    borderWidth: 1,
+    borderColor: '#E8ECEF',
+    shadowColor: '#887CBC',
     shadowOffset: {
       width: 0,
-      height: 2,
+      height: 4,
     },
     shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 3,
+    shadowRadius: 8,
+    elevation: 4,
   },
   searchIcon: {
-    marginRight: 10,
+    marginRight: 12,
   },
   searchInput: {
     flex: 1,
     fontSize: 16,
-    color: '#333',
+    color: '#2C3E50',
+    fontWeight: '500',
   },
 
   // Sección de añadir
   addSection: {
     paddingHorizontal: 20,
     paddingVertical: 15,
+    backgroundColor: 'transparent',
   },
   addButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#59C6C0',
-    paddingVertical: 15,
-    paddingHorizontal: 20,
-    borderRadius: 25,
-    shadowColor: '#000',
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    borderRadius: 28,
+    shadowColor: '#59C6C0',
     shadowOffset: {
       width: 0,
-      height: 2,
+      height: 5,
     },
-    shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 3,
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 6,
   },
   addButtonText: {
     color: 'white',
-    fontSize: 16,
-    fontWeight: '600',
-    marginLeft: 8,
+    fontSize: 17,
+    fontWeight: '700',
+    marginLeft: 10,
   },
 
   // Sección de comunidades
   communitiesSection: {
     padding: 20,
+    backgroundColor: 'transparent',
   },
   sectionTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#333',
+    fontSize: 26,
+    fontWeight: '800',
+    color: '#2C3E50',
     marginBottom: 20,
   },
 
   // Tarjeta de comunidad
   communityCard: {
     backgroundColor: 'white',
-    borderRadius: 15,
+    borderRadius: 18,
     padding: 20,
-    marginBottom: 15,
-    shadowColor: '#000',
+    marginBottom: 18,
+    marginHorizontal: 2,
+    borderWidth: 1,
+    borderColor: '#E8ECEF',
+    shadowColor: '#887CBC',
     shadowOffset: {
       width: 0,
-      height: 2,
+      height: 6,
     },
-    shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 3,
+    shadowOpacity: 0.15,
+    shadowRadius: 10,
+    elevation: 8,
   },
   communityHeader: {
     flexDirection: 'row',
@@ -1332,88 +1298,109 @@ const styles = StyleSheet.create({
     marginBottom: 15,
   },
   categoryIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 80,
+    height: 80,
+    borderRadius: 40,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 15,
+    marginRight: 16,
   },
   communityImage: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    marginRight: 15,
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    marginRight: 16,
   },
   communityInfo: {
     flex: 1,
   },
   communityName: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 4,
+    fontSize: 19,
+    fontWeight: '700',
+    color: '#2C3E50',
+    marginBottom: 6,
   },
   communityCategory: {
-    fontSize: 14,
-    color: '#666',
+    fontSize: 13,
+    color: '#7F8C8D',
     textTransform: 'capitalize',
+    fontWeight: '500',
   },
   communityStats: {
     flexDirection: 'row',
     alignItems: 'center',
+    backgroundColor: '#F8F9FA',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 12,
+    alignSelf: 'flex-start',
+    marginTop: 6,
   },
   memberCount: {
-    fontSize: 14,
-    color: '#666',
+    fontSize: 13,
+    color: '#2C3E50',
     marginLeft: 5,
     marginRight: 10,
+    fontWeight: '600',
   },
   privateIcon: {
     marginLeft: 5,
   },
   communityDescription: {
-    fontSize: 14,
-    color: '#666',
-    lineHeight: 20,
-    marginBottom: 15,
+    fontSize: 15,
+    color: '#7F8C8D',
+    lineHeight: 22,
+    marginBottom: 16,
   },
   joinButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#887CBC',
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 20,
+    paddingVertical: 14,
+    paddingHorizontal: 24,
+    borderRadius: 25,
     alignSelf: 'flex-start',
+    shadowColor: '#887CBC',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 5,
+    elevation: 5,
   },
   joinButtonDisabled: {
     backgroundColor: '#CCC',
     opacity: 0.7,
+    shadowOpacity: 0.1,
   },
   joinButtonText: {
     color: 'white',
-    fontSize: 14,
-    fontWeight: '600',
+    fontSize: 15,
+    fontWeight: '700',
     marginRight: 8,
   },
 
   // Estado vacío
   emptyState: {
     alignItems: 'center',
-    paddingVertical: 40,
+    paddingVertical: 60,
+    paddingHorizontal: 40,
   },
   emptyStateText: {
-    fontSize: 18,
-    color: '#666',
-    marginTop: 15,
-    marginBottom: 8,
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#2C3E50',
+    marginTop: 20,
+    marginBottom: 10,
+    textAlign: 'center',
   },
   emptyStateSubtext: {
-    fontSize: 14,
-    color: '#999',
+    fontSize: 15,
+    color: '#7F8C8D',
     textAlign: 'center',
+    lineHeight: 22,
   },
 
   // Estilos del Modal
@@ -1854,86 +1841,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#666',
     fontWeight: '500',
-  },
-  recommendedSection: {
-    paddingVertical: 20,
-    paddingLeft: 20,
-    backgroundColor: '#F8F8F8',
-    marginBottom: 16,
-  },
-  recommendedHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 16,
-    paddingRight: 20,
-  },
-  recommendedTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#333',
-  },
-  recommendedScrollContent: {
-    paddingRight: 20,
-    paddingBottom: 4,
-  },
-  recommendedCard: {
-    width: 150,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 14,
-    marginRight: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-    alignItems: 'center',
-  },
-  firstCard: {
-    marginLeft: 0,
-  },
-  lastCard: {
-    marginRight: 0,
-  },
-  recommendedName: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#333',
-    textAlign: 'center',
-    marginTop: 8,
-    minHeight: 36,
-  },
-  recommendedCategory: {
-    fontSize: 11,
-    color: '#59C6C0',
-    marginTop: 4,
-    textAlign: 'center',
-  },
-  recommendedStats: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginTop: 8,
-  },
-  recommendedMemberCount: {
-    fontSize: 11,
-    color: '#666',
-  },
-  recommendedActivity: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginTop: 6,
-    backgroundColor: '#E8F5E9',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 10,
-  },
-  recommendedActivityText: {
-    fontSize: 10,
-    color: '#32CD32',
-    fontWeight: '600',
   },
 
 });

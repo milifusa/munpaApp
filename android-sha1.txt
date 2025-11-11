@@ -1,0 +1,19 @@
+SHA-1 para agregar a Firebase Console:
+
+1. Ve a: https://console.firebase.google.com/project/mumpabackend/settings/general
+
+2. Busca tu app Android: com.munpa.app
+
+3. Agregar estos SHA-1:
+
+SHA-1 #1:
+48:2F:FD:A2:8E:D6:A1:76:B6:2F:40:A9:7B:1A:5E:64:4C:DE:B3:98
+
+SHA-1 #2:
+6E:64:8B:08:17:D3:F3:97:12:1C:C2:01:90:1D:15:E1:92:E1:40:50
+
+4. Descargar nuevo google-services.json
+
+5. Reemplazar en tu proyecto
+
+6. Ejecutar: eas build --platform android --profile production

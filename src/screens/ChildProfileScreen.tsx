@@ -27,6 +27,12 @@ import childProfileService, { vaccinesService } from '../services/childProfileSe
 
 const { width } = Dimensions.get('window');
 
+// Constantes para las caritas por defecto (fuera del componente para mejor rendimiento)
+const CARITA_1 = require('../../assets/caritas 1.png');
+const CARITA_2 = require('../../assets/caritas 2.png');
+const CARITA_3 = require('../../assets/caritas 3.png');
+const CARITAS = [CARITA_1, CARITA_2, CARITA_3];
+
 interface Child {
   id: string;
   name: string;
@@ -70,7 +76,7 @@ const ChildProfileScreen: React.FC = () => {
   const [milestonesLoading, setMilestonesLoading] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [selectedDate, setSelectedDate] = useState(new Date());
-  const [pendingVaccine, setPendingVaccine] = useState<{name: string, id?: string} | null>(null);
+  const [pendingVaccine, setPendingVaccine] = useState<{name: string, id?: string, isScheduling?: boolean} | null>(null);
 
   useEffect(() => {
     loadFonts();
@@ -262,23 +268,45 @@ const ChildProfileScreen: React.FC = () => {
   const saveVaccineWithDate = async (vaccineName: string, date: Date) => {
     try {
       const dateStr = date.toISOString().split('T')[0];
+      const isScheduling = pendingVaccine?.isScheduling || false;
       
       // Si tiene ID, es una vacuna existente que se está actualizando
       if (pendingVaccine?.id) {
-        await vaccinesService.updateVaccine(childId, pendingVaccine.id, {
-          appliedDate: dateStr,
-          status: 'applied',
-        });
-        Alert.alert('Éxito', `Vacuna "${vaccineName}" marcada como aplicada`);
+        if (isScheduling) {
+          // Programando una vacuna existente
+          await vaccinesService.updateVaccine(childId, pendingVaccine.id, {
+            scheduledDate: dateStr,
+            status: 'pending',
+          });
+          Alert.alert('Éxito', `Vacuna "${vaccineName}" programada para ${new Date(date).toLocaleDateString('es-ES')}`);
+        } else {
+          // Marcando como aplicada
+          await vaccinesService.updateVaccine(childId, pendingVaccine.id, {
+            appliedDate: dateStr,
+            status: 'applied',
+          });
+          Alert.alert('Éxito', `Vacuna "${vaccineName}" marcada como aplicada`);
+        }
       } else {
         // Si no tiene ID, es una vacuna nueva
-        await childProfileService.vaccines.addVaccine(childId, {
-          name: vaccineName,
-          scheduledDate: dateStr,
-          appliedDate: dateStr,
-          status: 'applied',
-        });
-        Alert.alert('Éxito', `Vacuna "${vaccineName}" registrada como aplicada`);
+        if (isScheduling) {
+          // Programando una vacuna nueva
+          await childProfileService.vaccines.addVaccine(childId, {
+            name: vaccineName,
+            scheduledDate: dateStr,
+            status: 'pending',
+          });
+          Alert.alert('Éxito', `Vacuna "${vaccineName}" programada para ${new Date(date).toLocaleDateString('es-ES')}`);
+        } else {
+          // Registrando como aplicada
+          await childProfileService.vaccines.addVaccine(childId, {
+            name: vaccineName,
+            scheduledDate: dateStr,
+            appliedDate: dateStr,
+            status: 'applied',
+          });
+          Alert.alert('Éxito', `Vacuna "${vaccineName}" registrada como aplicada`);
+        }
       }
       
       loadHealthData();
@@ -449,27 +477,22 @@ const ChildProfileScreen: React.FC = () => {
                   '¿Esta vacuna ya fue aplicada?',
                   [
                     {
-                      text: 'No, programar',
-                      onPress: async () => {
-                        try {
-                          const today = new Date().toISOString().split('T')[0];
-                          await childProfileService.vaccines.addVaccine(childId, {
-                            name: vaccineName.trim(),
-                            scheduledDate: today,
-                            status: 'pending',
-                          });
-                          Alert.alert('Éxito', `Vacuna "${vaccineName.trim()}" programada correctamente`);
-                          loadHealthData();
-                        } catch (error) {
-                          console.error('Error agregando vacuna:', error);
-                          Alert.alert('Error', 'No se pudo agregar la vacuna.');
-                        }
+                      text: 'PROGRAMAR',
+                      onPress: () => {
+                        // Abrir selector de fecha para programar (fecha futura)
+                        setPendingVaccine({ name: vaccineName.trim(), isScheduling: true });
+                        // Inicializar con fecha de mañana para programación
+                        const tomorrow = new Date();
+                        tomorrow.setDate(tomorrow.getDate() + 1);
+                        setSelectedDate(tomorrow);
+                        setShowDatePicker(true);
                       },
                     },
                     {
-                      text: 'Sí, aplicada',
+                      text: 'SÍ, APLICADA',
                       onPress: () => {
-                        setPendingVaccine({ name: vaccineName.trim() });
+                        // Abrir selector de fecha para marcar como aplicada (fecha pasada)
+                        setPendingVaccine({ name: vaccineName.trim(), isScheduling: false });
                         setSelectedDate(new Date());
                         setShowDatePicker(true);
                       },
@@ -528,28 +551,22 @@ const ChildProfileScreen: React.FC = () => {
           '¿Esta vacuna ya fue aplicada?',
           [
             {
-              text: 'No, programar',
-              onPress: async () => {
-                try {
-                  const today = new Date().toISOString().split('T')[0];
-                  await childProfileService.vaccines.addVaccine(childId, {
-                    name: vaccine.name,
-                    scheduledDate: today,
-                    status: 'pending',
-                  });
-                  Alert.alert('Éxito', `Vacuna "${vaccine.name}" programada correctamente`);
-                  loadHealthData();
-                } catch (error) {
-                  console.error('Error agregando vacuna:', error);
-                  Alert.alert('Error', 'No se pudo agregar la vacuna. Verifica que el backend esté funcionando.');
-                }
+              text: 'PROGRAMAR',
+              onPress: () => {
+                // Abrir selector de fecha para programar (fecha futura)
+                setPendingVaccine({ name: vaccine.name, isScheduling: true });
+                // Inicializar con fecha de mañana para programación
+                const tomorrow = new Date();
+                tomorrow.setDate(tomorrow.getDate() + 1);
+                setSelectedDate(tomorrow);
+                setShowDatePicker(true);
               },
             },
             {
-              text: 'Sí, aplicada',
+              text: 'SÍ, APLICADA',
               onPress: () => {
-                // Abrir selector de fecha
-                setPendingVaccine({ name: vaccine.name });
+                // Abrir selector de fecha para marcar como aplicada (fecha pasada)
+                setPendingVaccine({ name: vaccine.name, isScheduling: false });
                 setSelectedDate(new Date());
                 setShowDatePicker(true);
               },
@@ -828,12 +845,20 @@ const ChildProfileScreen: React.FC = () => {
 
   const getChildAvatar = (index: number) => {
     // Usar las tres caritas disponibles sin repetir
-    const caritas = [
-      require('../../assets/caritas 1.png'),
-      require('../../assets/caritas 2.png'),
-      require('../../assets/caritas 3.png'),
-    ];
-    return caritas[index % 3];
+    const caritaIndex = index % 3;
+    console.log('🎨 [CHILD PROFILE] Cargando carita por defecto, índice:', caritaIndex);
+    
+    // Retornar directamente el require según el índice
+    switch (caritaIndex) {
+      case 0:
+        return CARITA_1;
+      case 1:
+        return CARITA_2;
+      case 2:
+        return CARITA_3;
+      default:
+        return CARITA_1;
+    }
   };
 
   const getChildInfo = (child: Child) => {
@@ -876,7 +901,7 @@ const ChildProfileScreen: React.FC = () => {
 
       // Abrir selector de imagen
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: ['images'],
         allowsEditing: true,
         aspect: [1, 1],
         quality: 0.8,
@@ -993,9 +1018,16 @@ const ChildProfileScreen: React.FC = () => {
           <View style={styles.childInfoHeader}>
             <View style={styles.avatarContainer}>
               <Image 
-                source={profileImage ? { uri: profileImage } : getChildAvatar(0)} 
+                source={
+                  (profileImage && typeof profileImage === 'string' && profileImage.trim() !== '') 
+                    ? { uri: profileImage } 
+                    : getChildAvatar(0)
+                } 
                 style={styles.childAvatar}
+                resizeMode="cover"
                 key={profileImage || 'default'}
+                onLoad={() => console.log('✅ [PROFILE IMAGE] Imagen cargada')}
+                onError={(error) => console.log('❌ [PROFILE IMAGE ERROR]', error.nativeEvent)}
               />
               {loading && (
                 <View style={styles.loadingOverlay}>
@@ -1611,7 +1643,7 @@ const ChildProfileScreen: React.FC = () => {
     </View>
 
     {/* Date Picker Modal para vacunas */}
-    {showDatePicker && (
+    {showDatePicker && pendingVaccine && (
       Platform.OS === 'ios' ? (
         <Modal
           transparent={true}
@@ -1625,14 +1657,19 @@ const ChildProfileScreen: React.FC = () => {
           <View style={styles.modalOverlay}>
             <View style={styles.datePickerContainer}>
               <View style={styles.datePickerHeader}>
-                <Text style={styles.datePickerTitle}>Selecciona la fecha</Text>
+                <Text style={styles.datePickerTitle}>
+                  {pendingVaccine.isScheduling 
+                    ? '📅 ¿Cuándo quieres programar la vacuna?' 
+                    : '✅ ¿Cuándo se aplicó la vacuna?'}
+                </Text>
               </View>
               <DateTimePicker
                 value={selectedDate}
                 mode="date"
                 display="spinner"
                 onChange={handleDateChange}
-                maximumDate={new Date()}
+                maximumDate={pendingVaccine.isScheduling ? undefined : new Date()}
+                minimumDate={pendingVaccine.isScheduling ? new Date() : undefined}
                 locale="es-ES"
               />
               <View style={styles.datePickerButtons}>
@@ -1665,7 +1702,8 @@ const ChildProfileScreen: React.FC = () => {
           mode="date"
           display="default"
           onChange={handleDateChange}
-          maximumDate={new Date()}
+          maximumDate={pendingVaccine.isScheduling ? undefined : new Date()}
+          minimumDate={pendingVaccine.isScheduling ? new Date() : undefined}
         />
       )
     )}

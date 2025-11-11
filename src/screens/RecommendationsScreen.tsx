@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -9,84 +9,149 @@ import {
   Image,
   SafeAreaView,
   RefreshControl,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import api from '../services/api';
 
-// Datos de categorías
-const categories = [
-  {
-    id: 'places',
-    title: 'Lugares Family-Friendly',
-    subtitle: 'Restaurantes, parques y entretenimiento',
-    icon: 'location',
-    color: '#FF6B6B',
-    gradient: ['#FF6B6B', '#FF8E8E'],
-  },
-  {
-    id: 'doctors',
-    title: 'Médicos Pediatras',
-    subtitle: 'Doctores especializados en niños',
-    icon: 'medical',
-    color: '#4ECDC4',
-    gradient: ['#4ECDC4', '#6DD5DB'],
-  },
-  {
-    id: 'babysitters',
-    title: 'Niñeras Confiables',
-    subtitle: 'Cuidadores recomendados por la comunidad',
-    icon: 'people',
-    color: '#45B7D1',
-    gradient: ['#45B7D1', '#6BC5E8'],
-  },
-  {
-    id: 'daycare',
-    title: 'Guarderías y Jardines',
-    subtitle: 'Centros de cuidado infantil',
-    icon: 'school',
-    color: '#96CEB4',
-    gradient: ['#96CEB4', '#A8D5C4'],
-  },
-];
+// Interfaz para las categorías
+interface Category {
+  id: string;
+  name: string;
+  description: string;
+  imageUrl?: string;
+  order: number;
+  icon?: string;
+}
 
-const RecommendationsScreen = () => {
+// Interfaz para las recomendaciones recientes
+interface RecentRecommendation {
+  id: string;
+  name: string;
+  description: string;
+  address: string;
+  imageUrl?: string;
+  totalReviews: number;
+  averageRating: number;
+  commentsCount: number;
+  category: {
+    id: string;
+    name: string;
+    icon?: string;
+    imageUrl?: string;
+  } | null;
+  createdAt: Date;
+}
+
+const RecommendationsScreen = ({ navigation }: any) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [refreshing, setRefreshing] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [isLoadingCategories, setIsLoadingCategories] = useState(true);
+  const [categoriesError, setCategoriesError] = useState<string | null>(null);
+  const [recentRecommendations, setRecentRecommendations] = useState<RecentRecommendation[]>([]);
+  const [isLoadingRecent, setIsLoadingRecent] = useState(true);
+  const [recentError, setRecentError] = useState<string | null>(null);
 
-  const handleRefresh = () => {
-    setRefreshing(true);
-    // Simular carga de datos
-    setTimeout(() => {
-      setRefreshing(false);
-    }, 1000);
+  // Cargar categorías y recomendaciones recientes al montar el componente
+  useEffect(() => {
+    loadCategories();
+    loadRecentRecommendations();
+  }, []);
+
+  const loadCategories = async () => {
+    console.log('🔄 [RECOMMENDATIONS] Cargando categorías...');
+    setIsLoadingCategories(true);
+    setCategoriesError(null);
+    
+    try {
+      const response = await api.getCategories();
+      
+      if (response.success && response.data) {
+        console.log('✅ [RECOMMENDATIONS] Categorías cargadas:', response.data.length);
+        setCategories(response.data);
+      } else {
+        console.log('⚠️ [RECOMMENDATIONS] Respuesta sin datos de categorías');
+        setCategoriesError('No se pudieron cargar las categorías');
+      }
+    } catch (error: any) {
+      console.error('❌ [RECOMMENDATIONS] Error cargando categorías:', error);
+      setCategoriesError('Error al cargar las categorías');
+    } finally {
+      setIsLoadingCategories(false);
+    }
   };
 
-  const handleCategoryPress = (categoryId: string) => {
-    setSelectedCategory(categoryId);
-    console.log(`📍 [RECOMMENDATIONS] Categoría seleccionada: ${categoryId}`);
-    // Aquí se navegaría a la pantalla específica de la categoría
+  const loadRecentRecommendations = async () => {
+    console.log('🔄 [RECOMMENDATIONS] Cargando recomendaciones recientes...');
+    setIsLoadingRecent(true);
+    setRecentError(null);
+    
+    try {
+      const response = await api.getRecentRecommendations(10);
+      
+      if (response.success && response.data) {
+        console.log('✅ [RECOMMENDATIONS] Recomendaciones recientes cargadas:', response.data.length);
+        setRecentRecommendations(response.data);
+      } else {
+        console.log('⚠️ [RECOMMENDATIONS] Respuesta sin datos de recomendaciones recientes');
+        setRecentError('No se pudieron cargar las recomendaciones');
+      }
+    } catch (error: any) {
+      console.error('❌ [RECOMMENDATIONS] Error cargando recomendaciones recientes:', error);
+      setRecentError('Error al cargar las recomendaciones');
+    } finally {
+      setIsLoadingRecent(false);
+    }
+  };
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await Promise.all([loadCategories(), loadRecentRecommendations()]);
+    setRefreshing(false);
+  };
+
+  const handleCategoryPress = (category: Category) => {
+    setSelectedCategory(category.id);
+    console.log(`📍 [RECOMMENDATIONS] Categoría seleccionada: ${category.id}`);
+    
+    // Navegar a la pantalla de recomendaciones de la categoría
+    navigation.navigate('CategoryRecommendations', {
+      categoryId: category.id,
+      categoryName: category.name,
+    });
   };
 
   const renderQuickActions = () => (
     <View style={styles.quickActionsContainer}>
       <Text style={styles.sectionTitle}>Acciones Rápidas</Text>
       <View style={styles.quickActions}>
-        <TouchableOpacity style={styles.quickAction}>
-          <View style={[styles.quickActionIcon, { backgroundColor: '#887CBC' }]}>
-            <Ionicons name="add" size={20} color="white" />
-          </View>
-          <Text style={styles.quickActionText}>Agregar Lugar</Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity style={styles.quickAction}>
-          <View style={[styles.quickActionIcon, { backgroundColor: '#59C6C0' }]}>
-            <Ionicons name="star" size={20} color="white" />
+        <TouchableOpacity 
+          style={styles.quickAction}
+          onPress={() => navigation.navigate('Favorites')}
+        >
+          <View style={[styles.quickActionIcon, { backgroundColor: '#FF6B6B' }]}>
+            <Ionicons name="heart" size={20} color="white" />
           </View>
           <Text style={styles.quickActionText}>Mis Favoritos</Text>
         </TouchableOpacity>
         
-        <TouchableOpacity style={styles.quickAction}>
-          <View style={[styles.quickActionIcon, { backgroundColor: '#FF6B6B' }]}>
+        <TouchableOpacity 
+          style={styles.quickAction}
+          onPress={() => navigation.navigate('Wishlist')}
+        >
+          <View style={[styles.quickActionIcon, { backgroundColor: '#FFB74D' }]}>
+            <Ionicons name="bookmark" size={20} color="white" />
+          </View>
+          <Text style={styles.quickActionText}>Lista de Deseos</Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity 
+          style={styles.quickAction}
+          onPress={() => navigation.navigate('FavoritesMap')}
+        >
+          <View style={[styles.quickActionIcon, { backgroundColor: '#4285F4' }]}>
             <Ionicons name="map" size={20} color="white" />
           </View>
           <Text style={styles.quickActionText}>Ver Mapa</Text>
@@ -95,38 +160,122 @@ const RecommendationsScreen = () => {
     </View>
   );
 
-  const renderRecentRecommendations = () => (
-    <View style={styles.recentContainer}>
-      <Text style={styles.sectionTitle}>Últimas Recomendaciones</Text>
-      <View style={styles.recentItems}>
-        {[
-          { title: 'Parque Central Kids Zone', category: 'Lugares', rating: 4.8, reviews: 124 },
-          { title: 'Dr. María González', category: 'Pediatra', rating: 4.9, reviews: 89 },
-          { title: 'Guardería Pequeños Exploradores', category: 'Guardería', rating: 4.7, reviews: 56 },
-        ].map((item, index) => (
-          <TouchableOpacity key={index} style={styles.recentItem}>
-            <View style={styles.recentItemIcon}>
-              <Ionicons 
-                name={index === 0 ? 'location' : index === 1 ? 'medical' : 'school'} 
-                size={20} 
-                color="#59C6C0" 
-              />
-            </View>
-            <View style={styles.recentItemInfo}>
-              <Text style={styles.recentItemTitle}>{item.title}</Text>
-              <Text style={styles.recentItemCategory}>{item.category}</Text>
-              <View style={styles.recentItemRating}>
-                <Ionicons name="star" size={12} color="#FFD700" />
-                <Text style={styles.ratingText}>{item.rating}</Text>
-                <Text style={styles.reviewsText}>({item.reviews} reseñas)</Text>
+  const handleRecommendationPress = (recommendation: RecentRecommendation) => {
+    console.log('📍 [RECOMMENDATIONS] Recomendación seleccionada:', recommendation.id);
+    navigation.navigate('RecommendationDetail', {
+      recommendationId: recommendation.id,
+    });
+  };
+
+  const renderRecentRecommendations = () => {
+    // Si está cargando, mostrar indicador
+    if (isLoadingRecent) {
+      return (
+        <View style={styles.recentContainer}>
+          <Text style={styles.sectionTitle}>Últimas Recomendaciones</Text>
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#59C6C0" />
+            <Text style={styles.loadingText}>Cargando recomendaciones...</Text>
+          </View>
+        </View>
+      );
+    }
+
+    // Si hay error, mostrar mensaje de error
+    if (recentError) {
+      return (
+        <View style={styles.recentContainer}>
+          <Text style={styles.sectionTitle}>Últimas Recomendaciones</Text>
+          <View style={styles.errorContainer}>
+            <Ionicons name="alert-circle" size={48} color="#FF6B6B" />
+            <Text style={styles.errorText}>{recentError}</Text>
+            <TouchableOpacity style={styles.retryButton} onPress={loadRecentRecommendations}>
+              <Ionicons name="refresh" size={20} color="white" />
+              <Text style={styles.retryButtonText}>Reintentar</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      );
+    }
+
+    // Si no hay recomendaciones, mostrar mensaje vacío
+    if (recentRecommendations.length === 0) {
+      return (
+        <View style={styles.recentContainer}>
+          <Text style={styles.sectionTitle}>Últimas Recomendaciones</Text>
+          <View style={styles.emptyContainer}>
+            <Ionicons name="file-tray-outline" size={64} color="#CCC" />
+            <Text style={styles.emptyText}>No hay recomendaciones recientes</Text>
+            <Text style={styles.emptySubtext}>
+              Sé el primero en agregar una recomendación
+            </Text>
+          </View>
+        </View>
+      );
+    }
+
+    // Renderizar recomendaciones
+    return (
+      <View style={styles.recentContainer}>
+        <Text style={styles.sectionTitle}>Últimas Recomendaciones</Text>
+        <View style={styles.recentItems}>
+          {recentRecommendations.slice(0, 10).map((recommendation) => (
+            <TouchableOpacity 
+              key={recommendation.id} 
+              style={styles.recentItem}
+              onPress={() => handleRecommendationPress(recommendation)}
+            >
+              {/* Imagen o icono */}
+              {recommendation.imageUrl ? (
+                <Image 
+                  source={{ uri: recommendation.imageUrl }} 
+                  style={styles.recentItemImage}
+                />
+              ) : (
+                <View style={styles.recentItemIcon}>
+                  <Image 
+                    source={require('../../assets/icon.png')} 
+                    style={styles.defaultIcon}
+                    resizeMode="contain"
+                  />
+                </View>
+              )}
+              
+              {/* Información */}
+              <View style={styles.recentItemInfo}>
+                <Text style={styles.recentItemTitle} numberOfLines={1}>
+                  {recommendation.name}
+                </Text>
+                <Text style={styles.recentItemCategory} numberOfLines={1}>
+                  {recommendation.category?.name || 'Sin categoría'}
+                </Text>
+                <View style={styles.recentItemRating}>
+                  {/* Mostrar estrellas */}
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <Ionicons 
+                      key={star}
+                      name={star <= Math.round(recommendation.averageRating) ? 'star' : 'star-outline'} 
+                      size={12} 
+                      color="#FFD700" 
+                    />
+                  ))}
+                  <Text style={styles.ratingText}>
+                    {recommendation.averageRating.toFixed(1)}
+                  </Text>
+                  <Text style={styles.reviewsText}>
+                    ({recommendation.totalReviews} {recommendation.totalReviews === 1 ? 'reseña' : 'reseñas'})
+                  </Text>
+                </View>
               </View>
-            </View>
-            <Ionicons name="chevron-forward" size={16} color="#CCC" />
-          </TouchableOpacity>
-        ))}
+              
+              {/* Flecha */}
+              <Ionicons name="chevron-forward" size={16} color="#CCC" />
+            </TouchableOpacity>
+          ))}
+        </View>
       </View>
-    </View>
-  );
+    );
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -163,27 +312,73 @@ const RecommendationsScreen = () => {
         {/* Categorías principales */}
         <View style={styles.categoriesContainer}>
           <Text style={styles.sectionTitle}>¿Qué estás buscando?</Text>
-          <View style={styles.categoriesGrid}>
-            {categories.map((category) => (
-              <TouchableOpacity
-                key={category.id}
-                style={[
-                  styles.categoryCard,
-                  selectedCategory === category.id && styles.selectedCategory
-                ]}
-                onPress={() => handleCategoryPress(category.id)}
-              >
-                <View style={[styles.categoryIcon, { backgroundColor: category.color }]}>
-                  <Ionicons name={category.icon as any} size={28} color="white" />
-                </View>
-                <Text style={styles.categoryTitle}>{category.title}</Text>
-                <Text style={styles.categorySubtitle}>{category.subtitle}</Text>
-                <View style={styles.categoryArrow}>
-                  <Ionicons name="arrow-forward" size={16} color="#666" />
-                </View>
+          
+          {/* Estado de carga */}
+          {isLoadingCategories && (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color="#59C6C0" />
+              <Text style={styles.loadingText}>Cargando categorías...</Text>
+            </View>
+          )}
+
+          {/* Estado de error */}
+          {!isLoadingCategories && categoriesError && (
+            <View style={styles.errorContainer}>
+              <Ionicons name="alert-circle" size={48} color="#FF6B6B" />
+              <Text style={styles.errorText}>{categoriesError}</Text>
+              <TouchableOpacity style={styles.retryButton} onPress={loadCategories}>
+                <Ionicons name="refresh" size={20} color="white" />
+                <Text style={styles.retryButtonText}>Reintentar</Text>
               </TouchableOpacity>
-            ))}
-          </View>
+            </View>
+          )}
+
+          {/* Categorías de la API */}
+          {!isLoadingCategories && !categoriesError && categories.length > 0 && (
+            <View style={styles.categoriesGrid}>
+              {categories.map((category) => (
+                <TouchableOpacity
+                  key={category.id}
+                  style={[
+                    styles.categoryCard,
+                    selectedCategory === category.id && styles.selectedCategory
+                  ]}
+                  onPress={() => handleCategoryPress(category)}
+                >
+                  {/* Imagen o icono de la categoría */}
+                  {category.imageUrl ? (
+                    <Image 
+                      source={{ uri: category.imageUrl }} 
+                      style={styles.categoryImage}
+                    />
+                  ) : (
+                    <View style={styles.categoryIcon}>
+                      <Image 
+                        source={require('../../assets/icon.png')} 
+                        style={styles.defaultCategoryIcon}
+                        resizeMode="contain"
+                      />
+                    </View>
+                  )}
+                  
+                  {/* Información de la categoría */}
+                  <View style={styles.categoryInfo}>
+                    <Text style={styles.categoryTitle} numberOfLines={2}>
+                      {category.name}
+                    </Text>
+                    <Text style={styles.categorySubtitle} numberOfLines={2}>
+                      {category.description}
+                    </Text>
+                  </View>
+                  
+                  {/* Flecha */}
+                  <View style={styles.categoryArrow}>
+                    <Ionicons name="arrow-forward" size={16} color="#666" />
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
         </View>
 
         {/* Acciones rápidas */}
@@ -298,11 +493,28 @@ const styles = StyleSheet.create({
     backgroundColor: '#F0FDFC',
   },
   categoryIcon: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+    width: 80,
+    height: 80,
+    borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
+    marginBottom: 15,
+    backgroundColor: '#F0FDFC',
+  },
+  defaultCategoryIcon: {
+    width: 60,
+    height: 60,
+    opacity: 0.6,
+  },
+  categoryImage: {
+    width: 80,
+    height: 80,
+    borderRadius: 12,
+    marginBottom: 15,
+  },
+  categoryInfo: {
+    flex: 1,
+    paddingHorizontal: 12,
     marginBottom: 15,
   },
   categoryTitle: {
@@ -400,6 +612,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginRight: 15,
   },
+  defaultIcon: {
+    width: 40,
+    height: 40,
+    opacity: 0.6,
+  },
+  recentItemImage: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    marginRight: 15,
+    backgroundColor: '#F0FDFC',
+  },
   recentItemInfo: {
     flex: 1,
   },
@@ -434,6 +658,65 @@ const styles = StyleSheet.create({
   // Espaciado
   finalSpacing: {
     height: 30,
+  },
+
+  // Estados de carga, error y vacío
+  loadingContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 40,
+  },
+  loadingText: {
+    marginTop: 15,
+    fontSize: 16,
+    color: '#666',
+    fontWeight: '500',
+  },
+  errorContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 40,
+  },
+  errorText: {
+    marginTop: 15,
+    fontSize: 16,
+    color: '#FF6B6B',
+    textAlign: 'center',
+    fontWeight: '500',
+    marginBottom: 20,
+  },
+  retryButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#59C6C0',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 25,
+    gap: 8,
+  },
+  retryButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  emptyContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 40,
+  },
+  emptyText: {
+    marginTop: 15,
+    fontSize: 18,
+    color: '#666',
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  emptySubtext: {
+    marginTop: 8,
+    fontSize: 14,
+    color: '#999',
+    textAlign: 'center',
+    paddingHorizontal: 40,
   },
 });
 
