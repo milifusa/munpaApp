@@ -36,10 +36,27 @@ const DouliChat = () => {
   const [isLoading, setIsLoading] = useState(false);
   const flatListRef = useRef<FlatList<Message>>(null);
 
-  // Inicializar chat solo la primera vez
+  // Inicializar chat solo la primera vez y mostrar mensaje de bienvenida
   useEffect(() => {
     initializeChat();
+    
+    // Mostrar mensaje de bienvenida de Douli después de un breve delay
+    const welcomeTimer = setTimeout(() => {
+      // El mensaje de bienvenida ya está en el contexto, solo asegurarse de que se muestre
+      if (messages.length === 0) {
+        initializeChat();
+      }
+    }, 500);
+    
+    
+    return () => clearTimeout(welcomeTimer);
   }, []);
+
+  // Log cuando cambian los mensajes
+  useEffect(() => {
+    console.log('💬 [DOULI CHAT] Mensajes actualizados:', messages.length);
+    console.log('💬 [DOULI CHAT] Contenido de mensajes:', messages.map(m => ({ id: m.id, sender: m.sender, text: m.text.substring(0, 50) })));
+  }, [messages]);
 
   // Función para enviar mensaje
   const sendMessage = async () => {
@@ -212,6 +229,16 @@ const DouliChat = () => {
       keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
     >
       {/* Lista de mensajes */}
+      {messages.length === 0 ? (
+        <View style={styles.emptyContainer}>
+            <Image 
+              source={require('../../assets/douli.png')} 
+            style={styles.emptyDouliImage}
+            />
+          <Text style={styles.emptyText}>Hola, soy Douli, tu Doula virtual</Text>
+          <Text style={styles.emptySubtext}>¿En qué te puedo ayudar hoy?</Text>
+        </View>
+      ) : (
       <FlatList
         ref={flatListRef}
         data={messages}
@@ -223,6 +250,7 @@ const DouliChat = () => {
         onLayout={() => flatListRef.current?.scrollToEnd()}
         keyboardShouldPersistTaps="handled"
       />
+      )}
 
       {/* Indicador de carga */}
       {isLoading && (
@@ -294,7 +322,7 @@ const styles = StyleSheet.create({
     marginHorizontal: 8,
   },
   userAvatar: {
-    backgroundColor: '#887CBC',
+    backgroundColor: '#96d2d3',
     overflow: 'hidden', // Para que la imagen respete el borderRadius
   },
   userAvatarImage: {
@@ -303,7 +331,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
   },
   douliMessageAvatar: {
-    backgroundColor: '#887CBC',
+    backgroundColor: '#96d2d3',
     overflow: 'hidden', // Para que la imagen respete el borderRadius
   },
   douliMessageImage: {
@@ -317,7 +345,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
   },
   userContent: {
-    backgroundColor: '#887CBC',
+    backgroundColor: '#96d2d3',
     borderBottomRightRadius: 4,
   },
   douliContent: {
@@ -450,6 +478,32 @@ const styles = StyleSheet.create({
   },
   sendButtonDisabled: {
     backgroundColor: '#e0e0e0',
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 40,
+  },
+  emptyDouliImage: {
+    width: 120,
+    height: 120,
+    marginBottom: 20,
+    borderRadius: 60,
+  },
+  emptyText: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 8,
+    textAlign: 'center',
+    fontFamily: 'Montserrat',
+  },
+  emptySubtext: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
+    fontFamily: 'Montserrat',
   },
 });
 

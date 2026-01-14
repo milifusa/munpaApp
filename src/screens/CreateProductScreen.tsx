@@ -13,21 +13,15 @@ import {
   Modal,
   Dimensions,
   StatusBar,
+  SafeAreaView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
-// @ts-ignore - expo-maps exports GoogleMaps namespace but it's marked as @hidden
-let GoogleMaps: any;
-try {
-  const expoMaps = require('expo-maps');
-  GoogleMaps = expoMaps.GoogleMaps;
-} catch (error) {
-  console.warn('⚠️ [MAP] expo-maps no disponible:', error);
-  GoogleMaps = undefined;
-}
+// Importar expo-maps según la documentación oficial
+import { AppleMaps, GoogleMaps } from 'expo-maps';
 import marketplaceService, { CONDITIONS, CreateProductData, MarketplaceCategory, DEFAULT_CATEGORIES } from '../services/marketplaceService';
 import { imageUploadService } from '../services/imageUploadService';
 
@@ -45,6 +39,8 @@ const CreateProductScreen = () => {
   const [showMapModal, setShowMapModal] = useState(false);
   const [mapLocation, setMapLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
+  const [mapZoom, setMapZoom] = useState(15);
+  const [mapKey, setMapKey] = useState(0); // Key para forzar re-render del mapa
   
   // Datos del formulario
   const [title, setTitle] = useState('');
@@ -102,8 +98,6 @@ const CreateProductScreen = () => {
       console.log('📍 [CREATE PRODUCT] Solicitando ubicación con alta precisión...');
       const currentLocation = await Location.getCurrentPositionAsync({
         accuracy: Location.Accuracy.High,
-        maximumAge: 10000,
-        timeout: 15000,
       });
 
       const { latitude, longitude, accuracy } = currentLocation.coords;
@@ -153,8 +147,8 @@ const CreateProductScreen = () => {
         const address = [
           addressResult.street,
           addressResult.streetNumber,
-          addressResult.subLocality,
-          addressResult.locality,
+          addressResult.district,
+          addressResult.name,
         ]
           .filter(Boolean)
           .join(', ');
@@ -162,7 +156,7 @@ const CreateProductScreen = () => {
         const country = addressResult.country || 'México';
         console.log('✅ [CREATE PRODUCT] Dirección obtenida:', {
           address,
-          city: addressResult.city,
+          city: addressResult.city || addressResult.district,
           state: addressResult.region,
           country,
         });
@@ -171,7 +165,7 @@ const CreateProductScreen = () => {
           latitude,
           longitude,
           address: address || undefined,
-          city: addressResult.city || addressResult.subAdministrativeArea || undefined,
+          city: addressResult.city || addressResult.district || undefined,
           state: addressResult.region || undefined,
           country: country,
         });
@@ -228,12 +222,26 @@ const CreateProductScreen = () => {
     }
   }, [isEditing, product]);
 
+  // Ocultar loading cuando el modal se abre y el mapa se renderiza
+  useEffect(() => {
+    if (showMapModal && mapLocation) {
+      console.log('⏱️ [MAP] Modal abierto, ocultando loading después de 1 segundo');
+      // En iOS no hay onMapLoaded, así que ocultamos el loading después de un breve delay
+      const timeoutId = setTimeout(() => {
+        console.log('✅ [MAP] Ocultando loading (iOS no tiene onMapLoaded)');
+        setMapLoaded(true);
+      }, 1000); // 1 segundo es suficiente para que el mapa comience a renderizarse
+
+      return () => {
+        console.log('🧹 [MAP] Limpiando timeout');
+        clearTimeout(timeoutId);
+      };
+    }
+  }, [showMapModal, mapLocation]);
+
   const loadCategories = async () => {
     try {
-      console.log('🏷️ [CREATE PRODUCT] Cargando categorías...');
       const fetchedCategories = await marketplaceService.getCategories(true);
-      console.log('🏷️ [CREATE PRODUCT] Categorías obtenidas:', fetchedCategories.length);
-      console.log('🏷️ [CREATE PRODUCT] Primera categoría:', fetchedCategories[0]);
       
       // Actualizar solo si son diferentes a las por defecto o si hay más datos
       if (fetchedCategories && fetchedCategories.length > 0) {
@@ -338,11 +346,46 @@ const CreateProductScreen = () => {
   const handleSubmit = async () => {
     if (!validateForm()) return;
 
+    // Alerta informativa para donaciones (solo al crear, no al editar)
+    if (type === 'donacion' && !isEditing) {
+      return new Promise<void>((resolve) => {
+        Alert.alert(
+          '💝 ¡Importante sobre las donaciones!',
+          'Las donaciones deben ser productos que aún estén en buen estado y que puedan ser útiles para otras familias.\n\n' +
+          'Por favor, asegúrate de que el artículo que estás donando:\n' +
+          '• Esté en condiciones de uso\n' +
+          '• Sea seguro para bebés y niños\n' +
+          '• Esté limpio y en buen estado\n\n' +
+          '¡Gracias por contribuir a la economía circular! 🌱',
+          [
+            {
+              text: 'Cancelar',
+              style: 'cancel',
+              onPress: () => resolve(),
+            },
+            {
+              text: 'Entendido, continuar',
+              onPress: async () => {
+                await proceedWithSubmit();
+                resolve();
+              },
+            },
+          ],
+          { cancelable: true }
+        );
+      });
+    }
+
+    await proceedWithSubmit();
+  };
+
+  const proceedWithSubmit = async () => {
     try {
       setLoading(true);
 
       if (!location) {
         Alert.alert('Error', 'No se pudo obtener tu ubicación');
+        setLoading(false);
         return;
       }
 
@@ -362,14 +405,6 @@ const CreateProductScreen = () => {
       if (!selectedCategoryObj.slug || selectedCategoryObj.slug === selectedCategoryObj.id) {
         categoryToSend = selectedCategoryObj.id;
       }
-      
-      console.log('🏷️ [CREATE PRODUCT] Categoría seleccionada:', {
-        name: selectedCategoryObj.name,
-        slug: selectedCategoryObj.slug,
-        id: selectedCategoryObj.id,
-        sending: categoryToSend,
-        allCategories: categories.map(c => ({ name: c.name, slug: c.slug, id: c.id })),
-      });
 
       const productData: CreateProductData = {
         title: title.trim(),
@@ -420,9 +455,9 @@ const CreateProductScreen = () => {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#59C6C0" />
+      <StatusBar barStyle="light-content" backgroundColor="#96d2d3" />
       {/* Header */}
-      <View style={[styles.header, { paddingTop: Math.max(insets.top, Platform.OS === 'ios' ? 50 : 15) }]}>
+      <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
         <TouchableOpacity onPress={() => navigation.goBack()}>
           <Ionicons name="close" size={28} color="white" />
         </TouchableOpacity>
@@ -554,7 +589,6 @@ const CreateProductScreen = () => {
           <ScrollView horizontal showsHorizontalScrollIndicator={false}>
             <View style={styles.categoriesContainer}>
               {categories.map((cat) => {
-                console.log('🏷️ [RENDER] Renderizando categoría:', cat.name);
                 return (
                 <TouchableOpacity
                   key={cat.id}
@@ -626,7 +660,7 @@ const CreateProductScreen = () => {
                 onChangeText={setPrice}
                 keyboardType="numeric"
               />
-              <Text style={styles.currencyText}>MXN</Text>
+              <Text style={styles.currencyText}>USD</Text>
             </View>
           </View>
         )}
@@ -677,22 +711,69 @@ const CreateProductScreen = () => {
               </View>
               <TouchableOpacity
                 style={styles.updateLocationButton}
-                onPress={() => {
-                  // Inicializar el mapa con la ubicación actual o ubicación por defecto
-                  const initialLocation = location || {
-                    latitude: 19.4326,
-                    longitude: -99.1332,
-                  };
+                onPress={async () => {
+                  console.log('🗺️ [MAP] ========== ABRIENDO MODAL DE MAPA ==========');
                   
-                  console.log('🗺️ [MAP] Abriendo modal de mapa con ubicación:', initialLocation);
-                  console.log('🗺️ [MAP] GoogleMaps disponible:', typeof GoogleMaps !== 'undefined' && GoogleMaps && typeof GoogleMaps.View !== 'undefined');
+                  // Obtener ubicación actual si no hay una guardada o si es inválida
+                  let initialLocation = location;
                   
-                  setMapLocation({
+                  if (!initialLocation || !initialLocation.latitude || !initialLocation.longitude) {
+                    console.log('📍 [MAP] No hay ubicación guardada, obteniendo ubicación actual...');
+                    try {
+                      const { status } = await Location.requestForegroundPermissionsAsync();
+                      if (status === 'granted') {
+                        const currentLocation = await Location.getCurrentPositionAsync({
+                          accuracy: Location.Accuracy.High,
+                        });
+                        initialLocation = {
+                          latitude: currentLocation.coords.latitude,
+                          longitude: currentLocation.coords.longitude,
+                        };
+                        console.log('✅ [MAP] Ubicación actual obtenida:', initialLocation);
+                      } else {
+                        // Si no hay permiso, usar ubicación por defecto (Ciudad de México)
+                        initialLocation = {
+                          latitude: 19.4326,
+                          longitude: -99.1332,
+                        };
+                        console.log('⚠️ [MAP] Sin permiso de ubicación, usando ubicación por defecto');
+                      }
+                    } catch (error) {
+                      console.error('❌ [MAP] Error obteniendo ubicación:', error);
+                      // Usar ubicación por defecto si falla
+                      initialLocation = {
+                        latitude: 19.4326,
+                        longitude: -99.1332,
+                      };
+                    }
+                  }
+                  
+                  console.log('🗺️ [MAP] Ubicación inicial para el mapa:', initialLocation);
+                  console.log('🗺️ [MAP] Validando coordenadas:', {
                     latitude: initialLocation.latitude,
                     longitude: initialLocation.longitude,
+                    isValidLat: initialLocation.latitude >= -90 && initialLocation.latitude <= 90,
+                    isValidLon: initialLocation.longitude >= -180 && initialLocation.longitude <= 180,
                   });
-                  setMapLoaded(false); // Resetear estado de carga
-                  setShowMapModal(true);
+                  
+                  // Validar coordenadas antes de establecerlas
+                  if (initialLocation.latitude >= -90 && initialLocation.latitude <= 90 &&
+                      initialLocation.longitude >= -180 && initialLocation.longitude <= 180) {
+                    setMapLocation({
+                      latitude: initialLocation.latitude,
+                      longitude: initialLocation.longitude,
+                    });
+                    setMapZoom(15); // Resetear zoom a 15
+                    setMapLoaded(false); // Resetear estado de carga
+                    // Pequeño delay para asegurar que el estado se actualice antes de abrir el modal
+                    setTimeout(() => {
+                      setShowMapModal(true);
+                      console.log('🗺️ [MAP] Modal abierto con coordenadas:', initialLocation);
+                    }, 100);
+                  } else {
+                    console.error('❌ [MAP] Coordenadas inválidas:', initialLocation);
+                    Alert.alert('Error', 'Las coordenadas de ubicación no son válidas. Por favor, intenta de nuevo.');
+                  }
                 }}
               >
                 <Ionicons name="map" size={16} color="#59C6C0" />
@@ -741,40 +822,373 @@ const CreateProductScreen = () => {
         onRequestClose={() => setShowMapModal(false)}
       >
         <View style={styles.mapModalContainer}>
-          <View style={styles.mapModalHeader}>
+          <StatusBar barStyle="light-content" backgroundColor="#96d2d3" />
+          <View style={[styles.mapModalHeader, { paddingTop: insets.top + 10 }]}>
             <Text style={styles.mapModalTitle}>Selecciona tu ubicación</Text>
             <TouchableOpacity
               onPress={() => setShowMapModal(false)}
               style={styles.mapModalCloseButton}
             >
-              <Ionicons name="close" size={24} color="#333" />
+              <Ionicons name="close" size={24} color="white" />
             </TouchableOpacity>
           </View>
 
           {mapLocation ? (
-            <View style={[styles.mapContainer, { justifyContent: 'center', alignItems: 'center', backgroundColor: '#f0f0f0' }]}>
-              <Ionicons name="map-outline" size={48} color="#999" style={{ marginBottom: 16 }} />
-              <Text style={{ color: '#666', textAlign: 'center', padding: 20, fontSize: 14 }}>
-                El mapa requiere un rebuild nativo para funcionar correctamente.{'\n\n'}
-                Por favor, ejecuta:{'\n'}
-                <Text style={{ fontFamily: 'monospace', fontSize: 12 }}>npx expo run:android</Text>
-                {'\n\n'}
-                Mientras tanto, puedes usar las coordenadas actuales:{'\n'}
-                <Text style={{ fontFamily: 'monospace', fontSize: 11, color: '#999' }}>
-                  {mapLocation.latitude.toFixed(6)}, {mapLocation.longitude.toFixed(6)}
-                </Text>
-              </Text>
-              <TouchableOpacity
-                style={styles.mapConfirmButton}
-                onPress={() => {
-                  // Confirmar usando la ubicación actual
-                  setShowMapModal(false);
-                }}
-              >
-                <Text style={styles.mapConfirmButtonText}>Usar esta ubicación</Text>
-              </TouchableOpacity>
+            <View style={styles.mapContainer}>
+              {(() => {
+                console.log('🔍 [MAP] ========== RENDERIZANDO MAPA ==========');
+                console.log('🔍 [MAP] mapLocation:', mapLocation);
+                console.log('🔍 [MAP] mapLocation.latitude:', mapLocation?.latitude);
+                console.log('🔍 [MAP] mapLocation.longitude:', mapLocation?.longitude);
+                console.log('🔍 [MAP] mapLoaded:', mapLoaded);
+                console.log('🔍 [MAP] Platform.OS:', Platform.OS);
+                console.log('🔍 [MAP] GoogleMaps disponible:', typeof GoogleMaps !== 'undefined');
+                console.log('🔍 [MAP] AppleMaps disponible:', typeof AppleMaps !== 'undefined');
+                
+                // Verificar disponibilidad de componentes según la plataforma
+                const hasAppleMaps = Platform.OS === 'ios' && AppleMaps && AppleMaps.View;
+                const hasGoogleMaps = Platform.OS === 'android' && GoogleMaps && GoogleMaps.View;
+                
+                if (hasAppleMaps || hasGoogleMaps) {
+                  console.log('✅ [MAP] Renderizando', Platform.OS === 'ios' ? 'AppleMaps.View' : 'GoogleMaps.View');
+                  console.log('📍 [MAP] Marcador con coordenadas:', {
+                    latitude: mapLocation.latitude,
+                    longitude: mapLocation.longitude,
+                  });
+                  
+                  return (
+                    <>
+                      {!mapLoaded && (
+                        <View style={styles.mapLoadingOverlay}>
+                          <ActivityIndicator size="large" color="#59C6C0" />
+                          <Text style={styles.mapLoadingText}>Cargando mapa...</Text>
+                        </View>
+                      )}
+                      {Platform.OS === 'ios' ? (
+                        <View style={{ flex: 1, width: '100%', height: '100%', backgroundColor: 'transparent' }}>
+                          <AppleMaps.View
+                            key={`map-${mapLocation.latitude}-${mapLocation.longitude}-${mapKey}`}
+                            style={styles.map}
+                            cameraPosition={{
+                              latitude: mapLocation.latitude,
+                              longitude: mapLocation.longitude,
+                              zoom: mapZoom,
+                            } as any}
+                            annotations={[{
+                              id: 'location-marker',
+                              coordinates: {
+                                latitude: mapLocation.latitude,
+                                longitude: mapLocation.longitude,
+                              },
+                              title: 'Ubicación del producto',
+                            }]}
+                            onCameraMove={(event: any) => {
+                              // Cuando la cámara se mueve, el mapa está cargado
+                              console.log('📹 [MAP] onCameraMove ejecutado (iOS):', event);
+                              if (!mapLoaded) {
+                                console.log('✅ [MAP] Mapa está cargado (detectado por onCameraMove)');
+                                setMapLoaded(true);
+                              }
+                            }}
+                            onMapClick={(event: any) => {
+                              console.log('📍 [MAP] onMapClick ejecutado (iOS):', event);
+                              const coordinate = event.coordinates;
+                              console.log('📍 [MAP] Coordinate extraído:', coordinate);
+                              if (coordinate && coordinate.latitude && coordinate.longitude) {
+                                console.log('📍 [MAP] Nueva ubicación seleccionada:', coordinate);
+                                // Actualizar marcador cuando se hace click en el mapa
+                                setMapLocation({ 
+                                  latitude: coordinate.latitude, 
+                                  longitude: coordinate.longitude 
+                                });
+                              } else {
+                                console.warn('⚠️ [MAP] Evento onMapClick sin coordenadas válidas:', event);
+                              }
+                            }}
+                            onMarkerClick={(event: any) => {
+                              console.log('📍 [MAP] onMarkerClick ejecutado (iOS):', event);
+                              const coordinate = event.coordinates || event.coordinate;
+                              console.log('📍 [MAP] Coordinate del evento:', coordinate);
+                              if (coordinate && coordinate.latitude && coordinate.longitude) {
+                                console.log('📍 [MAP] Marcador clickeado en:', coordinate);
+                              } else {
+                                console.warn('⚠️ [MAP] onMarkerClick sin coordenadas válidas:', event);
+                              }
+                            }}
+                          />
+                          {/* Botones de zoom */}
+                          <View style={styles.zoomControls}>
+                            <TouchableOpacity
+                              style={[styles.zoomButton, { borderBottomWidth: 1, borderBottomColor: '#E0E0E0' }]}
+                              onPress={() => {
+                                const newZoom = Math.min(mapZoom + 1, 20);
+                                setMapZoom(newZoom);
+                                console.log('🔍 [MAP] Zoom aumentado a:', newZoom);
+                              }}
+                            >
+                              <Ionicons name="add" size={24} color="#333" />
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                              style={styles.zoomButton}
+                              onPress={() => {
+                                const newZoom = Math.max(mapZoom - 1, 1);
+                                setMapZoom(newZoom);
+                                console.log('🔍 [MAP] Zoom disminuido a:', newZoom);
+                              }}
+                            >
+                              <Ionicons name="remove" size={24} color="#333" />
+                            </TouchableOpacity>
+                          </View>
+                          {/* Botón de ubicarme */}
+                          <TouchableOpacity
+                            style={styles.myLocationButton}
+                            onPress={async () => {
+                              try {
+                                console.log('📍 [MAP] ========== BOTÓN UBICARME PRESIONADO ==========');
+                                console.log('📍 [MAP] Ubicación actual del mapa:', mapLocation);
+                                
+                                const { status } = await Location.requestForegroundPermissionsAsync();
+                                console.log('📍 [MAP] Estado de permisos:', status);
+                                
+                                if (status === 'granted') {
+                                  console.log('📍 [MAP] Permisos concedidos, obteniendo ubicación...');
+                                  const currentLocation = await Location.getCurrentPositionAsync({
+                                    accuracy: Location.Accuracy.High,
+                                  });
+                                  
+                                  const newLocation = {
+                                    latitude: currentLocation.coords.latitude,
+                                    longitude: currentLocation.coords.longitude,
+                                  };
+                                  
+                                  console.log('✅ [MAP] Ubicación GPS obtenida:', newLocation);
+                                  console.log('✅ [MAP] Coordenadas GPS:', {
+                                    lat: newLocation.latitude,
+                                    lon: newLocation.longitude,
+                                    isValidLat: newLocation.latitude >= -90 && newLocation.latitude <= 90,
+                                    isValidLon: newLocation.longitude >= -180 && newLocation.longitude <= 180,
+                                  });
+                                  
+                                  // Validar coordenadas antes de establecerlas
+                                  if (newLocation.latitude >= -90 && newLocation.latitude <= 90 &&
+                                      newLocation.longitude >= -180 && newLocation.longitude <= 180) {
+                                    // Forzar actualización del mapa
+                                    setMapLoaded(false);
+                                    setMapZoom(15);
+                                    setMapLocation({
+                                      latitude: newLocation.latitude,
+                                      longitude: newLocation.longitude,
+                                    });
+                                    setMapKey(prev => prev + 1); // Forzar re-render del mapa
+                                    
+                                    // Pequeño delay para asegurar que el estado se actualice
+                                    setTimeout(() => {
+                                      setMapLoaded(true);
+                                      console.log('✅ [MAP] Mapa actualizado con nueva ubicación');
+                                    }, 100);
+                                  } else {
+                                    console.error('❌ [MAP] Coordenadas inválidas:', newLocation);
+                                    Alert.alert('Error', 'Las coordenadas obtenidas no son válidas');
+                                  }
+                                } else {
+                                  console.warn('⚠️ [MAP] Permisos denegados');
+                                  Alert.alert(
+                                    'Permiso de ubicación requerido',
+                                    'Necesitamos tu ubicación para centrar el mapa. Por favor, permite el acceso a la ubicación en la configuración de la app.'
+                                  );
+                                }
+                              } catch (error) {
+                                console.error('❌ [MAP] Error obteniendo ubicación:', error);
+                                console.error('❌ [MAP] Error completo:', JSON.stringify(error, null, 2));
+                                Alert.alert('Error', 'No se pudo obtener tu ubicación actual. Por favor, intenta de nuevo.');
+                              }
+                            }}
+                          >
+                            <Ionicons name="locate" size={24} color="#59C6C0" />
+                          </TouchableOpacity>
+                        </View>
+                      ) : (
+                        <View style={{ flex: 1, width: '100%', height: '100%', position: 'relative' }}>
+                        <GoogleMaps.View
+                          key={`map-${mapLocation.latitude}-${mapLocation.longitude}-${mapKey}`}
+                          style={[styles.map, { width: '100%', height: '100%' }]}
+                          cameraPosition={{
+                            latitude: mapLocation.latitude,
+                            longitude: mapLocation.longitude,
+                            zoom: mapZoom,
+                          } as any}
+                          markers={[{
+                            id: 'location-marker',
+                            coordinates: {
+                              latitude: mapLocation.latitude,
+                              longitude: mapLocation.longitude,
+                            },
+                            draggable: true,
+                            title: 'Ubicación del producto',
+                          }]}
+                          onMapLoaded={() => {
+                            console.log('✅ [MAP] ========== onMapLoaded EJECUTADO (Android) ==========');
+                            console.log('✅ [MAP] Mapa cargado correctamente');
+                            setMapLoaded(true);
+                          }}
+                          onMapClick={(event: any) => {
+                            console.log('📍 [MAP] onMapClick ejecutado (Android):', event);
+                            const coordinate = event.coordinates || event.coordinate;
+                            console.log('📍 [MAP] Coordinate extraído:', coordinate);
+                            if (coordinate && coordinate.latitude && coordinate.longitude) {
+                              console.log('📍 [MAP] Nueva ubicación seleccionada:', coordinate);
+                              setMapLocation({ 
+                                latitude: coordinate.latitude, 
+                                longitude: coordinate.longitude 
+                              });
+                            } else {
+                              console.warn('⚠️ [MAP] Evento onMapClick sin coordenadas válidas:', event);
+                            }
+                          }}
+                          onMarkerClick={(event: any) => {
+                            console.log('📍 [MAP] onMarkerClick ejecutado (Android):', event);
+                            const coordinate = event.coordinate || event.coordinates;
+                            if (coordinate && coordinate.latitude && coordinate.longitude) {
+                              console.log('📍 [MAP] Marcador clickeado en:', coordinate);
+                            }
+                          }}
+                        />
+                        {/* Botones de zoom */}
+                        <View style={styles.zoomControls}>
+                          <TouchableOpacity
+                            style={[styles.zoomButton, { borderBottomWidth: 1, borderBottomColor: '#E0E0E0' }]}
+                            onPress={() => {
+                              const newZoom = Math.min(mapZoom + 1, 20);
+                              setMapZoom(newZoom);
+                              console.log('🔍 [MAP] Zoom aumentado a:', newZoom);
+                            }}
+                          >
+                            <Ionicons name="add" size={24} color="#333" />
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            style={styles.zoomButton}
+                            onPress={() => {
+                              const newZoom = Math.max(mapZoom - 1, 1);
+                              setMapZoom(newZoom);
+                              console.log('🔍 [MAP] Zoom disminuido a:', newZoom);
+                            }}
+                          >
+                            <Ionicons name="remove" size={24} color="#333" />
+                          </TouchableOpacity>
+                        </View>
+                        {/* Botón de ubicarme */}
+                        <TouchableOpacity
+                          style={styles.myLocationButton}
+                          onPress={async () => {
+                            try {
+                              console.log('📍 [MAP] ========== BOTÓN UBICARME PRESIONADO (Android) ==========');
+                              console.log('📍 [MAP] Ubicación actual del mapa:', mapLocation);
+                              
+                              const { status } = await Location.requestForegroundPermissionsAsync();
+                              console.log('📍 [MAP] Estado de permisos:', status);
+                              
+                              if (status === 'granted') {
+                                console.log('📍 [MAP] Permisos concedidos, obteniendo ubicación...');
+                                const currentLocation = await Location.getCurrentPositionAsync({
+                                  accuracy: Location.Accuracy.High,
+                                });
+                                
+                                const newLocation = {
+                                  latitude: currentLocation.coords.latitude,
+                                  longitude: currentLocation.coords.longitude,
+                                };
+                                
+                                console.log('✅ [MAP] Ubicación GPS obtenida:', newLocation);
+                                console.log('✅ [MAP] Coordenadas GPS:', {
+                                  lat: newLocation.latitude,
+                                  lon: newLocation.longitude,
+                                  isValidLat: newLocation.latitude >= -90 && newLocation.latitude <= 90,
+                                  isValidLon: newLocation.longitude >= -180 && newLocation.longitude <= 180,
+                                });
+                                
+                                // Validar coordenadas antes de establecerlas
+                                if (newLocation.latitude >= -90 && newLocation.latitude <= 90 &&
+                                    newLocation.longitude >= -180 && newLocation.longitude <= 180) {
+                                  // Forzar actualización del mapa
+                                  setMapLoaded(false);
+                                  setMapZoom(15);
+                                  setMapLocation({
+                                    latitude: newLocation.latitude,
+                                    longitude: newLocation.longitude,
+                                  });
+                                  setMapKey(prev => prev + 1); // Forzar re-render del mapa
+                                  
+                                  // Pequeño delay para asegurar que el estado se actualice
+                                  setTimeout(() => {
+                                    setMapLoaded(true);
+                                    console.log('✅ [MAP] Mapa actualizado con nueva ubicación');
+                                  }, 100);
+                                } else {
+                                  console.error('❌ [MAP] Coordenadas inválidas:', newLocation);
+                                  Alert.alert('Error', 'Las coordenadas obtenidas no son válidas');
+                                }
+                              } else {
+                                console.warn('⚠️ [MAP] Permisos denegados');
+                                Alert.alert(
+                                  'Permiso de ubicación requerido',
+                                  'Necesitamos tu ubicación para centrar el mapa. Por favor, permite el acceso a la ubicación en la configuración de la app.'
+                                );
+                              }
+                            } catch (error) {
+                              console.error('❌ [MAP] Error obteniendo ubicación:', error);
+                              console.error('❌ [MAP] Error completo:', JSON.stringify(error, null, 2));
+                              Alert.alert('Error', 'No se pudo obtener tu ubicación actual. Por favor, intenta de nuevo.');
+                            }
+                          }}
+                        >
+                          <Ionicons name="locate" size={24} color="#59C6C0" />
+                        </TouchableOpacity>
+                        </View>
+                      )}
+                    </>
+                  );
+                } else {
+                  console.warn('⚠️ [MAP] MapComponent no disponible');
+                  console.warn('⚠️ [MAP] Platform.OS:', Platform.OS);
+                  console.warn('⚠️ [MAP] GoogleMaps:', GoogleMaps);
+                  console.warn('⚠️ [MAP] AppleMaps:', AppleMaps);
+                  return (
+                    <View style={styles.mapErrorContainer}>
+                      <Ionicons name="map-outline" size={48} color="#999" style={{ marginBottom: 16 }} />
+                      <Text style={styles.mapErrorText}>
+                        El mapa no está disponible.{'\n\n'}
+                        Por favor, ejecuta:{'\n'}
+                        <Text style={{ fontFamily: 'monospace', fontSize: 12 }}>npx expo run:android</Text>
+                        {'\n'}o{'\n'}
+                        <Text style={{ fontFamily: 'monospace', fontSize: 12 }}>npx expo run:ios</Text>
+                        {'\n\n'}
+                        Coordenadas actuales:{'\n'}
+                        <Text style={{ fontFamily: 'monospace', fontSize: 11, color: '#999' }}>
+                          {mapLocation.latitude.toFixed(6)}, {mapLocation.longitude.toFixed(6)}
+                        </Text>
+                      </Text>
+                      <TouchableOpacity
+                        style={styles.mapConfirmButton}
+                        onPress={() => {
+                          // Confirmar usando la ubicación actual
+                          setShowMapModal(false);
+                        }}
+                      >
+                        <Text style={styles.mapConfirmButtonText}>Usar esta ubicación</Text>
+                      </TouchableOpacity>
+                    </View>
+                  );
+                }
+              })()}
             </View>
-          ) : null}
+          ) : (
+            <View style={styles.mapErrorContainer}>
+              <Ionicons name="location-outline" size={48} color="#999" />
+              <Text style={styles.mapErrorText}>
+                No se pudo obtener la ubicación inicial
+              </Text>
+            </View>
+          )}
 
           <View style={styles.mapModalFooter}>
             <View style={styles.mapLocationInfo}>
@@ -797,8 +1211,8 @@ const CreateProductScreen = () => {
                             const address = [
                               addressResult.street,
                               addressResult.streetNumber,
-                              addressResult.subLocality,
-                              addressResult.locality,
+                              addressResult.district,
+                              addressResult.name,
                             ]
                               .filter(Boolean)
                               .join(', ');
@@ -853,7 +1267,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F5F5F5',
   },
   header: {
-    backgroundColor: '#59C6C0',
+    backgroundColor: '#96d2d3',
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -896,7 +1310,7 @@ const styles = StyleSheet.create({
   },
   typeButtonActive: {
     borderColor: '#59C6C0',
-    backgroundColor: '#59C6C0',
+    backgroundColor: '#96d2d3',
   },
   typeButtonText: {
     marginTop: 5,
@@ -980,7 +1394,7 @@ const styles = StyleSheet.create({
   },
   categoryButtonActive: {
     borderColor: '#59C6C0',
-    backgroundColor: '#59C6C0',
+    backgroundColor: '#96d2d3',
   },
   categoryButtonText: {
     fontSize: 13,
@@ -1013,7 +1427,7 @@ const styles = StyleSheet.create({
   },
   conditionButtonActive: {
     borderColor: '#59C6C0',
-    backgroundColor: '#59C6C0',
+    backgroundColor: '#96d2d3',
   },
   conditionButtonText: {
     fontSize: 14,
@@ -1140,7 +1554,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 20,
     borderRadius: 6,
-    backgroundColor: '#59C6C0',
+    backgroundColor: '#96d2d3',
   },
   retryLocationText: {
     fontSize: 14,
@@ -1152,7 +1566,7 @@ const styles = StyleSheet.create({
     margin: 20,
     padding: 16,
     borderRadius: 8,
-    backgroundColor: '#59C6C0',
+    backgroundColor: '#96d2d3',
     alignItems: 'center',
   },
   submitButtonDisabled: {
@@ -1173,9 +1587,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 16,
-    paddingTop: Platform.OS === 'ios' ? 50 : 16,
-    backgroundColor: '#59C6C0',
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+    backgroundColor: '#96d2d3',
     borderBottomWidth: 1,
     borderBottomColor: '#E0E0E0',
   },
@@ -1191,13 +1605,52 @@ const styles = StyleSheet.create({
   mapContainer: {
     flex: 1,
     width: '100%',
+    height: '100%',
     backgroundColor: '#f0f0f0',
     position: 'relative',
+    minHeight: 400,
+  },
+  zoomControls: {
+    position: 'absolute',
+    right: 16,
+    top: 16,
+    backgroundColor: 'white',
+    borderRadius: 8,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  zoomButton: {
+    width: 44,
+    height: 44,
+    backgroundColor: 'white',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  myLocationButton: {
+    position: 'absolute',
+    right: 16,
+    top: 100,
+    width: 44,
+    height: 44,
+    backgroundColor: 'white',
+    borderRadius: 22,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
   },
   map: {
     width: '100%',
     height: '100%',
     flex: 1,
+    backgroundColor: '#e0e0e0', // Color de fondo temporal para verificar que el componente se renderiza
   },
   mapLoadingOverlay: {
     position: 'absolute',
@@ -1281,7 +1734,7 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 12,
     borderRadius: 8,
-    backgroundColor: '#59C6C0',
+    backgroundColor: '#96d2d3',
     alignItems: 'center',
   },
   mapConfirmButtonText: {

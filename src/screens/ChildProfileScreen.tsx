@@ -15,6 +15,7 @@ import {
   Modal,
   Button,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 // @ts-ignore
 import DateTimePicker from '@react-native-community/datetimepicker';
 import * as ImagePicker from 'expo-image-picker';
@@ -28,9 +29,9 @@ import childProfileService, { vaccinesService } from '../services/childProfileSe
 const { width } = Dimensions.get('window');
 
 // Constantes para las caritas por defecto (fuera del componente para mejor rendimiento)
-const CARITA_1 = require('../../assets/caritas 1.png');
-const CARITA_2 = require('../../assets/caritas 2.png');
-const CARITA_3 = require('../../assets/caritas 3.png');
+const CARITA_1 = require('../../assets/caritas1.png');
+const CARITA_2 = require('../../assets/caritas2.png');
+const CARITA_3 = require('../../assets/caritas3.png');
 const CARITAS = [CARITA_1, CARITA_2, CARITA_3];
 
 interface Child {
@@ -41,6 +42,7 @@ interface Child {
   gestationWeeks?: number | null;
   photoUrl?: string | null;
   createdAt: any; // Puede ser string o objeto de Firestore
+  birthDate?: string | any; // Fecha de nacimiento (puede ser string o objeto de Firestore)
   // Campos calculados por el backend
   currentAgeInMonths?: number | null;
   currentGestationWeeks?: number | null;
@@ -60,8 +62,8 @@ const ChildProfileScreen: React.FC = () => {
   const route = useRoute();
   const { childId, child: initialChild } = route.params as RouteParams;
   const [fontsLoaded, setFontsLoaded] = useState(false);
-  const [child, setChild] = useState(initialChild);
-  const [profileImage, setProfileImage] = useState<string | null>(initialChild.photoUrl || null);
+  const [child, setChild] = useState(initialChild || null);
+  const [profileImage, setProfileImage] = useState<string | null>(initialChild?.photoUrl || null);
   const [loading, setLoading] = useState(false);
   const [developmentInfo, setDevelopmentInfo] = useState<any>(null);
   const [developmentLoading, setDevelopmentLoading] = useState(false);
@@ -281,11 +283,11 @@ const ChildProfileScreen: React.FC = () => {
           Alert.alert('Éxito', `Vacuna "${vaccineName}" programada para ${new Date(date).toLocaleDateString('es-ES')}`);
         } else {
           // Marcando como aplicada
-          await vaccinesService.updateVaccine(childId, pendingVaccine.id, {
-            appliedDate: dateStr,
-            status: 'applied',
-          });
-          Alert.alert('Éxito', `Vacuna "${vaccineName}" marcada como aplicada`);
+        await vaccinesService.updateVaccine(childId, pendingVaccine.id, {
+          appliedDate: dateStr,
+          status: 'applied',
+        });
+        Alert.alert('Éxito', `Vacuna "${vaccineName}" marcada como aplicada`);
         }
       } else {
         // Si no tiene ID, es una vacuna nueva
@@ -299,13 +301,13 @@ const ChildProfileScreen: React.FC = () => {
           Alert.alert('Éxito', `Vacuna "${vaccineName}" programada para ${new Date(date).toLocaleDateString('es-ES')}`);
         } else {
           // Registrando como aplicada
-          await childProfileService.vaccines.addVaccine(childId, {
-            name: vaccineName,
-            scheduledDate: dateStr,
-            appliedDate: dateStr,
-            status: 'applied',
-          });
-          Alert.alert('Éxito', `Vacuna "${vaccineName}" registrada como aplicada`);
+        await childProfileService.vaccines.addVaccine(childId, {
+          name: vaccineName,
+          scheduledDate: dateStr,
+          appliedDate: dateStr,
+          status: 'applied',
+        });
+        Alert.alert('Éxito', `Vacuna "${vaccineName}" registrada como aplicada`);
         }
       }
       
@@ -831,6 +833,44 @@ const ChildProfileScreen: React.FC = () => {
     }
   };
 
+  const formatBirthDate = (dateValue: any): string => {
+    try {
+      if (!dateValue) return 'Fecha no disponible';
+      
+      let date: Date;
+      
+      // Manejar objeto de Firestore con _seconds
+      if (typeof dateValue === 'object' && dateValue._seconds) {
+        date = new Date(dateValue._seconds * 1000);
+      } 
+      // Manejar string de fecha
+      else if (typeof dateValue === 'string') {
+        date = new Date(dateValue);
+      }
+      // Manejar objeto Date
+      else if (dateValue instanceof Date) {
+        date = dateValue;
+      }
+      // Si no es ninguno de los anteriores, intentar convertir directamente
+      else {
+        date = new Date(dateValue);
+      }
+      
+      if (isNaN(date.getTime())) {
+        return 'Fecha no disponible';
+      }
+      
+      return date.toLocaleDateString('es-MX', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+      });
+    } catch (error) {
+      console.error('❌ Error formateando fecha de nacimiento:', error);
+      return 'Fecha no disponible';
+    }
+  };
+
   const formatFirestoreDate = (dateObj: any): string => {
     if (!dateObj) return 'Fecha no disponible';
     
@@ -1150,6 +1190,14 @@ const ChildProfileScreen: React.FC = () => {
                 }
               </Text>
             </View>
+            {!child.isUnborn && child.birthDate && (
+              <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>Fecha de nacimiento:</Text>
+                <Text style={styles.infoValue}>
+                  {formatBirthDate(child.birthDate)}
+                </Text>
+              </View>
+            )}
             <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>Fecha de registro:</Text>
               <Text style={styles.infoValue}>
@@ -1158,10 +1206,24 @@ const ChildProfileScreen: React.FC = () => {
             </View>
           </View>
           
-          {/* Botón de editar información */}
-          <TouchableOpacity style={styles.actionButton} onPress={handleEditChild}>
-            <Text style={styles.actionButtonText}>Editar información</Text>
-          </TouchableOpacity>
+          {/* Botones de acción */}
+          <View style={styles.actionButtonsContainer}>
+            <TouchableOpacity style={styles.actionButton} onPress={handleEditChild}>
+              <Ionicons name="create-outline" size={20} color="#FFF" />
+              <Text style={styles.actionButtonText}>Editar información</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={[styles.actionButton, styles.sleepButton]} 
+              onPress={() => {
+                // @ts-ignore
+                navigation.navigate('SleepTracker', { childId: child.id });
+              }}
+            >
+              <Ionicons name="moon" size={20} color="#FFF" />
+              <Text style={styles.actionButtonText}>💤 Seguimiento de Sueño</Text>
+            </TouchableOpacity>
+          </View>
         </View>
         )}
 
@@ -1630,15 +1692,20 @@ const ChildProfileScreen: React.FC = () => {
     <View style={styles.fabContainer}>
       <TouchableOpacity 
         style={[styles.fab, styles.fabSecondary]}
-        onPress={() => Alert.alert('Próximamente', 'Función de compartir próximamente')}
+        onPress={() => {
+          (navigation as any).navigate('ShareChild', {
+            childId: child.id,
+            childName: child.name,
+          });
+        }}
       >
-        <Text style={styles.fabIcon}>📤</Text>
+        <Ionicons name="share-outline" size={24} color="#FFFFFF" />
             </TouchableOpacity>
       <TouchableOpacity 
         style={styles.fab}
         onPress={handleEditChild}
       >
-        <Text style={styles.fabIcon}>✏️</Text>
+        <Ionicons name="create-outline" size={24} color="#FFFFFF" />
             </TouchableOpacity>
     </View>
 
@@ -1731,10 +1798,14 @@ const styles = StyleSheet.create({
   },
   backButton: {
     marginBottom: spacing.lg,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderRadius: borderRadius.base,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
   },
   backButtonText: {
     fontSize: typography.sizes.lg,
-    color: colors.white,
+    color: '#2c3e50', // Color oscuro para que sea visible sobre fondo claro
     fontWeight: typography.weights.medium,
   },
   childInfoHeader: {
@@ -1983,7 +2054,7 @@ const styles = StyleSheet.create({
     width: 60,
     height: 60,
     borderRadius: 30,
-    backgroundColor: '#59C6C0',
+    backgroundColor: '#96d2d3',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 12,
@@ -2002,7 +2073,7 @@ const styles = StyleSheet.create({
   childName: {
     fontSize: typography.sizes['3xl'],
     fontWeight: typography.weights.bold,
-    color: colors.white,
+    color: '#2c3e50', // Color oscuro para que sea visible sobre fondo claro
     marginBottom: spacing.sm,
   },
   ageWidget: {
@@ -2024,11 +2095,11 @@ const styles = StyleSheet.create({
   agePrimary: {
     fontSize: 16,
     fontWeight: '700',
-    color: colors.white,
+    color: '#2c3e50', // Color oscuro para que sea visible sobre fondo claro
   },
   ageSecondary: {
     fontSize: 13,
-    color: 'rgba(255, 255, 255, 0.9)',
+    color: '#34495e', // Color oscuro para que sea visible sobre fondo claro
     marginTop: 2,
   },
   tabsContainer: {
@@ -2056,7 +2127,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
   },
   activeTab: {
-    backgroundColor: '#59C6C0',
+    backgroundColor: '#96d2d3',
   },
   tabText: {
     fontSize: 13,
@@ -2148,21 +2219,32 @@ const styles = StyleSheet.create({
   actionsContainer: {
     gap: spacing.md,
   },
+  actionButtonsContainer: {
+    flexDirection: 'column',
+    gap: spacing.md,
+    marginTop: spacing.lg,
+  },
   actionButton: {
-    backgroundColor: colors.white,
+    backgroundColor: colors.primary,
     borderRadius: borderRadius.base,
-    padding: spacing.lg,
+    padding: spacing.md,
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
     ...shadows.base,
   },
+  sleepButton: {
+    backgroundColor: '#96d2d3',
+  },
   actionButtonText: {
-    fontSize: typography.sizes.lg,
-    fontWeight: typography.weights.medium,
-    color: colors.primary,
+    fontSize: typography.sizes.md,
+    fontWeight: typography.weights.semibold,
+    color: colors.white,
   },
   // Estilos para cartilla de vacunación
   vaccineCardContainer: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#F7FAFC',
     borderRadius: borderRadius.lg,
     marginBottom: spacing.xl,
     overflow: 'hidden',
@@ -2370,7 +2452,7 @@ const styles = StyleSheet.create({
     marginTop: spacing.lg,
   },
   addButton: {
-    backgroundColor: '#59C6C0',
+    backgroundColor: '#96d2d3',
     borderRadius: borderRadius.base,
     padding: spacing.md,
     alignItems: 'center',
@@ -2525,7 +2607,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F0F0F0',
   },
   confirmButton: {
-    backgroundColor: '#59C6C0',
+    backgroundColor: '#96d2d3',
   },
   cancelButtonText: {
     fontSize: typography.sizes.base,

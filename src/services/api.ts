@@ -3,6 +3,18 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const API_BASE_URL = 'https://api.munpa.online';
 
+// Función para obtener el timezone del usuario
+const getUserTimezone = (): string => {
+  try {
+    // Intenta obtener el timezone usando Intl API
+    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    return timezone || 'America/Mexico_City'; // Fallback
+  } catch (error) {
+    console.warn('⚠️ [TIMEZONE] No se pudo detectar, usando fallback');
+    return 'America/Mexico_City';
+  }
+};
+
 // Crear instancia de axios
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -28,7 +40,7 @@ const exchangeCustomTokenForIdToken = async (customToken: string): Promise<strin
   }
 };
 
-// Interceptor para agregar token de autenticación
+// Interceptor para agregar token de autenticación y timezone
 api.interceptors.request.use(
   async (config) => {
     
@@ -47,6 +59,9 @@ api.interceptors.request.use(
       console.log('⚠️ [INTERCEPTOR] No hay token disponible');
     }
 
+    // Agregar timezone del usuario en el header
+    const timezone = getUserTimezone();
+    config.headers['X-Timezone'] = timezone;
     
     return config;
   },
@@ -72,6 +87,7 @@ api.interceptors.response.use(
       data: error.response?.data,
       message: error.message,
     });
+    
     
     if (error.response?.status === 401) {
       // Token de acceso requerido - limpiar almacenamiento
@@ -162,7 +178,21 @@ export const authService = {
     }
   },
 
-  // Login con Google (endpoint simplificado)
+  // Login con Google usando idToken (nuevo endpoint que resuelve DEVELOPER_ERROR)
+  googleLogin: async (idToken: string) => {
+    console.log('🔑 Iniciando login con Google con idToken...');
+    console.log('🔑 idToken (primeros 50 chars):', idToken.substring(0, 50) + '...');
+    try {
+      const response = await api.post('/api/auth/google', { idToken });
+      console.log('✅ Login con Google exitoso:', response.data);
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ Error en login con Google:', error.response?.data || error.message);
+      throw error;
+    }
+  },
+
+  // Login con Google (endpoint simplificado) - DEPRECATED, usar googleLogin
   googleLoginSimple: async (data: { email: string; displayName: string; photoURL?: string; googleId: string }) => {
     console.log('🔑 Iniciando login con Google (simplificado)...');
     console.log('📤 Datos a enviar:', data);
@@ -170,8 +200,8 @@ export const authService = {
       const response = await api.post('/api/auth/google-login-simple', data);
       console.log('✅ Login con Google exitoso:', response.data);
       return response.data;
-    } catch (error) {
-      console.error('❌ Error en login con Google:', error);
+    } catch (error: any) {
+      console.error('❌ Error en login con Google:', error.response?.data || error.message);
       throw error;
     }
   },
@@ -565,11 +595,9 @@ export const childrenService = {
 export const profileService = {
   // Obtener perfil completo
   getProfile: async () => {
-    console.log('👤 [PROFILE] Obteniendo perfil...');
     
     try {
       const response = await api.get('/api/auth/profile');
-      console.log('✅ [PROFILE] Perfil obtenido:', response.data);
       return response.data;
     } catch (error) {
       console.error('❌ [PROFILE] Error obteniendo perfil:', error);
@@ -586,11 +614,9 @@ export const profileService = {
     isPregnant?: boolean;
     gestationWeeks?: number;
   }) => {
-    console.log('👤 [PROFILE] Actualizando perfil:', data);
     
     try {
       const response = await api.put('/api/auth/profile', data);
-      console.log('✅ [PROFILE] Perfil actualizado:', response.data);
       return response.data;
     } catch (error) {
       console.error('❌ [PROFILE] Error actualizando perfil:', error);
@@ -609,7 +635,6 @@ export const communitiesService = {
     isPrivate: boolean;
     image: string | null;
   }) => {
-    console.log('🏗️ [COMMUNITIES] Creando nueva comunidad:', data);
     
     try {
       let response;
@@ -652,11 +677,9 @@ export const communitiesService = {
 
   // Obtener todas las comunidades públicas
   getPublicCommunities: async () => {
-    console.log('🏗️ [COMMUNITIES] Obteniendo comunidades públicas...');
     
     try {
       const response = await api.get('/api/communities');
-      console.log('✅ [COMMUNITIES] Comunidades públicas obtenidas:', response.data);
       return response.data;
     } catch (error: any) {
       console.error('❌ [COMMUNITIES] Error obteniendo comunidades públicas:', error.response?.data || error.message);
@@ -666,11 +689,9 @@ export const communitiesService = {
 
   // Obtener comunidades del usuario
   getUserCommunities: async () => {
-    console.log('🏗️ [COMMUNITIES] Obteniendo comunidades del usuario...');
     
     try {
       const response = await api.get('/api/user/communities');
-      console.log('✅ [COMMUNITIES] Comunidades del usuario obtenidas:', response.data);
       return response.data;
     } catch (error: any) {
       console.error('❌ [COMMUNITIES] Error obteniendo comunidades del usuario:', error.response?.data || error.message);
@@ -680,7 +701,6 @@ export const communitiesService = {
 
   // Unirse a una comunidad
   joinCommunity: async (communityId: string) => {
-    console.log('🏗️ [COMMUNITIES] Uniéndose a comunidad:', communityId);
     
     try {
       const response = await api.post(`/api/communities/${communityId}/join`);
@@ -742,6 +762,7 @@ export const communitiesService = {
     content: string;
     imageUrl?: string;
     tags?: string[];
+    attachedLists?: string[]; // Array de IDs de listas
   }) => {
     console.log('📝 [COMMUNITIES] Creando nuevo post en comunidad:', communityId);
     console.log('📝 [COMMUNITIES] Datos del post:', postData);
@@ -914,10 +935,8 @@ export const listsService = {
     imageUrl?: string;
     isPublic: boolean;
   }) => {
-    console.log('📋 [LISTS] Creando nueva lista:', data);
     try {
       const response = await api.post('/api/lists', data);
-      console.log('✅ [LISTS] Lista creada exitosamente:', response.data);
       return response.data;
     } catch (error: any) {
       console.error('❌ [LISTS] Error creando lista:', error.response?.data || error.message);
@@ -927,14 +946,12 @@ export const listsService = {
 
   // Obtener mis listas (privadas y públicas propias)
   getUserLists: async (filters?: { isPublic?: boolean; limit?: number }) => {
-    console.log('📋 [LISTS] Obteniendo mis listas:', filters);
     try {
       const params = new URLSearchParams();
       if (filters?.isPublic !== undefined) params.append('isPublic', filters.isPublic.toString());
       if (filters?.limit) params.append('limit', filters.limit.toString());
       
       const response = await api.get(`/api/user/lists?${params.toString()}`);
-      console.log('✅ [LISTS] Mis listas obtenidas:', response.data);
       return response.data;
     } catch (error: any) {
       console.error('❌ [LISTS] Error obteniendo mis listas:', error.response?.data || error.message);
@@ -944,14 +961,12 @@ export const listsService = {
 
   // Obtener listas públicas
   getPublicLists: async (filters?: { limit?: number; sortBy?: 'stars' | 'recent' }) => {
-    console.log('📋 [LISTS] Obteniendo listas públicas:', filters);
     try {
       const params = new URLSearchParams();
       if (filters?.limit) params.append('limit', filters.limit.toString());
       if (filters?.sortBy) params.append('sortBy', filters.sortBy);
       
       const response = await api.get(`/api/lists/public?${params.toString()}`);
-      console.log('✅ [LISTS] Listas públicas obtenidas:', response.data);
       return response.data;
     } catch (error: any) {
       console.error('❌ [LISTS] Error obteniendo listas públicas:', error.response?.data || error.message);
@@ -961,7 +976,6 @@ export const listsService = {
 
   // Obtener detalles de una lista específica
   getListDetails: async (listId: string) => {
-    console.log('📋 [LISTS] Obteniendo detalles de lista:', listId);
     try {
       const response = await api.get(`/api/lists/${listId}`);
       console.log('✅ [LISTS] Detalles de lista obtenidos:', response.data);
@@ -978,7 +992,6 @@ export const listsService = {
     description?: string;
     isPublic?: boolean;
   }) => {
-    console.log('📋 [LISTS] Actualizando lista:', listId, data);
     try {
       const response = await api.put(`/api/lists/${listId}`, data);
       console.log('✅ [LISTS] Lista actualizada exitosamente:', response.data);
@@ -991,7 +1004,6 @@ export const listsService = {
 
   // Copiar lista pública
   copyList: async (listId: string) => {
-    console.log('📋 [LISTS] Copiando lista pública:', listId);
     try {
       const response = await api.post(`/api/lists/${listId}/copy`);
       console.log('✅ [LISTS] Lista copiada exitosamente:', response.data);
@@ -1154,17 +1166,21 @@ export const categoriesService = {
 // ============================================
 
 export const recommendationsService = {
-  // Obtener todas las recomendaciones o filtradas por categoría
-  getRecommendations: async (categoryId?: string) => {
-    const queryParam = categoryId ? `?categoryId=${categoryId}` : '';
-    console.log('⭐ [RECOMMENDATIONS] Obteniendo recomendaciones', categoryId ? `para categoría: ${categoryId}` : '');
+  // Obtener todas las recomendaciones o filtradas por categoría con paginación
+  getRecommendations: async (categoryId?: string, page: number = 1, limit: number = 20) => {
+    const params = new URLSearchParams();
+    if (categoryId) params.append('categoryId', categoryId);
+    params.append('page', page.toString());
+    params.append('limit', limit.toString());
+    
+    const queryParam = params.toString() ? `?${params.toString()}` : '';
+    console.log('⭐ [RECOMMENDATIONS] Obteniendo recomendaciones', categoryId ? `para categoría: ${categoryId}` : '', `Página: ${page}, Límite: ${limit}`);
     
     try {
       const response = await api.get(`/api/recommendations${queryParam}`);
       
       console.log('✅ [RECOMMENDATIONS] Recomendaciones obtenidas exitosamente');
-      console.log('📦 [RECOMMENDATIONS] Total:', response.data?.data?.length || 0);
-      console.log('📦 [RECOMMENDATIONS] Datos:', JSON.stringify(response.data, null, 2));
+      console.log('📦 [RECOMMENDATIONS] Total en esta página:', response.data?.data?.length || 0);
       
       return response.data;
     } catch (error: any) {
@@ -1174,10 +1190,10 @@ export const recommendationsService = {
     }
   },
 
-  // Obtener recomendaciones por categoría (alias más específico)
-  getRecommendationsByCategory: async (categoryId: string) => {
-    console.log('⭐ [RECOMMENDATIONS] Obteniendo recomendaciones por categoría:', categoryId);
-    return recommendationsService.getRecommendations(categoryId);
+  // Obtener recomendaciones por categoría (alias más específico) con paginación
+  getRecommendationsByCategory: async (categoryId: string, page: number = 1, limit: number = 20) => {
+    console.log('⭐ [RECOMMENDATIONS] Obteniendo recomendaciones por categoría:', categoryId, `Página: ${page}, Límite: ${limit}`);
+    return recommendationsService.getRecommendations(categoryId, page, limit);
   },
 
   // Obtener una recomendación específica por ID
@@ -1645,6 +1661,289 @@ export const recommendationsService = {
   },
 };
 
+// Servicio de administración
+export const adminService = {
+  // Fijar o desfijar un post
+  pinPost: async (postId: string, isPinned: boolean) => {
+    console.log(`📌 [ADMIN] ${isPinned ? 'Fijando' : 'Desfijando'} post:`, postId);
+    
+    try {
+      const response = await api.patch(`/api/admin/posts/${postId}/pin`, {
+        isPinned
+      });
+      
+      console.log(`✅ [ADMIN] Post ${isPinned ? 'fijado' : 'desfijado'} exitosamente`);
+      return response.data;
+    } catch (error: any) {
+      console.error(`❌ [ADMIN] Error ${isPinned ? 'fijando' : 'desfijando'} post:`, error.response?.data || error.message);
+      throw error;
+    }
+  },
+};
+
+// ==========================================
+// 🛌 SLEEP TRACKING & AI PREDICTION SERVICE
+// ==========================================
+export const sleepService = {
+  // Registrar evento de sueño (iniciar tracking)
+  recordSleep: async (data: {
+    childId: string;
+    type: 'nap' | 'nightsleep';
+    startTime: string;
+    endTime?: string;
+    duration?: number;
+    quality?: 'poor' | 'fair' | 'good' | 'excellent';
+    wakeUps?: number;
+    location?: 'crib' | 'stroller' | 'car' | 'carrier';
+    temperature?: number;
+    noiseLevel?: number;
+    notes?: string;
+  }) => {
+    
+    try {
+      const response = await api.post('/api/sleep/record', data);
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ [SLEEP] Error registrando evento:', error.response?.data || error.message);
+      throw error;
+    }
+  },
+
+  // Actualizar evento de sueño (terminar tracking)
+  updateSleepEvent: async (eventId: string, data: {
+    endTime?: string;
+    duration?: number;
+    quality?: 'poor' | 'fair' | 'good' | 'excellent';
+    wakeUps?: number;
+    location?: 'crib' | 'stroller' | 'car' | 'carrier';
+    temperature?: number;
+    noiseLevel?: number;
+    notes?: string;
+    pauses?: Array<{
+      id?: string;
+      duration: number;
+      reason?: string;
+      startTime?: string;
+      endTime?: string;
+    }>;
+  }) => {
+    console.log('📝 [SLEEP] Actualizando evento:', eventId, data);
+    
+    try {
+      const response = await api.put(`/api/sleep/${eventId}`, data);
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ [SLEEP] Error actualizando evento:', error.response?.data || error.message);
+      throw error;
+    }
+  },
+
+  // Editar solo horarios (inicio/fin)
+  updateSleepTimes: async (eventId: string, data: {
+    startTime?: string;
+    endTime?: string | null; // Permitir null para indicar que se debe eliminar
+  }) => {
+    console.log('⏰ [SLEEP] Actualizando horarios:', eventId, data);
+    
+    // Si endTime es undefined, no lo incluimos en el payload
+    // Si endTime es null, lo enviamos para indicar que se debe eliminar
+    const payload: any = {};
+    if (data.startTime !== undefined) {
+      payload.startTime = data.startTime;
+    }
+    if (data.endTime !== undefined) {
+      payload.endTime = data.endTime; // Puede ser string o null
+    }
+    
+    console.log('📤 [SLEEP] Payload a enviar:', payload);
+    
+    try {
+      const response = await api.patch(`/api/sleep/${eventId}/times`, payload);
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ [SLEEP] Error actualizando horarios:', error.response?.data || error.message);
+      throw error;
+    }
+  },
+
+  // Agregar pausa/interrupción
+  addSleepPause: async (eventId: string, data: {
+    duration?: number;
+    startTime?: string;
+    endTime?: string;
+    reason?: string;
+  }) => {
+    console.log('⏸️ [SLEEP] Agregando pausa:', eventId, data);
+    
+    try {
+      const response = await api.post(`/api/sleep/${eventId}/pause`, data);
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ [SLEEP] Error agregando pausa:', error.response?.data || error.message);
+      throw error;
+    }
+  },
+
+  // Eliminar pausa
+  removeSleepPause: async (eventId: string, pauseId: string) => {
+    console.log('🗑️ [SLEEP] Eliminando pausa:', eventId, pauseId);
+    
+    try {
+      const response = await api.delete(`/api/sleep/${eventId}/pause/${pauseId}`);
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ [SLEEP] Error eliminando pausa:', error.response?.data || error.message);
+      throw error;
+    }
+  },
+
+  // Obtener historial de sueño
+  getSleepHistory: async (childId: string, days: number = 7) => {
+    console.log(`📋 [SLEEP] Obteniendo historial de sueño (${days} días):`, childId);
+    
+    try {
+      const response = await api.get(`/api/sleep/history/${childId}`, {
+        params: { days }
+      });
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ [SLEEP] Error obteniendo historial:', error.response?.data || error.message);
+      throw error;
+    }
+  },
+
+  // Obtener predicción con IA
+  getSleepPrediction: async (childId: string) => {
+    try {
+      const response = await api.get(`/api/sleep/predict/${childId}`);
+      
+      // DEBUG: Verificar estructura completa de la respuesta
+      
+      // Log detallado de allNaps
+      if (response.data?.prediction?.dailySchedule?.allNaps) {
+        response.data.prediction.dailySchedule.allNaps.forEach((nap: any, index: number) => {
+          console.log(`\nSiesta ${index + 1}:`);
+          console.log(`  - Tipo: ${nap.type || 'N/A'}`);
+          console.log(`  - Hora: ${nap.time || nap.startTime || 'N/A'}`);
+          console.log(`  - Duración esperada: ${nap.expectedDuration || nap.duration || 'N/A'} min`);
+          console.log(`  - Estado: ${nap.status || 'N/A'}`);
+          console.log(`  - Source: ${nap.source || 'N/A'}`);
+          console.log(`  - Confidence: ${nap.confidence || 'N/A'}%`);
+          console.log(`  - Completada: ${nap.completed ? 'Sí' : 'No'}`);
+          if (nap.actualDuration) {
+            console.log(`  - Duración real: ${nap.actualDuration} min`);
+          }
+          if (nap.startTime && nap.endTime) {
+            console.log(`  - Inicio real: ${nap.startTime}`);
+            console.log(`  - Fin real: ${nap.endTime}`);
+          }
+        });
+      } 
+      
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ [SLEEP AI] Error obteniendo predicción:', error.response?.data || error.message);
+      throw error;
+    }
+  },
+
+  // Obtener análisis detallado de patrones
+  getSleepAnalysis: async (childId: string, days: number = 30) => {
+    console.log(`📊 [SLEEP] Obteniendo análisis (${days} días):`, childId);
+    
+    try {
+      const response = await api.get(`/api/sleep/analysis/${childId}`, {
+        params: { days }
+      });
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ [SLEEP] Error obteniendo análisis:', error.response?.data || error.message);
+      throw error;
+    }
+  },
+
+  // Obtener estadísticas semanales/mensuales
+  getSleepStats: async (childId: string, period: 'week' | 'month' = 'week') => {
+    console.log(`📈 [SLEEP] Obteniendo estadísticas (${period}):`, childId);
+    
+    try {
+      const response = await api.get(`/api/sleep/stats/${childId}`, {
+        params: { period }
+      });
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ [SLEEP] Error obteniendo estadísticas:', error.response?.data || error.message);
+      throw error;
+    }
+  },
+
+  // Obtener recordatorios inteligentes
+  getSleepReminders: async (childId: string) => {
+    try {
+      const response = await api.get(`/api/sleep/reminders/${childId}`);
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ [SLEEP] Error obteniendo recordatorios:', error.response?.data || error.message);
+      throw error;
+    }
+  },
+
+  // Eliminar evento de sueño
+  deleteSleepEvent: async (eventId: string) => {
+    console.log('🗑️ [SLEEP] Eliminando evento:', eventId);
+    
+    try {
+      const response = await api.delete(`/api/sleep/${eventId}`);
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ [SLEEP] Error eliminando evento:', error.response?.data || error.message);
+      throw error;
+    }
+  },
+
+  // Registrar hora de despertar
+  recordWakeTime: async (data: {
+    childId: string;
+    wakeTime: string; // ISO timestamp
+  }) => {
+    
+    try {
+      const response = await api.post('/api/sleep/wake-time', data);
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ [SLEEP] Error registrando hora de despertar:', error.response?.data || error.message);
+      throw error;
+    }
+  },
+
+  // Obtener hora de despertar (registrada hoy o predicha)
+  getWakeTime: async (childId: string) => {
+    
+    try {
+      const response = await api.get(`/api/sleep/wake-time/${childId}`);
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ [SLEEP] Error obteniendo hora de despertar:', error.response?.data || error.message);
+      throw error;
+    }
+  },
+};
+
+// ============= ACTIVIDADES PARA BEBÉS 🎨 =============
+export const activitiesService = {
+  // Obtener sugerencias de actividades según edad y estado del bebé
+  getActivitySuggestions: async (childId: string) => {
+    
+    try {
+      const response = await api.get(`/api/activities/suggestions/${childId}`);
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ [ACTIVITIES] Error obteniendo sugerencias:', error.response?.data || error.message);
+      throw error;
+    }
+  },
+};
+
 // Export de la instancia de axios para uso en otros servicios
 export { api as axiosInstance };
 
@@ -1657,4 +1956,7 @@ export default {
   ...listsService,
   ...categoriesService,
   ...recommendationsService,
+  ...adminService,
+  ...sleepService,
+  ...activitiesService,
 };

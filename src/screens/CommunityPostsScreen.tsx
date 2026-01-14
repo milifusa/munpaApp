@@ -20,10 +20,12 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../contexts/AuthContext';
 import { communitiesService } from '../services/api';
 import LikeButton from '../components/LikeButton';
+import { shareContentHelper } from '../utils/shareContentHelper';
+import PostCard from '../components/PostCard';
 
 interface Post {
   id: string;
-  title: string;
+  title?: string;
   content: string;
   authorId: string;
   authorName: string;
@@ -35,7 +37,18 @@ interface Post {
   commentCount: number;
   isLiked: boolean;
   imageUrl?: string;
+  imagePosition?: 'start' | 'end';
+  isPinned?: boolean;
   tags?: string[];
+  attachedLists?: Array<{
+    id: string;
+    title: string;
+    description?: string;
+    imageUrl?: string;
+    isPublic: boolean;
+    totalItems: number;
+    completedItems: number;
+  }>;
 }
 
 interface CommunityPostsScreenProps {
@@ -84,11 +97,6 @@ const CommunityPostsScreen: React.FC = () => {
     }
   }, [isAuthenticated]);
 
-  // Debug: Log cuando cambia el estado de posts
-  useEffect(() => {
-    console.log('🎨 [POSTS] Estado de posts cambiado:', posts);
-    console.log('🎨 [POSTS] Longitud de posts:', posts.length);
-  }, [posts]);
 
   // Función para cargar los posts
   const loadPosts = async () => {
@@ -107,13 +115,22 @@ const CommunityPostsScreen: React.FC = () => {
       
       if (result.success) {
         const postsData = result.data || [];
-        console.log('📝 [POSTS] Datos de posts extraídos:', postsData);
-        console.log('📊 [POSTS] Tipo de datos:', typeof postsData);
-        console.log('📊 [POSTS] Es array?', Array.isArray(postsData));
-        console.log('📊 [POSTS] Longitud:', postsData?.length);
         
         const finalPosts = Array.isArray(postsData) ? postsData : [];
-        console.log('✅ [POSTS] Posts finales a mostrar:', finalPosts);
+        
+        // Debug: verificar attachedLists en cada post
+        finalPosts.forEach((post: any, index: number) => {
+          console.log(`📋 [POSTS] Post ${index}:`, {
+            id: post.id,
+            hasAttachedLists: !!post.attachedLists,
+            attachedListsType: typeof post.attachedLists,
+            attachedListsIsArray: Array.isArray(post.attachedLists),
+            attachedListsLength: post.attachedLists?.length || 0,
+            attachedLists: post.attachedLists
+          });
+        });
+        
+        console.log('✅ [POSTS] Posts finales a mostrar:', finalPosts.length);
         setPosts(finalPosts);
       } else {
         console.log('❌ [POSTS] Backend no devolvió success: true');
@@ -303,7 +320,7 @@ const CommunityPostsScreen: React.FC = () => {
     return (
       <SafeAreaView style={styles.safeArea}>
         <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
-        <View style={[styles.header, { paddingTop: Math.max(insets.top, Platform.OS === 'ios' ? 15 : 10) }]}>
+        <View style={[styles.header, { paddingTop: Platform.OS === 'ios' ? 10 : 10 }]}>
         <TouchableOpacity 
           style={styles.backButton}
           onPress={() => navigation.goBack()}
@@ -326,12 +343,12 @@ const CommunityPostsScreen: React.FC = () => {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="light-content" backgroundColor="#59C6C0" />
+      <StatusBar barStyle="light-content" backgroundColor="#96d2d3" />
       <View style={styles.contentWrapper}>
         {/* Header */}
         <LinearGradient
           colors={['#59C6C0', '#4DB8B3']}
-          style={[styles.header, { paddingTop: Math.max(insets.top, Platform.OS === 'ios' ? 15 : 10) }]}
+          style={[styles.header, { paddingTop: Platform.OS === 'ios' ? 10 : 10 }]}
         >
         <TouchableOpacity 
           style={styles.backButton}
@@ -418,93 +435,38 @@ const CommunityPostsScreen: React.FC = () => {
             </Text>
             
             {posts.map((post) => (
-              <View key={post.id} style={styles.postCard}>
-                {/* Contenido del post */}
-                <View style={styles.postContent}>
-                  <Text style={styles.postText}>{post.content}</Text>
-                  
-                  {/* Imagen del post si existe */}
-                  {post.imageUrl && (
-                    <Image source={{ uri: post.imageUrl }} style={styles.postImage} />
-                  )}
-                </View>
-
-                {/* Información del autor abajo */}
-                <View style={styles.postAuthorInfo}>
-                  <View style={styles.authorInfo}>
-                    <View style={styles.authorAvatar}>
-                      {post.authorPhoto ? (
-                        <Image source={{ uri: post.authorPhoto }} style={styles.authorAvatarImage} />
-                      ) : (
-                        <Ionicons name="person" size={16} color="#666" />
-                      )}
-                    </View>
-                    <View style={styles.authorDetails}>
-                      <Text style={styles.authorName}>{post.authorName}</Text>
-                      <Text style={styles.postDate}>
-                        {formatDate(post.createdAt)}
-                      </Text>
-                    </View>
-                  </View>
-                </View>
-
-                {/* Footer del post con estadísticas */}
-                <View style={styles.postFooter}>
-                  <View style={styles.postStats}>
-                    <View style={styles.statItem}>
-                      <Ionicons name="heart" size={16} color="#FF6B6B" />
-                      <Text style={styles.statText}>{post.likeCount || 0}</Text>
-                    </View>
-                    <View style={styles.statItem}>
-                      <Ionicons name="chatbubble" size={16} color="#59C6C0" />
-                      <Text style={styles.statText}>{post.commentCount || 0}</Text>
-                      {post.commentCount > 0 && (
-                        <View style={styles.commentIndicator}>
-                          <Text style={styles.commentIndicatorText}>
-                            {post.commentCount > 99 ? '99+' : post.commentCount}
-                          </Text>
-                        </View>
-                      )}
-                    </View>
-                  </View>
-                  
-                  {/* Botones de acción */}
-                  <View style={styles.postActions}>
-                    <LikeButton
-                      isLiked={post.isLiked || false}
-                      likeCount={post.likeCount || 0}
-                      onPress={() => handleLikePost(post)}
-                      isLoading={likingPostId === post.id}
-                      size="medium"
-                      showCount={false}
-                    />
-                    <TouchableOpacity 
-                      style={[
-                        styles.actionButton,
-                        post.commentCount > 0 && styles.actionButtonWithComments
-                      ]}
-                      onPress={() => {
-                        console.log('💬 [POSTS] Navegando a comentarios del post:', post.id);
-                        (navigation as any).navigate('Comments', {
-                          postId: post.id,
-                          postContent: post.content,
-                          postAuthorName: post.authorName,
-                          communityName: communityName
-                        });
-                      }}
-                    >
-                      <Ionicons 
-                        name={post.commentCount > 0 ? "chatbubble" : "chatbubble-outline"} 
-                        size={20} 
-                        color={post.commentCount > 0 ? "#59C6C0" : "#666"} 
-                      />
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.actionButton}>
-                      <Ionicons name="share-outline" size={20} color="#666" />
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              </View>
+              <PostCard
+                key={post.id}
+                post={post}
+                onLike={handleLikePost}
+                onComment={(post) => {
+                  console.log('💬 [POSTS] Navegando a comentarios del post:', post.id);
+                  (navigation as any).navigate('Comments', {
+                    postId: post.id,
+                    postContent: post.content,
+                    postAuthorName: post.authorName,
+                    communityName: communityName
+                  });
+                }}
+                onShare={(postId) => {
+                  console.log('📤 [POSTS] Compartiendo post:', postId);
+                  shareContentHelper.sharePost(postId).catch((error) => {
+                    console.error('❌ [POSTS] Error compartiendo post:', error);
+                  });
+                }}
+                formatDate={formatDate}
+                communityName={communityName}
+                likingPostId={likingPostId}
+                onViewFull={(post) => {
+                  (navigation as any).navigate('PostDetail', {
+                    post,
+                    communityName,
+                    formatDate,
+                    onLike: handleLikePost,
+                    likingPostId
+                  });
+                }}
+              />
             ))}
           </View>
         )}
@@ -517,15 +479,15 @@ const CommunityPostsScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#F7FAFC',
   },
   safeArea: {
     flex: 1,
-    backgroundColor: '#59C6C0',
+    backgroundColor: '#96d2d3',
   },
   contentWrapper: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#F7FAFC',
   },
   header: {
     flexDirection: 'row',
@@ -609,7 +571,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 20,
     paddingVertical: 15,
-    backgroundColor: '#F8F9FA',
+    backgroundColor: '#F7FAFC',
   },
   communityName: {
     fontSize: 16,
@@ -652,7 +614,7 @@ const styles = StyleSheet.create({
   createFirstPostButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#59C6C0',
+    backgroundColor: '#96d2d3',
     paddingVertical: 12,
     paddingHorizontal: 20,
     borderRadius: 25,
@@ -768,7 +730,7 @@ const styles = StyleSheet.create({
     marginLeft: 5,
   },
   commentIndicator: {
-    backgroundColor: '#59C6C0',
+    backgroundColor: '#96d2d3',
     borderRadius: 10,
     paddingHorizontal: 6,
     paddingVertical: 2,

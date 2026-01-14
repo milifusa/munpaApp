@@ -4,6 +4,7 @@ import {
   Text,
   StyleSheet,
   ScrollView,
+  FlatList,
   TouchableOpacity,
   Image,
   SafeAreaView,
@@ -73,10 +74,14 @@ const CategoryRecommendationsScreen = ({ route, navigation }: any) => {
   
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [sortBy, setSortBy] = useState<'distance' | 'rating' | 'name'>('distance');
   const [hasRecalculatedWithLocation, setHasRecalculatedWithLocation] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const [limit] = useState(20); // Número de recomendaciones por página
   
   // Hook de ubicación
   const {
@@ -92,7 +97,10 @@ const CategoryRecommendationsScreen = ({ route, navigation }: any) => {
 
   useEffect(() => {
     setHasRecalculatedWithLocation(false); // Reset al cambiar de categoría
-    loadRecommendations();
+    setCurrentPage(1); // Reset página al cambiar de categoría
+    setHasMore(true); // Reset hasMore
+    setRecommendations([]); // Limpiar recomendaciones anteriores
+    loadRecommendations(1, true); // Cargar primera página
   }, [categoryId]);
 
   // Recargar cuando la ubicación esté disponible por primera vez
@@ -101,7 +109,10 @@ const CategoryRecommendationsScreen = ({ route, navigation }: any) => {
       console.log('📍 [CATEGORY RECOMMENDATIONS] ✨ Ubicación obtenida, recalculando distancias...');
       console.log(`📍 [CATEGORY RECOMMENDATIONS] Ubicación: {${userLat}, ${userLon}}`);
       setHasRecalculatedWithLocation(true); // Marcar como recalculado
-      loadRecommendations();
+      setCurrentPage(1);
+      setHasMore(true);
+      setRecommendations([]);
+      loadRecommendations(1, true);
     }
   }, [userLat, userLon, recommendations.length, isLoading]);
 
@@ -123,22 +134,33 @@ const CategoryRecommendationsScreen = ({ route, navigation }: any) => {
     }
   }, [sortBy]);
 
-  const loadRecommendations = async () => {
-    console.log('🔄 [CATEGORY RECOMMENDATIONS] Cargando recomendaciones para categoría:', categoryId);
+  const loadRecommendations = async (page: number = 1, reset: boolean = false) => {
+    console.log('🔄 [CATEGORY RECOMMENDATIONS] Cargando recomendaciones para categoría:', categoryId, `Página: ${page}`);
     console.log('📍 [CATEGORY RECOMMENDATIONS] Ubicación del usuario:', { userLat, userLon });
-    setIsLoading(true);
-    setError(null);
+    
+    if (reset) {
+      setIsLoading(true);
+      setError(null);
+    } else {
+      setIsLoadingMore(true);
+    }
 
     try {
-      const response = await api.getRecommendationsByCategory(categoryId);
+      const response = await api.getRecommendationsByCategory(categoryId, page, limit);
       
       if (response.success && response.data) {
-        console.log('✅ [CATEGORY RECOMMENDATIONS] Recomendaciones cargadas:', response.data.length);
+        const newRecommendations = response.data;
+        console.log('✅ [CATEGORY RECOMMENDATIONS] Recomendaciones cargadas:', newRecommendations.length);
+        
+        // Verificar si hay más páginas
+        if (newRecommendations.length < limit) {
+          setHasMore(false);
+        }
         
         // Cargar estadísticas y estado de favorito para cada recomendación
         console.log('🔄 [CATEGORY RECOMMENDATIONS] Cargando estadísticas y favoritos...');
         const recommendationsWithData = await Promise.all(
-          response.data.map(async (rec: Recommendation) => {
+          newRecommendations.map(async (rec: Recommendation) => {
             try {
               const [reviewsResponse, favoriteResponse] = await Promise.all([
                 api.getRecommendationReviews(rec.id, 1, 1),
@@ -149,14 +171,9 @@ const CategoryRecommendationsScreen = ({ route, navigation }: any) => {
               let distance: number | undefined;
               let estimatedTime: string | undefined;
               
-              console.log(`📍 [${rec.name}] Tiene coordenadas:`, { lat: rec.latitude, lon: rec.longitude });
-              
               if (userLat && userLon && rec.latitude && rec.longitude) {
                 distance = calculateDistance(userLat, userLon, rec.latitude, rec.longitude);
                 estimatedTime = getEstimatedTime(distance);
-                console.log(`✅ [${rec.name}] Distancia calculada: ${distance}km (${estimatedTime})`);
-              } else {
-                console.log(`⚠️ [${rec.name}] NO se pudo calcular distancia - userLat: ${userLat}, userLon: ${userLon}, recLat: ${rec.latitude}, recLon: ${rec.longitude}`);
               }
               
               return {
@@ -177,36 +194,63 @@ const CategoryRecommendationsScreen = ({ route, navigation }: any) => {
           })
         );
         
-        // Ordenar por distancia si está disponible
-        const sortedRecommendations = [...recommendationsWithData].sort((a, b) => {
-          if (sortBy === 'distance') {
-            if (a.distance === undefined) return 1;
-            if (b.distance === undefined) return -1;
-            return a.distance - b.distance;
-          } else if (sortBy === 'rating') {
-            return (b.stats?.averageRating || 0) - (a.stats?.averageRating || 0);
-          } else {
-            return a.name.localeCompare(b.name);
-          }
-        });
+        // Ordenar por distancia si está disponible (solo para la primera página o cuando se recarga)
+        let sortedRecommendations = recommendationsWithData;
+        if (reset || page === 1) {
+          sortedRecommendations = [...recommendationsWithData].sort((a, b) => {
+            if (sortBy === 'distance') {
+              if (a.distance === undefined) return 1;
+              if (b.distance === undefined) return -1;
+              return a.distance - b.distance;
+            } else if (sortBy === 'rating') {
+              return (b.stats?.averageRating || 0) - (a.stats?.averageRating || 0);
+            } else {
+              return a.name.localeCompare(b.name);
+            }
+          });
+        }
         
         console.log('✅ [CATEGORY RECOMMENDATIONS] Datos cargados y ordenados');
-        setRecommendations(sortedRecommendations);
+        
+        if (reset) {
+          setRecommendations(sortedRecommendations);
+        } else {
+          setRecommendations(prev => [...prev, ...sortedRecommendations]);
+        }
+        
+        setCurrentPage(page);
       } else {
         console.log('⚠️ [CATEGORY RECOMMENDATIONS] Respuesta sin datos');
-        setError('No se pudieron cargar las recomendaciones');
+        setHasMore(false);
+        if (reset) {
+          setError('No se pudieron cargar las recomendaciones');
+        }
       }
     } catch (error: any) {
       console.error('❌ [CATEGORY RECOMMENDATIONS] Error cargando recomendaciones:', error);
-      setError('Error al cargar las recomendaciones');
+      setHasMore(false);
+      if (reset) {
+        setError('Error al cargar las recomendaciones');
+      }
     } finally {
       setIsLoading(false);
+      setIsLoadingMore(false);
+    }
+  };
+
+  const loadMoreRecommendations = () => {
+    if (!isLoadingMore && hasMore && !isLoading) {
+      const nextPage = currentPage + 1;
+      loadRecommendations(nextPage, false);
     }
   };
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    await loadRecommendations();
+    setCurrentPage(1);
+    setHasMore(true);
+    setRecommendations([]);
+    await loadRecommendations(1, true);
     setRefreshing(false);
   };
 
@@ -482,9 +526,8 @@ const CategoryRecommendationsScreen = ({ route, navigation }: any) => {
     ) : null;
   };
 
-  const renderRecommendationCard = (recommendation: Recommendation) => (
+  const renderRecommendationCard = ({ item: recommendation }: { item: Recommendation }) => (
     <TouchableOpacity 
-      key={recommendation.id} 
       style={styles.card}
       onPress={() => handleRecommendationPress(recommendation)}
     >
@@ -635,7 +678,7 @@ const CategoryRecommendationsScreen = ({ route, navigation }: any) => {
 
           {recommendation.website && (
             <TouchableOpacity 
-              style={[styles.quickActionButton, { backgroundColor: '#887CBC' }]}
+              style={[styles.quickActionButton, { backgroundColor: '#96d2d3' }]}
               onPress={() => handleOpenLink(recommendation.website!, recommendation.id)}
             >
               <Ionicons name="globe" size={18} color="white" />
@@ -649,13 +692,13 @@ const CategoryRecommendationsScreen = ({ route, navigation }: any) => {
   const insets = useSafeAreaInsets();
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#59C6C0" />
+    <View style={[styles.container, { paddingTop: insets.top }]}>
+      <StatusBar barStyle="light-content" backgroundColor="#96d2d3" />
       <View style={styles.content}>
         {/* Header */}
         <LinearGradient
           colors={['#59C6C0', '#4DB8B3']}
-          style={[styles.header, { paddingTop: Math.max(insets.top, Platform.OS === 'ios' ? 10 : 15) }]}
+          style={styles.header}
         >
         <TouchableOpacity 
           style={styles.backButton}
@@ -721,68 +764,67 @@ const CategoryRecommendationsScreen = ({ route, navigation }: any) => {
         </View>
       )}
 
-      <ScrollView 
-        style={styles.scrollView}
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
-        }
-      >
-        {/* Estado de carga */}
-        {isLoading && (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#59C6C0" />
-            <Text style={styles.loadingText}>Cargando recomendaciones...</Text>
-          </View>
-        )}
-
-        {/* Estado de error */}
-        {!isLoading && error && (
-          <View style={styles.errorContainer}>
-            <Ionicons name="alert-circle" size={64} color="#FF6B6B" />
-            <Text style={styles.errorText}>{error}</Text>
-            <TouchableOpacity style={styles.retryButton} onPress={loadRecommendations}>
-              <Ionicons name="refresh" size={20} color="white" />
-              <Text style={styles.retryButtonText}>Reintentar</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-
-        {/* Lista de recomendaciones */}
-        {!isLoading && !error && recommendations.length > 0 && (
-          <View style={styles.cardsContainer}>
-            {recommendations.map(recommendation => renderRecommendationCard(recommendation))}
-          </View>
-        )}
-
-        {/* Estado vacío */}
-        {!isLoading && !error && recommendations.length === 0 && (
-          <View style={styles.emptyContainer}>
-            <Ionicons name="search-outline" size={64} color="#CCC" />
-            <Text style={styles.emptyText}>
-              No hay recomendaciones disponibles
-            </Text>
-            <Text style={styles.emptySubtext}>
-              Aún no hay lugares registrados en esta categoría
-            </Text>
-          </View>
-        )}
-
-        <View style={styles.finalSpacing} />
-      </ScrollView>
+      {isLoading && recommendations.length === 0 ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#59C6C0" />
+          <Text style={styles.loadingText}>Cargando recomendaciones...</Text>
+        </View>
+      ) : error && recommendations.length === 0 ? (
+        <View style={styles.errorContainer}>
+          <Ionicons name="alert-circle" size={64} color="#FF6B6B" />
+          <Text style={styles.errorText}>{error}</Text>
+          <TouchableOpacity style={styles.retryButton} onPress={() => loadRecommendations(1, true)}>
+            <Ionicons name="refresh" size={20} color="white" />
+            <Text style={styles.retryButtonText}>Reintentar</Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <FlatList
+          data={recommendations}
+          renderItem={renderRecommendationCard}
+          keyExtractor={(item) => item.id}
+          style={styles.scrollView}
+          contentContainerStyle={styles.cardsContainer}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+          }
+          onEndReached={loadMoreRecommendations}
+          onEndReachedThreshold={0.5}
+          ListEmptyComponent={
+            <View style={styles.emptyContainer}>
+              <Ionicons name="search-outline" size={64} color="#CCC" />
+              <Text style={styles.emptyText}>
+                No hay recomendaciones disponibles
+              </Text>
+              <Text style={styles.emptySubtext}>
+                Aún no hay lugares registrados en esta categoría
+              </Text>
+            </View>
+          }
+          ListFooterComponent={
+            isLoadingMore ? (
+              <View style={styles.loadingMoreContainer}>
+                <ActivityIndicator size="small" color="#59C6C0" />
+                <Text style={styles.loadingMoreText}>Cargando más recomendaciones...</Text>
+              </View>
+            ) : null
+          }
+        />
+      )}
       </View>
-    </SafeAreaView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#59C6C0',
+    backgroundColor: '#96d2d3',
   },
   content: {
     flex: 1,
-    backgroundColor: '#F8F9FA',
+    backgroundColor: '#F7FAFC',
   },
   scrollView: {
     flex: 1,
@@ -793,6 +835,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 20,
+    paddingTop: 10,
     paddingBottom: 15,
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255, 255, 255, 0.3)',
@@ -818,11 +861,12 @@ const styles = StyleSheet.create({
   // Cards
   cardsContainer: {
     padding: 20,
+    paddingBottom: 30,
   },
   card: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#F7FAFC',
     borderRadius: 16,
-    marginBottom: 20,
+    marginBottom: 20, // Espacio entre tarjetas
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
@@ -943,7 +987,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#59C6C0',
+    backgroundColor: '#96d2d3',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -977,7 +1021,7 @@ const styles = StyleSheet.create({
   retryButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#59C6C0',
+    backgroundColor: '#96d2d3',
     paddingHorizontal: 20,
     paddingVertical: 12,
     borderRadius: 25,
@@ -1010,10 +1054,21 @@ const styles = StyleSheet.create({
   finalSpacing: {
     height: 30,
   },
+  loadingMoreContainer: {
+    paddingVertical: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loadingMoreText: {
+    marginTop: 8,
+    fontSize: 14,
+    color: '#666',
+    fontFamily: 'Montserrat',
+  },
 
   // Filtros
   filtersContainer: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#F7FAFC',
     padding: 15,
     borderBottomWidth: 1,
     borderBottomColor: '#E9ECEF',
@@ -1034,13 +1089,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 20,
-    backgroundColor: '#F8F9FA',
+    backgroundColor: '#F7FAFC',
     borderWidth: 1,
     borderColor: '#59C6C0',
     gap: 5,
   },
   filterButtonActive: {
-    backgroundColor: '#59C6C0',
+    backgroundColor: '#96d2d3',
   },
   filterButtonText: {
     fontSize: 13,
@@ -1076,7 +1131,7 @@ const styles = StyleSheet.create({
   timeBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F8F9FA',
+    backgroundColor: '#F7FAFC',
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 12,

@@ -16,6 +16,9 @@ const WELCOME_MESSAGE: DouliMessage = {
   priority: 'medium'
 };
 
+// Ref global para rastrear si ya se mostró el mensaje inicial en esta sesión de la app
+let hasShownInitialMessage = false;
+
 export const useDouliChat = (currentRouteName?: string) => {
   const [isVisible, setIsVisible] = useState(false);
   const [currentMessage, setCurrentMessage] = useState<DouliMessage | null>(null);
@@ -39,7 +42,6 @@ export const useDouliChat = (currentRouteName?: string) => {
         // Tomar el primer tip del array y agregar prefijo
         const tipFromBackend = data.data.tips[0];
         messageText = `Douli Tips: ${tipFromBackend}`;
-        console.log('🔍 useDouliChat: Tip extraído del backend:', tipFromBackend);
       }
       
       
@@ -63,34 +65,33 @@ export const useDouliChat = (currentRouteName?: string) => {
 
   const showMessage = useCallback(async (message?: DouliMessage) => {
     if (isVisible) {
+      console.log('💬 [DOULI CHAT] Ya hay un mensaje visible, no mostrar otro');
       return;
     }
     
-    
+    console.log('💬 [DOULI CHAT] showMessage llamado');
     let messageToShow: DouliMessage;
     
     if (message) {
       messageToShow = message;
+      console.log('💬 [DOULI CHAT] Usando mensaje proporcionado:', messageToShow.text.substring(0, 50));
     } else {
       try {
         messageToShow = await getRandomMessage();
+        console.log('💬 [DOULI CHAT] Mensaje obtenido del backend:', messageToShow.text.substring(0, 50));
       } catch (error) {
         console.error('🔍 useDouliChat: Error obteniendo mensaje del backend:', error);
         messageToShow = WELCOME_MESSAGE;
+        console.log('💬 [DOULI CHAT] Usando mensaje de bienvenida por defecto');
       }
     }
     
+    console.log('💬 [DOULI CHAT] Estableciendo mensaje y visibilidad');
     setCurrentMessage(messageToShow);
     setIsVisible(true);
     lastShownTimeRef.current = Date.now();
     
-    // Auto-cierre después de 10 segundos
-    const autoCloseTimer = setTimeout(() => {
-      setIsVisible(false);
-    }, 10000);
-    
-    // Limpiar el timer si se cierra manualmente
-    return () => clearTimeout(autoCloseTimer);
+    // No auto-cerrar, solo se cierra cuando el usuario hace click
   }, [getRandomMessage, isVisible]);
 
   const hideMessage = useCallback(() => {
@@ -109,8 +110,8 @@ export const useDouliChat = (currentRouteName?: string) => {
   // configurar timers
   useEffect(() => {
     
-    // No mostrar en pantalla de Doula
-    if (currentRouteName === 'Doula') {
+    // Solo mostrar en pantalla Home
+    if (currentRouteName !== 'Home') {
       clearTimers();
       hideMessage();
       return;
@@ -120,24 +121,30 @@ export const useDouliChat = (currentRouteName?: string) => {
     clearTimers();
 
     const scheduleNext = () => {
-      // Mensaje cada 5 minutos exactos (300000 ms)
-      const delay = 3000000; // 5 minutos
+      // Mensaje cada 60 minutos (3600000 ms = 60 minutos)
+      const delay = 3600000; // 60 minutos en milisegundos
       showTimeoutRef.current = setTimeout(async () => {
-        if (currentRouteName !== 'Doula') {
+        if (currentRouteName === 'Home') {
+          console.log('💬 [DOULI CHAT] Mostrando mensaje programado (60 min)');
           await showMessage();
           scheduleNext(); // Programa el siguiente
         }
       }, delay);
     };
 
-    // Primer mensaje inmediatamente al iniciar (solo una vez)
-    if (!initialTimeoutRef.current) {
+    // Primer mensaje solo en la primera carga de la app (solo una vez en toda la sesión)
+    if (!hasShownInitialMessage && !initialTimeoutRef.current) {
+      console.log('💬 [DOULI CHAT] Programando primer mensaje (primera carga) para ruta:', currentRouteName);
       initialTimeoutRef.current = setTimeout(async () => {
-        if (currentRouteName !== 'Doula') {
+        if (currentRouteName === 'Home') {
+          console.log('💬 [DOULI CHAT] Mostrando primer mensaje (primera carga)');
+          hasShownInitialMessage = true; // Marcar como mostrado
           await showMessage();
-          scheduleNext(); // Inicia la secuencia
+          scheduleNext(); // Inicia la secuencia de 60 minutos
+        } else {
+          console.log('💬 [DOULI CHAT] No mostrar mensaje fuera de Home');
         }
-      }, 1000);
+      }, 2000); // 2 segundos para dar tiempo a que cargue la pantalla
     }
 
     return () => {

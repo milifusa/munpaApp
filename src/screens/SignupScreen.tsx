@@ -498,7 +498,7 @@ const SignupScreen: React.FC<SignupScreenProps> = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#887CBC', // Fondo púrpura principal
+    backgroundColor: '#96d2d3', // Fondo púrpura principal
     paddingBottom: 0,
   },
   scrollContainer: {
@@ -607,7 +607,7 @@ const styles = StyleSheet.create({
     borderColor: 'transparent',
   },
   genderButtonActive: {
-    backgroundColor: '#59C6C0',
+    backgroundColor: '#96d2d3',
     borderColor: '#59C6C0',
   },
   genderButtonText: {

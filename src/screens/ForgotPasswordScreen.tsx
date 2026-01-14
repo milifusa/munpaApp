@@ -148,7 +148,7 @@ const ForgotPasswordScreen: React.FC<{ navigation: any }> = ({ navigation }) => 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#887CBC',
+    backgroundColor: '#96d2d3',
   },
   scrollContainer: {
     flexGrow: 1,

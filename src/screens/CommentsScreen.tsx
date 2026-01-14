@@ -235,7 +235,7 @@ const CommentsScreen: React.FC = () => {
     return (
       <SafeAreaView style={styles.safeArea}>
         <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
-        <View style={[styles.header, { paddingTop: Math.max(insets.top, Platform.OS === 'ios' ? 15 : 10) }]}>
+        <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
           <TouchableOpacity 
             style={styles.backButton}
             onPress={() => navigation.goBack()}
@@ -260,7 +260,7 @@ const CommentsScreen: React.FC = () => {
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
       {/* Header */}
-      <View style={[styles.header, { paddingTop: Math.max(insets.top, Platform.OS === 'ios' ? 15 : 10) }]}>
+      <View style={[styles.header, { paddingTop: Platform.OS === 'ios' ? 10 : 10 }]}>
         <TouchableOpacity 
           style={styles.backButton}
           onPress={() => navigation.goBack()}
@@ -403,7 +403,7 @@ const CommentsScreen: React.FC = () => {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#F7FAFC',
   },
   header: {
     flexDirection: 'row',
@@ -413,7 +413,7 @@ const styles = StyleSheet.create({
     paddingBottom: 15,
     borderBottomWidth: 1,
     borderBottomColor: '#E5E5E5',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#F7FAFC',
   },
   backButton: {
     padding: 10,
@@ -430,7 +430,7 @@ const styles = StyleSheet.create({
   },
   postInfo: {
     padding: 20,
-    backgroundColor: '#F8F9FA',
+    backgroundColor: '#F7FAFC',
     borderBottomWidth: 1,
     borderBottomColor: '#E5E5E5',
   },
@@ -584,7 +584,7 @@ const styles = StyleSheet.create({
     padding: 20,
     borderTopWidth: 1,
     borderTopColor: '#E5E5E5',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#F7FAFC',
   },
   inputContainer: {
     flex: 1,
@@ -598,7 +598,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     fontSize: 14,
     color: '#333',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#F7FAFC',
     maxHeight: 100,
     textAlignVertical: 'top',
   },
@@ -609,7 +609,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   sendButton: {
-    backgroundColor: '#59C6C0',
+    backgroundColor: '#96d2d3',
     width: 44,
     height: 44,
     borderRadius: 22,

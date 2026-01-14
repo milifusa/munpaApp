@@ -178,9 +178,9 @@ const ItemCommentsScreen = () => {
   if (isLoading) {
     return (
       <SafeAreaView style={styles.container}>
-        <StatusBar barStyle="light-content" backgroundColor="#59C6C0" />
+        <StatusBar barStyle="light-content" backgroundColor="#96d2d3" />
         {/* Header */}
-        <View style={[styles.header, { paddingTop: Math.max(insets.top, Platform.OS === 'ios' ? 15 : 10) }]}>
+        <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
           <TouchableOpacity
             style={styles.backButton}
             onPress={() => navigation.goBack()}
@@ -201,9 +201,9 @@ const ItemCommentsScreen = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#59C6C0" />
+      <StatusBar barStyle="light-content" backgroundColor="#96d2d3" />
       {/* Header */}
-      <View style={[styles.header, { paddingTop: Math.max(insets.top, Platform.OS === 'ios' ? 15 : 10) }]}>
+      <View style={[styles.header, { paddingTop: Platform.OS === 'ios' ? 10 : 10 }]}>
         <TouchableOpacity
           style={styles.backButton}
           onPress={() => navigation.goBack()}
@@ -281,7 +281,7 @@ const ItemCommentsScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#F7FAFC',
   },
   
   // Header
@@ -289,7 +289,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#59C6C0',
+    backgroundColor: '#96d2d3',
     paddingHorizontal: 20,
     paddingBottom: 15,
   },
@@ -312,7 +312,7 @@ const styles = StyleSheet.create({
   // Item info
   itemInfo: {
     padding: 20,
-    backgroundColor: '#F8F9FA',
+    backgroundColor: '#F7FAFC',
     borderBottomWidth: 1,
     borderBottomColor: '#E9ECEF',
   },
@@ -374,7 +374,7 @@ const styles = StyleSheet.create({
 
   // Comment card
   commentCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#F7FAFC',
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
@@ -400,7 +400,7 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: '#F8F9FA',
+    backgroundColor: '#F7FAFC',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
@@ -435,7 +435,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-end',
     padding: 16,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#F7FAFC',
     borderTopWidth: 1,
     borderTopColor: '#E9ECEF',
   },
@@ -449,13 +449,13 @@ const styles = StyleSheet.create({
     marginRight: 12,
     maxHeight: 100,
     fontSize: 14,
-    backgroundColor: '#F8F9FA',
+    backgroundColor: '#F7FAFC',
   },
   sendButton: {
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: '#59C6C0',
+    backgroundColor: '#96d2d3',
     justifyContent: 'center',
     alignItems: 'center',
   },

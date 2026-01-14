@@ -23,6 +23,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import api from '../services/api';
 import recommendationAnalyticsService from '../services/recommendationAnalyticsService';
 import { useAuth } from '../contexts/AuthContext';
+import { shareContentHelper } from '../utils/shareContentHelper';
 
 interface Review {
   id: string;
@@ -648,10 +649,10 @@ const RecommendationDetailScreen = ({ route, navigation }: any) => {
   if (isLoading) {
     return (
       <SafeAreaView style={styles.container}>
-        <StatusBar barStyle="light-content" backgroundColor="#59C6C0" />
+        <StatusBar barStyle="light-content" backgroundColor="#96d2d3" />
         <LinearGradient
           colors={['#59C6C0', '#4DB8B3']}
-          style={[styles.header, { paddingTop: Math.max(insets.top, Platform.OS === 'ios' ? 10 : 15) }]}
+          style={[styles.header, { paddingTop: insets.top + 10 }]}
         >
           <TouchableOpacity onPress={() => navigation.goBack()}>
             <Ionicons name="arrow-back" size={24} color="white" />
@@ -668,10 +669,10 @@ const RecommendationDetailScreen = ({ route, navigation }: any) => {
   if (error || !recommendation) {
     return (
       <SafeAreaView style={styles.container}>
-        <StatusBar barStyle="light-content" backgroundColor="#59C6C0" />
+        <StatusBar barStyle="light-content" backgroundColor="#96d2d3" />
         <LinearGradient
           colors={['#59C6C0', '#4DB8B3']}
-          style={[styles.header, { paddingTop: Math.max(insets.top, Platform.OS === 'ios' ? 10 : 15) }]}
+          style={[styles.header, { paddingTop: insets.top + 10 }]}
         >
           <TouchableOpacity onPress={() => navigation.goBack()}>
             <Ionicons name="arrow-back" size={24} color="white" />
@@ -690,12 +691,12 @@ const RecommendationDetailScreen = ({ route, navigation }: any) => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#59C6C0" />
+      <StatusBar barStyle="light-content" backgroundColor="#96d2d3" />
       <View style={styles.contentWrapper}>
         {/* Header */}
         <LinearGradient
           colors={['#59C6C0', '#4DB8B3']}
-          style={[styles.header, { paddingTop: Math.max(insets.top, Platform.OS === 'ios' ? 10 : 15) }]}
+          style={[styles.header, { paddingTop: insets.top + 10 }]}
         >
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color="white" />
@@ -703,6 +704,12 @@ const RecommendationDetailScreen = ({ route, navigation }: any) => {
         <Text style={styles.headerTitle} numberOfLines={1}>
           {recommendation.name}
         </Text>
+        <TouchableOpacity 
+          onPress={() => shareContentHelper.shareRecommendation(recommendationId)}
+          style={styles.shareButton}
+        >
+          <Ionicons name="share-outline" size={24} color="white" />
+        </TouchableOpacity>
       </LinearGradient>
 
       <ScrollView
@@ -1147,11 +1154,11 @@ const RecommendationDetailScreen = ({ route, navigation }: any) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#59C6C0',
+    backgroundColor: '#96d2d3',
   },
   contentWrapper: {
     flex: 1,
-    backgroundColor: '#F8F9FA',
+    backgroundColor: '#F7FAFC',
   },
   scrollView: {
     flex: 1,
@@ -1168,6 +1175,10 @@ const styles = StyleSheet.create({
   },
   backButton: {
     marginRight: 15,
+    padding: 5,
+  },
+  shareButton: {
+    marginLeft: 15,
     padding: 5,
   },
   headerTitle: {
@@ -1278,7 +1289,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#59C6C0',
+    backgroundColor: '#96d2d3',
     paddingVertical: 12,
     borderRadius: 10,
     gap: 6,
@@ -1299,7 +1310,7 @@ const styles = StyleSheet.create({
   writeReviewButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#59C6C0',
+    backgroundColor: '#96d2d3',
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 20,
@@ -1326,7 +1337,7 @@ const styles = StyleSheet.create({
 
   // Reviews
   reviewCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#F7FAFC',
     padding: 15,
     borderRadius: 12,
     marginBottom: 12,
@@ -1510,7 +1521,7 @@ const styles = StyleSheet.create({
   communityStatsRow: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    backgroundColor: '#F8F9FA',
+    backgroundColor: '#F7FAFC',
     borderRadius: 12,
     padding: 16,
   },
@@ -1575,7 +1586,7 @@ const styles = StyleSheet.create({
   popularCommunityItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F8F9FA',
+    backgroundColor: '#F7FAFC',
     padding: 12,
     borderRadius: 10,
     gap: 10,
@@ -1614,7 +1625,7 @@ const styles = StyleSheet.create({
     maxHeight: '90%',
   },
   modalContent: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#F7FAFC',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     padding: 20,
@@ -1658,7 +1669,7 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   commentInput: {
-    backgroundColor: '#F8F9FA',
+    backgroundColor: '#F7FAFC',
     borderRadius: 10,
     padding: 12,
     fontSize: 15,
@@ -1676,7 +1687,7 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   fieldInput: {
-    backgroundColor: '#F8F9FA',
+    backgroundColor: '#F7FAFC',
     borderRadius: 10,
     padding: 12,
     fontSize: 15,
@@ -1692,7 +1703,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 16,
     borderRadius: 20,
-    backgroundColor: '#F8F9FA',
+    backgroundColor: '#F7FAFC',
     borderWidth: 1,
     borderColor: '#E9ECEF',
   },
@@ -1772,7 +1783,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#59C6C0',
+    backgroundColor: '#96d2d3',
     paddingVertical: 12,
     paddingHorizontal: 20,
     borderRadius: 10,
@@ -1809,7 +1820,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   retryButton: {
-    backgroundColor: '#59C6C0',
+    backgroundColor: '#96d2d3',
     paddingHorizontal: 20,
     paddingVertical: 12,
     borderRadius: 25,

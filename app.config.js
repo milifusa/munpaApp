@@ -1,8 +1,10 @@
+require('dotenv').config();
+
 module.exports = ({ config }) => ({
   ...config,
   name: 'Munpa',
   slug: 'munpaApp',
-  version: '0.0.3',
+  version: '1.0.1',
   orientation: 'portrait',
   icon: './assets/icon.png',
   userInterfaceStyle: 'light',
@@ -15,12 +17,18 @@ module.exports = ({ config }) => ({
   ios: {
     supportsTablet: true,
     bundleIdentifier: 'com.munpa.app',
+    buildNumber: '1.0.9',
     icon: './assets/icon.png',
     infoPlist: {
       ITSAppUsesNonExemptEncryption: false,
       NSUserTrackingUsageDescription: 'Munpa utiliza esta información para mostrarte contenido relevante y mejorar tu experiencia en la comunidad de padres. Tus datos nunca se comparten con terceros para publicidad.'
     },
-    googleServicesFile: './GoogleService-Info.plist'
+    googleServicesFile: './GoogleService-Info.plist',
+    entitlements: {
+      'aps-environment': 'production'
+    },
+    scheme: 'munpa',
+    associatedDomains: ['munpa.online', 'www.munpa.online']
   },
   android: {
     package: 'com.munpa.app',
@@ -30,7 +38,85 @@ module.exports = ({ config }) => ({
     },
     edgeToEdgeEnabled: true,
     icon: './assets/icon.png',
-    googleServicesFile: './google-services.json'
+    googleServicesFile: './google-services.json',
+    intentFilters: [
+      {
+        action: 'VIEW',
+        autoVerify: true,
+        data: [
+          {
+            scheme: 'munpa',
+            host: 'share-child'
+          },
+          {
+            scheme: 'munpa',
+            host: 'post'
+          },
+          {
+            scheme: 'munpa',
+            host: 'recommendation'
+          },
+          {
+            scheme: 'munpa',
+            host: 'marketplace',
+            pathPrefix: '/product'
+          },
+          {
+            scheme: 'munpa',
+            host: 'marketplace',
+            pathPrefix: '/favorites'
+          },
+          {
+            scheme: 'munpa',
+            host: 'recommendations',
+            pathPrefix: '/favorites'
+          }
+        ],
+        category: ['BROWSABLE', 'DEFAULT']
+      },
+      {
+        action: 'VIEW',
+        autoVerify: true,
+        data: [
+          {
+            scheme: 'https',
+            host: 'munpa.online',
+            pathPrefix: '/share-child'
+          },
+          {
+            scheme: 'https',
+            host: 'www.munpa.online',
+            pathPrefix: '/share-child'
+          },
+          {
+            scheme: 'https',
+            host: 'munpa.online',
+            pathPrefix: '/post'
+          },
+          {
+            scheme: 'https',
+            host: 'munpa.online',
+            pathPrefix: '/recommendation'
+          },
+          {
+            scheme: 'https',
+            host: 'munpa.online',
+            pathPrefix: '/marketplace/product'
+          },
+          {
+            scheme: 'https',
+            host: 'munpa.online',
+            pathPrefix: '/marketplace/favorites'
+          },
+          {
+            scheme: 'https',
+            host: 'munpa.online',
+            pathPrefix: '/recommendations/favorites'
+          }
+        ],
+        category: ['BROWSABLE', 'DEFAULT']
+      }
+    ]
   },
   web: {
     favicon: './assets/favicon.png',
@@ -60,11 +146,28 @@ module.exports = ({ config }) => ({
     [
       'expo-maps',
       {
-        // Google Maps API Key (opcional, pero recomendado para producción)
+        // Google Maps API Key (OBLIGATORIA para Android)
         // Obtén tu API key en: https://developers.google.com/maps/documentation/android-sdk/get-api-key
+        // Ver instrucciones en: COMO_OBTENER_GOOGLE_MAPS_API_KEY.md
+        // 
+        // Para configurar:
+        // 1. Crea un archivo .env en la raíz del proyecto
+        // 2. Agrega: GOOGLE_MAPS_API_KEY=tu_api_key_aqui
+        // 3. O reemplaza directamente el string vacío con tu API key
         googleMapsApiKey: process.env.GOOGLE_MAPS_API_KEY || ''
       }
-    ]
+    ],
+    [
+      'expo-notifications',
+      {
+        icon: './assets/icon.png',
+        color: '#59C6C0',
+        mode: 'production',
+        android: {
+          useNextNotificationsApi: true,
+        },
+      }
+    ],
   ],
   fonts: [
     {

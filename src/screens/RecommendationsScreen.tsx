@@ -12,7 +12,9 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import api from '../services/api';
+import BannerCarousel from '../components/BannerCarousel';
 
 // Interfaz para las categorías
 interface Category {
@@ -44,6 +46,7 @@ interface RecentRecommendation {
 }
 
 const RecommendationsScreen = ({ navigation }: any) => {
+  const insets = useSafeAreaInsets();
   const [searchQuery, setSearchQuery] = useState('');
   const [refreshing, setRefreshing] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
@@ -124,9 +127,17 @@ const RecommendationsScreen = ({ navigation }: any) => {
   };
 
   const renderQuickActions = () => (
-    <View style={styles.quickActionsContainer}>
-      <Text style={styles.sectionTitle}>Acciones Rápidas</Text>
+    <View >
       <View style={styles.quickActions}>
+      <TouchableOpacity 
+          style={styles.quickAction}
+          onPress={() => navigation.navigate('ListsMain')}
+        >
+          <View style={[styles.quickActionIcon, { backgroundColor: '#96d2d3', }]}>
+            <Ionicons name="list" size={20} color="white" />
+          </View>
+          <Text style={styles.quickActionText}>Listas</Text>
+        </TouchableOpacity>
         <TouchableOpacity 
           style={styles.quickAction}
           onPress={() => navigation.navigate('Favorites')}
@@ -156,6 +167,8 @@ const RecommendationsScreen = ({ navigation }: any) => {
           </View>
           <Text style={styles.quickActionText}>Ver Mapa</Text>
         </TouchableOpacity>
+        
+        
       </View>
     </View>
   );
@@ -278,19 +291,20 @@ const RecommendationsScreen = ({ navigation }: any) => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={styles.container}>
       <ScrollView 
         style={styles.scrollView} 
+        contentContainerStyle={{ paddingBottom: insets.bottom }}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
         }
       >
-        {/* Header */}
-        <View style={styles.header}>
-          <Text style={styles.title}>Recomendaciones</Text>
-          <Text style={styles.subtitle}>Para Familias 👨‍👩‍👧‍👦</Text>
-          
+        {/* Carrusel de Banners de Recomendaciones */}
+        <BannerCarousel section="recomendaciones" fallbackToHome={false} />
+
+        {/* Contenido principal */}
+        <View style={styles.contentContainer}>
           {/* Barra de búsqueda */}
           <View style={styles.searchContainer}>
             <Ionicons name="search" size={20} color="#999" style={styles.searchIcon} />
@@ -307,6 +321,9 @@ const RecommendationsScreen = ({ navigation }: any) => {
               </TouchableOpacity>
             )}
           </View>
+          
+          {/* Acciones rápidas */}
+          {renderQuickActions()}
         </View>
 
         {/* Categorías principales */}
@@ -381,8 +398,7 @@ const RecommendationsScreen = ({ navigation }: any) => {
           )}
         </View>
 
-        {/* Acciones rápidas */}
-        {renderQuickActions()}
+        
 
         {/* Recomendaciones recientes */}
         {renderRecentRecommendations()}
@@ -390,35 +406,24 @@ const RecommendationsScreen = ({ navigation }: any) => {
         {/* Espacio final */}
         <View style={styles.finalSpacing} />
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8F9FA',
+    backgroundColor: '#F7FAFC',
   },
   scrollView: {
     flex: 1,
   },
   
-  // Header
-  header: {
-    backgroundColor: '#FFFFFF',
+  // Contenedor de contenido
+  contentContainer: {
     paddingHorizontal: 20,
     paddingTop: 20,
-    paddingBottom: 25,
-    borderBottomLeftRadius: 25,
-    borderBottomRightRadius: 25,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 5,
+    paddingBottom: 10,
   },
   title: {
     fontSize: 32,
@@ -436,7 +441,7 @@ const styles = StyleSheet.create({
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F8F9FA',
+    backgroundColor: '#F7FAFC',
     borderRadius: 15,
     paddingHorizontal: 15,
     paddingVertical: 12,
@@ -472,7 +477,7 @@ const styles = StyleSheet.create({
   },
   categoryCard: {
     width: '47%',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#F7FAFC',
     borderRadius: 20,
     padding: 20,
     alignItems: 'center',
@@ -537,26 +542,12 @@ const styles = StyleSheet.create({
     right: 15,
   },
   
-  // Acciones rápidas
-  quickActionsContainer: {
-    paddingHorizontal: 20,
-    marginBottom: 30,
-  },
+
   quickActions: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
+    backgroundColor: 'transparent',
     paddingVertical: 20,
-    paddingHorizontal: 10,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 3,
   },
   quickAction: {
     alignItems: 'center',
@@ -583,7 +574,7 @@ const styles = StyleSheet.create({
     marginBottom: 30,
   },
   recentItems: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#F7FAFC',
     borderRadius: 20,
     padding: 15,
     shadowColor: '#000',
@@ -688,7 +679,7 @@ const styles = StyleSheet.create({
   retryButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#59C6C0',
+    backgroundColor: '#96d2d3',
     paddingHorizontal: 20,
     paddingVertical: 12,
     borderRadius: 25,

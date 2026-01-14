@@ -13,14 +13,17 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   RefreshControl,
+  SafeAreaView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
 import { useNavigation } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../contexts/AuthContext';
 import { communitiesService } from '../services/api';
 import { imageUploadService } from '../services/imageUploadService';
+import BannerCarousel from '../components/BannerCarousel';
 
 interface Community {
   id: string;
@@ -39,6 +42,7 @@ interface Community {
 
 const CommunitiesScreen = () => {
   const navigation = useNavigation<any>();
+  const insets = useSafeAreaInsets();
   const { user, isAuthenticated } = useAuth();
   const [communities, setCommunities] = useState<Community[]>([]);
   const [userCommunities, setUserCommunities] = useState<Community[]>([]);
@@ -64,6 +68,7 @@ const CommunitiesScreen = () => {
     description: '',
     isPrivate: false,
     image: null as string | null,
+    imageMimeType: undefined as string | undefined,
   });
 
   // Cargar comunidades al montar el componente
@@ -285,9 +290,6 @@ const CommunitiesScreen = () => {
       if (result.success) {
         // El backend devuelve la estructura: { data: { results: [...] } }
         const searchData = result.data?.results || [];
-        console.log('✅ [COMMUNITIES] Resultados de búsqueda:', searchData.length);
-        console.log('✅ [COMMUNITIES] Total encontrados:', result.data?.totalFound || 0);
-        console.log('✅ [COMMUNITIES] Datos extraídos:', searchData);
         
         // Asegurar que searchData sea un array
         const validResults = Array.isArray(searchData) ? searchData : [];
@@ -319,26 +321,17 @@ const CommunitiesScreen = () => {
 
     setIsCreating(true);
     try {
-      console.log('🏗️ [COMMUNITIES] Creando comunidad con datos:', newCommunity);
-      console.log('🔄 [COMMUNITIES] Conversión de campos:', {
-        isPrivate: newCommunity.isPrivate,
-        isPublic: !newCommunity.isPrivate
-      });
+      
       
       let imageUrl = null;
       
       // 1. Si hay imagen, subirla primero para obtener la URL
       if (newCommunity.image) {
         console.log('🖼️ [COMMUNITIES] Subiendo imagen a /api/communities/upload-photo...');
+        console.log('🖼️ [COMMUNITIES] Tipo MIME de la imagen:', newCommunity.imageMimeType);
         try {
-          imageUrl = await imageUploadService.uploadCommunityImage(newCommunity.image);
-          console.log('✅ [COMMUNITIES] Imagen subida exitosamente, URL obtenida:', imageUrl);
-          console.log('🔍 [COMMUNITIES] Verificando URL obtenida:', {
-            imageUrl,
-            isString: typeof imageUrl === 'string',
-            length: imageUrl?.length,
-            startsWithHttp: imageUrl?.startsWith('http')
-          });
+          imageUrl = await imageUploadService.uploadCommunityImage(newCommunity.image, newCommunity.imageMimeType);
+
         } catch (imageError) {
           console.error('❌ [COMMUNITIES] Error subiendo imagen a /api/communities/upload-photo:', imageError);
           Alert.alert('Error', 'No se pudo subir la imagen. La comunidad se creará sin imagen.');
@@ -355,11 +348,9 @@ const CommunitiesScreen = () => {
         image: imageUrl, // Usar la URL obtenida del upload (se enviará como imageUrl)
       };
       
-      console.log('🏗️ [COMMUNITIES] Datos preparados:', communityData);
       
       // 3. Crear la comunidad con la URL de la imagen
       const response = await communitiesService.createCommunity(communityData);
-      console.log('✅ [COMMUNITIES] Comunidad creada:', response);
       
       // 4. Recargar todas las comunidades para mostrar la nueva
       await loadCommunities();
@@ -371,6 +362,7 @@ const CommunitiesScreen = () => {
         description: '',
         isPrivate: false,
         image: null,
+        imageMimeType: undefined,
       });
       setIsCreateModalVisible(false);
       
@@ -407,15 +399,18 @@ const CommunitiesScreen = () => {
           uri: selectedImage.uri,
           width: selectedImage.width,
           height: selectedImage.height,
-          fileSize: selectedImage.fileSize
+          fileSize: selectedImage.fileSize,
+          mimeType: selectedImage.mimeType,
+          type: selectedImage.type
         });
         
         setNewCommunity(prev => ({
           ...prev,
-          image: selectedImage.uri
+          image: selectedImage.uri,
+          imageMimeType: selectedImage.mimeType || undefined // Guardar el tipo MIME real
         }));
         
-        console.log('✅ [IMAGE PICKER] Imagen asignada al estado');
+        console.log('✅ [IMAGE PICKER] Imagen asignada al estado con tipo MIME:', selectedImage.mimeType);
       } else {
         console.log('🖼️ [IMAGE PICKER] Selección cancelada por el usuario');
       }
@@ -448,15 +443,18 @@ const CommunitiesScreen = () => {
           uri: selectedImage.uri,
           width: selectedImage.width,
           height: selectedImage.height,
-          fileSize: selectedImage.fileSize
+          fileSize: selectedImage.fileSize,
+          mimeType: selectedImage.mimeType,
+          type: selectedImage.type
         });
         
         setNewCommunity(prev => ({
           ...prev,
-          image: selectedImage.uri
+          image: selectedImage.uri,
+          imageMimeType: selectedImage.mimeType || undefined // Guardar el tipo MIME real
         }));
         
-        console.log('✅ [CAMERA] Foto asignada al estado');
+        console.log('✅ [CAMERA] Foto asignada al estado con tipo MIME:', selectedImage.mimeType);
       } else {
         console.log('📸 [CAMERA] Captura cancelada por el usuario');
       }
@@ -473,6 +471,7 @@ const CommunitiesScreen = () => {
       description: '',
       isPrivate: false,
       image: null,
+      imageMimeType: undefined,
     });
     setIsCreateModalVisible(false);
   };
@@ -714,6 +713,9 @@ const CommunitiesScreen = () => {
           />
         }
       >
+        {/* Carrusel de Banners de Comunidades */}
+        <BannerCarousel section="comunidades" fallbackToHome={false} />
+
         {/* Sección de Búsqueda */}
         <View style={styles.searchSection}>
           <View style={styles.searchContainer}>
@@ -823,13 +825,6 @@ const CommunitiesScreen = () => {
                 >
                   <View style={styles.communityHeader}>
                     <CommunityIcon community={community} />
-                    <View style={styles.communityInfo}>
-                      <Text style={styles.communityName}>{community.name || 'Sin nombre'}</Text>
-                      <Text style={styles.communityCategory}>{community.category || 'General'}</Text>
-                      <Text numberOfLines={2} style={styles.communityDescription}>
-                        {community.description || 'Sin descripción'}
-                      </Text>
-                    </View>
                     <View style={styles.communityStats}>
                       <Ionicons name="people" size={16} color="#666" />
                       <Text style={styles.memberCount}>{community.memberCount || 0}</Text>
@@ -838,6 +833,20 @@ const CommunitiesScreen = () => {
                       )}
                     </View>
                   </View>
+                  <View style={styles.communityTitleContainer}>
+                    <Text 
+                      style={styles.communityName}
+                      numberOfLines={2}
+                      ellipsizeMode="tail"
+                      textBreakStrategy="highQuality"
+                    >
+                      {community.name || 'Sin nombre'}
+                    </Text>
+                    <Text style={styles.communityCategory}>{community.category || 'General'}</Text>
+                  </View>
+                  <Text numberOfLines={2} style={styles.communityDescription}>
+                    {community.description || 'Sin descripción'}
+                  </Text>
                   <Text style={styles.communityDescription}>
                     {community.description || 'Sin descripción disponible'}
                   </Text>
@@ -862,10 +871,6 @@ const CommunitiesScreen = () => {
               >
                 <View style={styles.communityHeader}>
                   <CommunityIcon community={community} />
-                  <View style={styles.communityInfo}>
-                    <Text style={styles.communityName}>{community.name || 'Sin nombre'}</Text>
-                    <Text style={styles.communityCategory}>{community.category || 'General'}</Text>
-                  </View>
                   <View style={styles.communityStats}>
                     <Ionicons name="people" size={16} color="#666" />
                     <Text style={styles.memberCount}>{community.memberCount || 0}</Text>
@@ -873,6 +878,17 @@ const CommunitiesScreen = () => {
                       <Ionicons name="lock-closed" size={16} color="#666" style={styles.privateIcon} />
                     )}
                   </View>
+                </View>
+                <View style={styles.communityTitleContainer}>
+                  <Text 
+                    style={styles.communityName}
+                    numberOfLines={2}
+                    ellipsizeMode="tail"
+                    textBreakStrategy="highQuality"
+                  >
+                    {community.name || 'Sin nombre'}
+                  </Text>
+                  <Text style={styles.communityCategory}>{community.category || 'General'}</Text>
                 </View>
                 <Text style={styles.communityDescription}>
                   {community.description || 'Sin descripción disponible'}
@@ -918,14 +934,6 @@ const CommunitiesScreen = () => {
               >
                 <View style={styles.communityHeader}>
                   <CommunityIcon community={community} />
-                  <View style={styles.communityInfo}>
-                    <Text style={styles.communityName}>{community.name || 'Sin nombre'}</Text>
-                    <Text style={styles.communityCategory}>{community.category || 'General'}</Text>
-                    <View style={styles.ownerBadge}>
-                      <Ionicons name="star" size={12} color="#FFD700" />
-                      <Text style={styles.ownerText}>Mi Comunidad</Text>
-                    </View>
-                  </View>
                   <View style={styles.communityStats}>
                     <Ionicons name="people" size={16} color="#666" />
                     <Text style={styles.memberCount}>{community.memberCount || 0}</Text>
@@ -946,7 +954,21 @@ const CommunitiesScreen = () => {
                     )}
                   </View>
                 </View>
-                
+                <View style={styles.communityTitleContainer}>
+                  <Text 
+                    style={styles.communityName}
+                    numberOfLines={2}
+                    ellipsizeMode="tail"
+                    textBreakStrategy="highQuality"
+                  >
+                    {community.name || 'Sin nombre'}
+                  </Text>
+                  <Text style={styles.communityCategory}>{community.category || 'General'}</Text>
+                  <View style={styles.ownerBadge}>
+                    <Ionicons name="star" size={12} color="#FFD700" />
+                    <Text style={styles.ownerText}>Mi Comunidad</Text>
+                  </View>
+                </View>
                 <Text style={styles.communityDescription}>{community.description || 'Sin descripción'}</Text>
                 
                 <CommunityActionButton community={community} />
@@ -993,10 +1015,6 @@ const CommunitiesScreen = () => {
               >
                 <View style={styles.communityHeader}>
                   <CommunityIcon community={community} />
-                  <View style={styles.communityInfo}>
-                    <Text style={styles.communityName}>{community.name || 'Sin nombre'}</Text>
-                    <Text style={styles.communityCategory}>{community.category || 'General'}</Text>
-                  </View>
                   <View style={styles.communityStats}>
                     <Ionicons name="people" size={16} color="#666" />
                     <Text style={styles.memberCount}>{community.memberCount || 0}</Text>
@@ -1017,7 +1035,17 @@ const CommunitiesScreen = () => {
                     )}
                   </View>
                 </View>
-                
+                <View style={styles.communityTitleContainer}>
+                  <Text 
+                    style={styles.communityName}
+                    numberOfLines={2}
+                    ellipsizeMode="tail"
+                    textBreakStrategy="highQuality"
+                  >
+                    {community.name || 'Sin nombre'}
+                  </Text>
+                  <Text style={styles.communityCategory}>{community.category || 'General'}</Text>
+                </View>
                 <Text style={styles.communityDescription}>{community.description || 'Sin descripción'}</Text>
                 
                 <CommunityActionButton community={community} />
@@ -1034,11 +1062,12 @@ const CommunitiesScreen = () => {
         animationType="slide"
         presentationStyle="pageSheet"
       >
-        <KeyboardAvoidingView 
-          style={styles.modalContainer}
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        >
-          <View style={styles.modalHeader}>
+        <SafeAreaView style={{ flex: 1 }}>
+          <KeyboardAvoidingView 
+            style={styles.modalContainer}
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          >
+            <View style={[styles.modalHeader, { paddingTop: insets.top }]}>
             <TouchableOpacity onPress={resetForm} style={styles.closeButton}>
               <Ionicons name="close" size={24} color="#666" />
             </TouchableOpacity>
@@ -1181,7 +1210,8 @@ const CommunitiesScreen = () => {
               )}
             </TouchableOpacity>
           </View>
-        </KeyboardAvoidingView>
+          </KeyboardAvoidingView>
+        </SafeAreaView>
       </Modal>
     </View>
   );
@@ -1201,7 +1231,6 @@ const styles = StyleSheet.create({
   // Sección de búsqueda
   searchSection: {
     padding: 20,
-    paddingTop: 60,
     backgroundColor: 'transparent',
   },
   searchContainer: {
@@ -1242,7 +1271,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#59C6C0',
+    backgroundColor: '#96d2d3',
     paddingVertical: 16,
     paddingHorizontal: 24,
     borderRadius: 28,
@@ -1295,30 +1324,41 @@ const styles = StyleSheet.create({
   communityHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 15,
+    justifyContent: 'space-between',
+    marginBottom: 16,
+    width: '100%',
+  },
+  communityTitleContainer: {
+    width: '100%',
+    marginBottom: 8,
+    marginTop: 4,
+    paddingLeft: 0,
   },
   categoryIcon: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    width: 70,
+    height: 70,
+    borderRadius: 35,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 16,
+    marginRight: 12,
+    flexShrink: 0,
   },
   communityImage: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    marginRight: 16,
-  },
-  communityInfo: {
-    flex: 1,
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+    marginRight: 12,
+    flexShrink: 0,
   },
   communityName: {
-    fontSize: 19,
+    fontSize: 18,
     fontWeight: '700',
     color: '#2C3E50',
     marginBottom: 6,
+    lineHeight: 24,
+    letterSpacing: 0.2,
+    textAlign: 'left',
+    width: '100%',
   },
   communityCategory: {
     fontSize: 13,
@@ -1329,12 +1369,11 @@ const styles = StyleSheet.create({
   communityStats: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F8F9FA',
+    backgroundColor: '#F7FAFC',
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 12,
-    alignSelf: 'flex-start',
-    marginTop: 6,
+    flexShrink: 0,
   },
   memberCount: {
     fontSize: 13,
@@ -1356,7 +1395,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#887CBC',
+    backgroundColor: '#96d2d3',
     paddingVertical: 14,
     paddingHorizontal: 24,
     borderRadius: 25,
@@ -1406,7 +1445,7 @@ const styles = StyleSheet.create({
   // Estilos del Modal
   modalContainer: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#F7FAFC',
   },
   modalHeader: {
     flexDirection: 'row',
@@ -1447,7 +1486,7 @@ const styles = StyleSheet.create({
     borderStyle: 'dashed',
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#F8F9FA',
+    backgroundColor: '#F7FAFC',
   },
   selectedImage: {
     width: 120,
@@ -1484,7 +1523,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     fontSize: 16,
     color: '#333',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#F7FAFC',
   },
   textArea: {
     height: 100,
@@ -1500,7 +1539,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 15,
     paddingHorizontal: 15,
-    backgroundColor: '#F8F9FA',
+    backgroundColor: '#F7FAFC',
     borderRadius: 8,
     marginTop: 10,
   },
@@ -1518,7 +1557,7 @@ const styles = StyleSheet.create({
     width: 10,
     height: 10,
     borderRadius: 5,
-    backgroundColor: '#887CBC',
+    backgroundColor: '#96d2d3',
   },
   privacyInfo: {
     flex: 1,
@@ -1552,7 +1591,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     borderWidth: 1,
     borderColor: '#E5E5E5',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#F7FAFC',
     alignItems: 'center',
   },
   cancelButtonText: {
@@ -1568,7 +1607,7 @@ const styles = StyleSheet.create({
     paddingVertical: 15,
     paddingHorizontal: 20,
     borderRadius: 8,
-    backgroundColor: '#59C6C0',
+    backgroundColor: '#96d2d3',
     gap: 8,
   },
   createButtonDisabled: {
@@ -1632,7 +1671,7 @@ const styles = StyleSheet.create({
     marginLeft: 4,
   },
   myCommunityButton: {
-    backgroundColor: '#59C6C0',
+    backgroundColor: '#96d2d3',
   },
   privateRequestButton: {
     backgroundColor: '#FF6B6B',
@@ -1707,7 +1746,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 10,
     paddingHorizontal: 15,
-    backgroundColor: '#F8F9FA',
+    backgroundColor: '#F7FAFC',
     borderRadius: 20,
     borderWidth: 1,
     borderColor: '#E5E5E5',
@@ -1785,7 +1824,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F5F5F5',
   },
   filterChip: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#F7FAFC',
     borderRadius: 20,
     paddingVertical: 8,
     paddingHorizontal: 16,
@@ -1794,7 +1833,7 @@ const styles = StyleSheet.create({
     borderColor: '#E0E0E0',
   },
   filterChipActive: {
-    backgroundColor: '#59C6C0',
+    backgroundColor: '#96d2d3',
     borderColor: '#59C6C0',
   },
   filterChipText: {

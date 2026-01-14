@@ -15,6 +15,10 @@
     </intent>
   </queries>
   <application android:name=".MainApplication" android:label="@string/app_name" android:icon="@mipmap/ic_launcher" android:roundIcon="@mipmap/ic_launcher_round" android:allowBackup="true" android:theme="@style/AppTheme" android:supportsRtl="true" android:enableOnBackInvokedCallback="false">
+    <meta-data android:name="com.google.firebase.messaging.default_notification_color" android:resource="@color/notification_icon_color"/>
+    <meta-data android:name="com.google.firebase.messaging.default_notification_icon" android:resource="@drawable/notification_icon"/>
+    <meta-data android:name="expo.modules.notifications.default_notification_color" android:resource="@color/notification_icon_color"/>
+    <meta-data android:name="expo.modules.notifications.default_notification_icon" android:resource="@drawable/notification_icon"/>
     <meta-data android:name="expo.modules.updates.ENABLED" android:value="false"/>
     <meta-data android:name="expo.modules.updates.EXPO_UPDATES_CHECK_ON_LAUNCH" android:value="ALWAYS"/>
     <meta-data android:name="expo.modules.updates.EXPO_UPDATES_LAUNCH_WAIT_MS" android:value="0"/>
@@ -22,6 +26,29 @@
       <intent-filter>
         <action android:name="android.intent.action.MAIN"/>
         <category android:name="android.intent.category.LAUNCHER"/>
+      </intent-filter>
+      <intent-filter android:autoVerify="true" data-generated="true">
+        <action android:name="android.intent.action.VIEW"/>
+        <data android:scheme="munpa" android:host="share-child"/>
+        <data android:scheme="munpa" android:host="post"/>
+        <data android:scheme="munpa" android:host="recommendation"/>
+        <data android:scheme="munpa" android:host="marketplace" android:pathPrefix="/product"/>
+        <data android:scheme="munpa" android:host="marketplace" android:pathPrefix="/favorites"/>
+        <data android:scheme="munpa" android:host="recommendations" android:pathPrefix="/favorites"/>
+        <category android:name="android.intent.category.BROWSABLE"/>
+        <category android:name="android.intent.category.DEFAULT"/>
+      </intent-filter>
+      <intent-filter android:autoVerify="true" data-generated="true">
+        <action android:name="android.intent.action.VIEW"/>
+        <data android:scheme="https" android:host="munpa.online" android:pathPrefix="/share-child"/>
+        <data android:scheme="https" android:host="www.munpa.online" android:pathPrefix="/share-child"/>
+        <data android:scheme="https" android:host="munpa.online" android:pathPrefix="/post"/>
+        <data android:scheme="https" android:host="munpa.online" android:pathPrefix="/recommendation"/>
+        <data android:scheme="https" android:host="munpa.online" android:pathPrefix="/marketplace/product"/>
+        <data android:scheme="https" android:host="munpa.online" android:pathPrefix="/marketplace/favorites"/>
+        <data android:scheme="https" android:host="munpa.online" android:pathPrefix="/recommendations/favorites"/>
+        <category android:name="android.intent.category.BROWSABLE"/>
+        <category android:name="android.intent.category.DEFAULT"/>
       </intent-filter>
     </activity>
   </application>

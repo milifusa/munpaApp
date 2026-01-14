@@ -310,7 +310,7 @@ const FavoritesScreen = ({ navigation }: any) => {
 
           {recommendation.website && (
             <TouchableOpacity 
-              style={[styles.quickActionButton, { backgroundColor: '#887CBC' }]}
+              style={[styles.quickActionButton, { backgroundColor: '#96d2d3' }]}
               onPress={(e) => {
                 e.stopPropagation();
                 handleOpenLink(recommendation.website!, recommendation.id);
@@ -326,12 +326,12 @@ const FavoritesScreen = ({ navigation }: any) => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#59C6C0" />
+      <StatusBar barStyle="light-content" backgroundColor="#96d2d3" />
       <View style={styles.content}>
         {/* Header */}
         <LinearGradient
           colors={['#59C6C0', '#4DB8B3']}
-          style={[styles.header, { paddingTop: Math.max(insets.top, Platform.OS === 'ios' ? 15 : 10) }]}
+          style={[styles.header, { paddingTop: insets.top + 10 }]}
         >
           <TouchableOpacity 
             style={styles.backButton}
@@ -413,11 +413,11 @@ const FavoritesScreen = ({ navigation }: any) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#59C6C0',
+    backgroundColor: '#96d2d3',
   },
   content: {
     flex: 1,
-    backgroundColor: '#F8F9FA',
+    backgroundColor: '#F7FAFC',
   },
   scrollView: {
     flex: 1,
@@ -456,7 +456,7 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   card: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#F7FAFC',
     borderRadius: 16,
     marginBottom: 20,
     shadowColor: '#000',
@@ -575,7 +575,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#59C6C0',
+    backgroundColor: '#96d2d3',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -609,7 +609,7 @@ const styles = StyleSheet.create({
   retryButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#59C6C0',
+    backgroundColor: '#96d2d3',
     paddingHorizontal: 20,
     paddingVertical: 12,
     borderRadius: 25,
@@ -642,7 +642,7 @@ const styles = StyleSheet.create({
   },
   exploreButton: {
     marginTop: 25,
-    backgroundColor: '#59C6C0',
+    backgroundColor: '#96d2d3',
     paddingHorizontal: 25,
     paddingVertical: 12,
     borderRadius: 25,

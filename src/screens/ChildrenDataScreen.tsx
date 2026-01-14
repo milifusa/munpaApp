@@ -11,7 +11,10 @@ import {
   ScrollView,
   Modal,
   Button,
+  ActivityIndicator,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
 // @ts-ignore
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useNavigation, useRoute } from '@react-navigation/native';
@@ -164,7 +167,7 @@ const ChildrenDataScreen: React.FC = () => {
         
         if (birthDate < eighteenYearsAgo) {
           Alert.alert('Error', `La fecha de nacimiento de ${child.name} no puede ser hace más de 18 años`);
-          return false;
+        return false;
         }
       }
     }
@@ -440,6 +443,10 @@ const ChildrenDataScreen: React.FC = () => {
         contentContainerStyle={styles.scrollContainer}
         showsVerticalScrollIndicator={false}
       >
+        <LinearGradient
+          colors={['#59C6C0', '#4DB8B3']}
+          style={styles.headerGradient}
+      >
         <View style={styles.header}>
           <MunpaLogo size="large" />
           <Text style={styles.title}>
@@ -455,25 +462,39 @@ const ChildrenDataScreen: React.FC = () => {
           {/* Información adicional para quienes esperan bebé(s) */}
           {pregnancyStatus === 'pregnant' && (
             <View style={styles.infoContainer}>
+                <Ionicons name="heart" size={20} color="#FFFFFF" style={styles.infoIcon} />
               <Text style={styles.infoText}>
                 {isMultiplePregnancy 
-                  ? `👶👶 Registraremos 2 bebés por nacer (${gender === 'F' ? 'gemelos, trillizos, etc.' : 'gemelos, trillizos, etc.'})`
+                    ? `👶👶 Registraremos 2 bebés por nacer (gemelos, trillizos, etc.)`
                   : `👶 Registraremos 1 bebé por nacer`
                 }
               </Text>
             </View>
           )}
         </View>
+        </LinearGradient>
 
         <View style={styles.form}>
           {childrenData.map((child, index) => (
             <View key={index} style={styles.childCard}>
+              <View style={styles.cardHeader}>
+                <View style={styles.iconContainer}>
+                  <Ionicons 
+                    name={child.isUnborn ? "heart" : "person"} 
+                    size={24} 
+                    color="#59C6C0" 
+                  />
+                </View>
               <Text style={styles.childTitle}>
                 {getChildTitle(index, child)}
               </Text>
+              </View>
               
               <View style={styles.inputContainer}>
+                <View style={styles.labelContainer}>
+                  <Ionicons name="person-outline" size={18} color="#59C6C0" />
                 <Text style={styles.label}>Nombre</Text>
+                </View>
                 <TextInput
                   style={styles.input}
                   value={child.name}
@@ -485,11 +506,15 @@ const ChildrenDataScreen: React.FC = () => {
 
               {!isUnbornChild(index) ? (
                 <View style={styles.dateContainer}>
-                  <Text style={styles.label}>Fecha de nacimiento</Text>
-                  <TouchableOpacity
+                  <View style={styles.labelContainer}>
+                    <Ionicons name="calendar-outline" size={18} color="#59C6C0" />
+                    <Text style={styles.label}>Fecha de nacimiento</Text>
+                  </View>
+                        <TouchableOpacity
                     style={styles.dateButton}
                     onPress={() => openDatePicker(index)}
                   >
+                    <Ionicons name="calendar" size={20} color="#59C6C0" style={styles.dateIconLeft} />
                     <Text style={styles.dateButtonText}>
                       {child.birthDate 
                         ? child.birthDate.toLocaleDateString('es-ES', { 
@@ -499,25 +524,32 @@ const ChildrenDataScreen: React.FC = () => {
                           })
                         : 'Seleccionar fecha'}
                     </Text>
-                    <Text style={styles.dateIcon}>📅</Text>
-                  </TouchableOpacity>
+                    <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
+                        </TouchableOpacity>
                   
                   {child.birthDate && (
                     <View style={styles.calculatedAgeContainer}>
-                      <Text style={styles.calculatedAgeLabel}>Edad actual:</Text>
-                      <Text style={styles.calculatedAgeValue}>
-                        {calculateAge(child.birthDate)}
-                      </Text>
+                      <Ionicons name="time-outline" size={18} color="#4CAF50" />
+                      <View style={styles.ageTextContainer}>
+                        <Text style={styles.calculatedAgeLabel}>Edad actual:</Text>
+                        <Text style={styles.calculatedAgeValue}>
+                          {calculateAge(child.birthDate)}
+                        </Text>
+                      </View>
                     </View>
                   )}
                 </View>
               ) : (
                 <View style={styles.dateContainer}>
-                  <Text style={styles.label}>Fecha esperada de parto</Text>
+                  <View style={styles.labelContainer}>
+                    <Ionicons name="heart-outline" size={18} color="#F57C00" />
+                    <Text style={styles.label}>Fecha esperada de parto</Text>
+                  </View>
                   <TouchableOpacity
                     style={styles.dateButton}
                     onPress={() => openDatePicker(index)}
                   >
+                    <Ionicons name="calendar" size={20} color="#F57C00" style={styles.dateIconLeft} />
                     <Text style={styles.dateButtonText}>
                       {child.dueDate 
                         ? child.dueDate.toLocaleDateString('es-ES', { 
@@ -527,14 +559,15 @@ const ChildrenDataScreen: React.FC = () => {
                           })
                         : 'Seleccionar fecha'}
                     </Text>
-                    <Text style={styles.dateIcon}>📅</Text>
+                    <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
                   </TouchableOpacity>
                   
                   {child.dueDate && (
                     <View style={styles.pregnancyInfoContainer}>
+                      <Ionicons name="information-circle" size={20} color="#F57C00" />
                       <Text style={styles.pregnancyInfoText}>
                         {getPregnancyInfo(child.dueDate)}
-                      </Text>
+                  </Text>
                     </View>
                   )}
                 </View>
@@ -544,10 +577,15 @@ const ChildrenDataScreen: React.FC = () => {
 
           <View style={styles.buttonContainer}>
             <TouchableOpacity
-              style={[styles.button, styles.primaryButton]}
+              style={[styles.button, styles.primaryButton, isLoading && styles.buttonDisabled]}
               onPress={handleSave}
               disabled={isLoading}
             >
+              {isLoading ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <Ionicons name="checkmark-circle" size={20} color="#FFFFFF" style={styles.buttonIcon} />
+              )}
               <Text style={styles.buttonText}>
                 {isLoading 
                   ? (isEditing ? 'Actualizando...' : 'Guardando...') 
@@ -562,6 +600,7 @@ const ChildrenDataScreen: React.FC = () => {
                 onPress={handleSkip}
                 disabled={isLoading}
               >
+                <Ionicons name="arrow-forward" size={18} color="#FFFFFF" style={styles.buttonIcon} />
                 <Text style={styles.secondaryButtonText}>
                   Omitir por ahora
                 </Text>
@@ -674,11 +713,24 @@ const ChildrenDataScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#887CBC',
+    backgroundColor: '#F5F5F5',
   },
   scrollContainer: {
     flexGrow: 1,
-    paddingBottom: 20,
+    paddingBottom: 30,
+  },
+  headerGradient: {
+    borderBottomLeftRadius: 30,
+    borderBottomRightRadius: 30,
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 8,
   },
   header: {
     alignItems: 'center',
@@ -693,110 +745,150 @@ const styles = StyleSheet.create({
     marginTop: 20,
     marginBottom: 8,
     textAlign: 'center',
+    fontFamily: 'Montserrat',
   },
   subtitle: {
     fontSize: 16,
     color: '#FFFFFF',
     textAlign: 'center',
-    opacity: 0.9,
+    opacity: 0.95,
+    fontFamily: 'Montserrat',
   },
   form: {
     flex: 1,
     paddingHorizontal: 20,
   },
   childCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 20,
-    marginBottom: 20,
+    backgroundColor: '#F7FAFC',
+    borderRadius: 20,
+    padding: 24,
+    marginBottom: 24,
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
-      height: 2,
+      height: 4,
     },
-    shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 5,
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 6,
+    borderWidth: 1,
+    borderColor: '#F0F0F0',
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 24,
+    gap: 12,
+  },
+  iconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#E8F8F7',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   childTitle: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: 'bold',
     color: '#2c3e50',
-    marginBottom: 20,
-    textAlign: 'center',
+    fontFamily: 'Montserrat',
   },
   inputContainer: {
-    marginBottom: 16,
+    marginBottom: 20,
+  },
+  labelContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+    gap: 8,
   },
   label: {
     fontSize: 16,
     fontWeight: '600',
     color: '#2c3e50',
-    marginBottom: 8,
+    fontFamily: 'Montserrat',
   },
   input: {
-    borderWidth: 1,
-    borderColor: '#e1e8ed',
-    borderRadius: 8,
+    borderWidth: 2,
+    borderColor: '#E8F8F7',
+    borderRadius: 12,
     padding: 16,
     fontSize: 16,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: '#FAFAFA',
     color: '#2c3e50',
+    fontFamily: 'Montserrat',
   },
   // Nuevos estilos para el sistema de fechas
   dateContainer: {
-    marginBottom: 16,
+    marginBottom: 20,
   },
   dateButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#f8f9fa',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#e1e8ed',
+    backgroundColor: '#FAFAFA',
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#E8F8F7',
     padding: 16,
+    gap: 12,
   },
   dateButtonText: {
     fontSize: 16,
     color: '#2c3e50',
     fontWeight: '500',
     flex: 1,
+    fontFamily: 'Montserrat',
   },
-  dateIcon: {
-    fontSize: 20,
-    marginLeft: 8,
+  dateIconLeft: {
+    marginRight: 0,
   },
   calculatedAgeContainer: {
-    marginTop: 12,
-    padding: 12,
+    marginTop: 16,
+    padding: 16,
     backgroundColor: '#E8F5E9',
-    borderRadius: 8,
+    borderRadius: 12,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    gap: 12,
+    borderWidth: 1,
+    borderColor: '#C8E6C9',
+  },
+  ageTextContainer: {
+    flex: 1,
   },
   calculatedAgeLabel: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
     color: '#2c3e50',
+    fontFamily: 'Montserrat',
+    marginBottom: 2,
   },
   calculatedAgeValue: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: 'bold',
     color: '#4CAF50',
+    fontFamily: 'Montserrat',
   },
   pregnancyInfoContainer: {
-    marginTop: 12,
-    padding: 12,
+    marginTop: 16,
+    padding: 16,
     backgroundColor: '#FFF3E0',
-    borderRadius: 8,
+    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    borderWidth: 1,
+    borderColor: '#FFE0B2',
   },
   pregnancyInfoText: {
     fontSize: 14,
     fontWeight: '600',
     color: '#F57C00',
-    textAlign: 'center',
+    flex: 1,
+    fontFamily: 'Montserrat',
   },
   // Estilos para el modal del date picker
   modalOverlay: {
@@ -805,7 +897,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   datePickerContainer: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#F7FAFC',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     paddingBottom: 20,
@@ -850,44 +942,73 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
   infoContainer: {
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: 8,
-    padding: 12,
-    marginTop: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 12,
+    padding: 14,
+    marginTop: 16,
     marginHorizontal: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+  },
+  infoIcon: {
+    marginRight: 0,
   },
   infoText: {
     fontSize: 14,
     color: '#FFFFFF',
     textAlign: 'center',
-    opacity: 0.9,
+    flex: 1,
+    fontFamily: 'Montserrat',
+    fontWeight: '500',
   },
   buttonContainer: {
-    marginTop: 20,
+    marginTop: 30,
+    marginBottom: 20,
   },
   button: {
-    borderRadius: 8,
-    padding: 16,
+    borderRadius: 16,
+    padding: 18,
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 16,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 6,
   },
   primaryButton: {
-    backgroundColor: '#B4C14B',
+    backgroundColor: '#96d2d3',
+  },
+  buttonDisabled: {
+    opacity: 0.6,
   },
   secondaryButton: {
     backgroundColor: 'transparent',
-    borderWidth: 1,
-    borderColor: '#FFFFFF',
+    borderWidth: 2,
+    borderColor: '#59C6C0',
+  },
+  buttonIcon: {
+    marginRight: 8,
   },
   buttonText: {
     color: '#FFFFFF',
-    fontSize: 16,
+    fontSize: 17,
     fontWeight: 'bold',
+    fontFamily: 'Montserrat',
   },
   secondaryButtonText: {
-    color: '#FFFFFF',
+    color: '#59C6C0',
     fontSize: 16,
     fontWeight: '600',
+    fontFamily: 'Montserrat',
   },
 });
 

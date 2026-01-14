@@ -48,13 +48,25 @@ const formatDate = (timestamp: any): string => {
 };
 
 const ListDetailScreen = () => {
-  const navigation = useNavigation();
+  const navigation = useNavigation<any>();
   const route = useRoute();
   const insets = useSafeAreaInsets();
   const { user, isAuthenticated } = useAuth();
   
   // Parámetros de navegación
   const { listId, listTitle } = route.params as { listId: string; listTitle: string };
+
+  // Función para manejar el botón de atrás
+  const handleGoBack = () => {
+    // Intentar hacer goBack primero
+    if (navigation.canGoBack()) {
+      navigation.goBack();
+    } else {
+      // Si no puede hacer goBack, navegar a RecommendationsMain
+      console.log('⚠️ [LIST DETAIL] No se puede hacer goBack, navegando a RecommendationsMain');
+      navigation.navigate('RecommendationsMain');
+    }
+  };
   
   // Estados principales
   const [list, setList] = useState<List | null>(null);
@@ -129,7 +141,7 @@ const ListDetailScreen = () => {
         'No se pudo cargar la lista',
         [
           { text: 'Reintentar', onPress: loadListDetails },
-          { text: 'Volver', onPress: () => navigation.goBack() }
+          { text: 'Volver', onPress: handleGoBack }
         ]
       );
     }
@@ -525,7 +537,7 @@ const ListDetailScreen = () => {
         </Text>
         <TouchableOpacity 
           style={styles.backButton}
-          onPress={() => navigation.goBack()}
+          onPress={handleGoBack}
         >
           <Text style={styles.backButtonText}>Volver</Text>
         </TouchableOpacity>
@@ -563,16 +575,16 @@ const ListDetailScreen = () => {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="light-content" backgroundColor="#59C6C0" />
+      <StatusBar barStyle="light-content" backgroundColor="#96d2d3" />
       <View style={styles.contentWrapper}>
         {/* Header personalizado */}
         <LinearGradient
           colors={['#59C6C0', '#4DB8B3']}
-          style={[styles.header, { paddingTop: Math.max(insets.top, Platform.OS === 'ios' ? 10 : 20) }]}
+          style={[styles.header, { paddingTop: insets.top + 10 }]}
         >
         <TouchableOpacity
           style={styles.headerBackButton}
-          onPress={() => navigation.goBack()}
+          onPress={handleGoBack}
         >
           <Ionicons name="arrow-back" size={24} color="white" />
         </TouchableOpacity>
@@ -788,11 +800,12 @@ const ListDetailScreen = () => {
         animationType="slide"
         presentationStyle="pageSheet"
       >
-        <KeyboardAvoidingView 
-          style={styles.modalContainer}
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        >
-          <View style={styles.modalHeader}>
+        <SafeAreaView style={{ flex: 1 }}>
+          <KeyboardAvoidingView 
+            style={styles.modalContainer}
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          >
+            <View style={[styles.modalHeader, { paddingTop: insets.top }]}>
             <TouchableOpacity 
               onPress={() => setShowAddItemModal(false)} 
               style={styles.closeButton}
@@ -949,7 +962,8 @@ const ListDetailScreen = () => {
               )}
             </TouchableOpacity>
           </View>
-        </KeyboardAvoidingView>
+          </KeyboardAvoidingView>
+        </SafeAreaView>
       </Modal>
       </View>
     </SafeAreaView>
@@ -1131,11 +1145,11 @@ const ListItemComponent = ({ item, isOwner, isToggling, onToggle, onDelete, isPu
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#59C6C0',
+    backgroundColor: '#96d2d3',
   },
   contentWrapper: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#F7FAFC',
   },
   
   // Loading y error
@@ -1143,7 +1157,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#F7FAFC',
   },
   loadingText: {
     marginTop: 10,
@@ -1155,7 +1169,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 40,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#F7FAFC',
   },
   errorTitle: {
     fontSize: 20,
@@ -1173,7 +1187,7 @@ const styles = StyleSheet.create({
     marginBottom: 30,
   },
   backButton: {
-    backgroundColor: '#59C6C0',
+    backgroundColor: '#96d2d3',
     paddingHorizontal: 20,
     paddingVertical: 10,
     borderRadius: 20,
@@ -1186,7 +1200,7 @@ const styles = StyleSheet.create({
 
   // Header personalizado
   header: {
-    backgroundColor: '#59C6C0',
+    backgroundColor: '#96d2d3',
     paddingBottom: 15,
     paddingHorizontal: 20,
     flexDirection: 'row',
@@ -1221,13 +1235,13 @@ const styles = StyleSheet.create({
   // Contenido principal
   scrollView: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#F7FAFC',
   },
   
   // Información de la lista
   listInfo: {
     padding: 20,
-    backgroundColor: '#F8F9FA',
+    backgroundColor: '#F7FAFC',
     borderBottomWidth: 1,
     borderBottomColor: '#E0E0E0',
   },
@@ -1302,7 +1316,7 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
   },
   addItemButton: {
-    backgroundColor: '#59C6C0',
+    backgroundColor: '#96d2d3',
     width: 36,
     height: 36,
     borderRadius: 18,
@@ -1322,7 +1336,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   addFirstItemButton: {
-    backgroundColor: '#59C6C0',
+    backgroundColor: '#96d2d3',
     paddingHorizontal: 20,
     paddingVertical: 10,
     borderRadius: 20,
@@ -1429,7 +1443,7 @@ const styles = StyleSheet.create({
   infoChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F8F9FA',
+    backgroundColor: '#F7FAFC',
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 12,
@@ -1519,7 +1533,7 @@ const styles = StyleSheet.create({
   // Modal estilos
   modalContainer: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#F7FAFC',
   },
   modalHeader: {
     flexDirection: 'row',
@@ -1527,7 +1541,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 20,
     paddingVertical: 15,
-    backgroundColor: '#F8F9FA',
+    backgroundColor: '#F7FAFC',
     borderBottomWidth: 1,
     borderBottomColor: '#E0E0E0',
   },
@@ -1553,7 +1567,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   textInput: {
-    backgroundColor: '#F8F9FA',
+    backgroundColor: '#F7FAFC',
     borderWidth: 1,
     borderColor: '#E0E0E0',
     borderRadius: 12,
@@ -1614,7 +1628,7 @@ const styles = StyleSheet.create({
   },
   imageOption: {
     alignItems: 'center',
-    backgroundColor: '#F8F9FA',
+    backgroundColor: '#F7FAFC',
     paddingVertical: 15,
     paddingHorizontal: 25,
     borderRadius: 12,
@@ -1649,10 +1663,10 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     borderWidth: 1,
     borderColor: '#E0E0E0',
-    backgroundColor: '#F8F9FA',
+    backgroundColor: '#F7FAFC',
   },
   priorityOptionSelected: {
-    backgroundColor: '#59C6C0',
+    backgroundColor: '#96d2d3',
     borderColor: '#59C6C0',
   },
   priorityOptionText: {
@@ -1670,7 +1684,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     paddingHorizontal: 20,
     paddingVertical: 15,
-    backgroundColor: '#F8F9FA',
+    backgroundColor: '#F7FAFC',
     borderTopWidth: 1,
     borderTopColor: '#E0E0E0',
   },
@@ -1693,7 +1707,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 15,
-    backgroundColor: '#59C6C0',
+    backgroundColor: '#96d2d3',
     borderRadius: 12,
     marginLeft: 10,
   },

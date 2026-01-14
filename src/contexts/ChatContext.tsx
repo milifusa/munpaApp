@@ -28,8 +28,11 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const initializeChat = () => {
     if (!isInitialized.current) {
+      console.log('💬 [CHAT CONTEXT] Inicializando chat...');
       // Generar ID de conversación único
-      setConversationId(`conv_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`);
+      const newConversationId = `conv_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      setConversationId(newConversationId);
+      console.log('💬 [CHAT CONTEXT] Conversation ID generado:', newConversationId);
       
       // Agregar mensaje de bienvenida de Douli
       const welcomeMessage: Message = {
@@ -41,8 +44,12 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
         source: 'knowledge_base'
       };
       
+      console.log('💬 [CHAT CONTEXT] Mensaje de bienvenida creado:', welcomeMessage);
       setMessages([welcomeMessage]);
       isInitialized.current = true;
+      console.log('💬 [CHAT CONTEXT] Chat inicializado correctamente');
+    } else {
+      console.log('💬 [CHAT CONTEXT] Chat ya estaba inicializado');
     }
   };
 

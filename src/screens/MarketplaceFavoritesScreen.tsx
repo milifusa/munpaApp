@@ -15,6 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import marketplaceService, { MarketplaceProduct } from '../services/marketplaceService';
+import { shareContentHelper } from '../utils/shareContentHelper';
 
 const MarketplaceFavoritesScreen = () => {
   const navigation = useNavigation<any>();
@@ -96,7 +97,7 @@ const MarketplaceFavoritesScreen = () => {
 
           {item.type === 'venta' && item.price && (
             <Text style={styles.productPrice}>
-              ${item.price.toLocaleString('es-MX')}
+              ${item.price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </Text>
           )}
 
@@ -123,14 +124,16 @@ const MarketplaceFavoritesScreen = () => {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#59C6C0" />
+      <StatusBar barStyle="light-content" backgroundColor="#96d2d3" />
       {/* Header */}
-      <View style={[styles.header, { paddingTop: Math.max(insets.top, Platform.OS === 'ios' ? 50 : 15) }]}>
+      <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
         <TouchableOpacity onPress={() => navigation.goBack()}>
           <Ionicons name="arrow-back" size={24} color="white" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Mis Favoritos</Text>
-        <View style={{ width: 24 }} />
+        <TouchableOpacity onPress={() => shareContentHelper.shareMarketplaceFavorites()}>
+          <Ionicons name="share-outline" size={24} color="white" />
+        </TouchableOpacity>
       </View>
 
       {/* Contenido */}
@@ -175,7 +178,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F5F5F5',
   },
   header: {
-    backgroundColor: '#59C6C0',
+    backgroundColor: '#96d2d3',
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -225,7 +228,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 30,
     paddingVertical: 14,
     borderRadius: 8,
-    backgroundColor: '#59C6C0',
+    backgroundColor: '#96d2d3',
   },
   browseButtonText: {
     fontSize: 14,

@@ -12,8 +12,11 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { StatusBar } from 'react-native';
 import marketplaceService, { MarketplaceProduct, CATEGORIES, CONDITIONS } from '../services/marketplaceService';
 import { useAuth } from '../contexts/AuthContext';
+import { shareContentHelper } from '../utils/shareContentHelper';
 
 const { width } = Dimensions.get('window');
 
@@ -21,6 +24,7 @@ const ProductDetailScreen = () => {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const { user } = useAuth();
+  const insets = useSafeAreaInsets();
   const { productId } = route.params;
 
   const [product, setProduct] = useState<MarketplaceProduct | null>(null);
@@ -85,9 +89,17 @@ const ProductDetailScreen = () => {
   const handleMarkAsSold = async () => {
     if (!product) return;
 
+    const statusText = product.type === 'venta' ? 'vendido' : 
+                      product.type === 'donacion' ? 'donado' : 'intercambiado';
+    const statusTitle = product.type === 'venta' ? 'Marcar como vendido' : 
+                        product.type === 'donacion' ? 'Marcar como donado' : 'Marcar como intercambiado';
+    const statusQuestion = product.type === 'venta' ? '¿Estás seguro de que quieres marcar este producto como vendido?' : 
+                          product.type === 'donacion' ? '¿Estás seguro de que quieres marcar este producto como donado?' : 
+                          '¿Estás seguro de que quieres marcar este producto como intercambiado?';
+
     Alert.alert(
-      'Marcar como vendido',
-      '¿Estás seguro de que quieres marcar este producto como vendido?',
+      statusTitle,
+      statusQuestion,
       [
         {
           text: 'Cancelar',
@@ -100,7 +112,7 @@ const ProductDetailScreen = () => {
               const status = product.type === 'venta' ? 'vendido' : 
                            product.type === 'donacion' ? 'donado' : 'intercambiado';
               await marketplaceService.updateProductStatus(productId, status);
-              Alert.alert('Éxito', 'Producto actualizado');
+              Alert.alert('Éxito', `Producto marcado como ${statusText}`);
               navigation.goBack();
             } catch (error) {
               console.error('Error actualizando estado:', error);
@@ -202,12 +214,19 @@ const ProductDetailScreen = () => {
 
   return (
     <View style={styles.container}>
+      <StatusBar barStyle="light-content" backgroundColor="rgba(0,0,0,0.3)" translucent />
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
         <TouchableOpacity style={styles.headerButton} onPress={() => navigation.goBack()}>
           <Ionicons name="arrow-back" size={24} color="white" />
         </TouchableOpacity>
         <View style={styles.headerActions}>
+          <TouchableOpacity 
+            style={styles.headerButton} 
+            onPress={() => shareContentHelper.shareProduct(productId)}
+          >
+            <Ionicons name="share-outline" size={24} color="white" />
+          </TouchableOpacity>
           <TouchableOpacity style={styles.headerButton} onPress={handleToggleFavorite}>
             <Ionicons
               name={isFavorite ? 'heart' : 'heart-outline'}
@@ -275,14 +294,31 @@ const ProductDetailScreen = () => {
             </Text>
           </View>
 
-          {/* Precio o información de trueque */}
+          {/* Precio o información de trueque/donación */}
           {product.type === 'venta' && product.price && (
-            <Text style={styles.price}>${product.price.toLocaleString('es-MX')}</Text>
+            <Text style={styles.price}>${product.price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
+          )}
+          {product.type === 'donacion' && (
+            <View style={styles.donationInfo}>
+              <View style={styles.donationHeader}>
+                <Ionicons name="heart" size={24} color="#FF6B6B" />
+                <Text style={styles.donationTitle}>Donación Gratuita</Text>
+              </View>
+              <Text style={styles.donationSubtitle}>
+                Este producto se está donando de forma gratuita
+              </Text>
+            </View>
           )}
           {product.type === 'trueque' && product.tradeFor && (
             <View style={styles.tradeInfo}>
-              <Ionicons name="swap-horizontal" size={20} color="#2196F3" />
-              <Text style={styles.tradeText}>Busco a cambio: {product.tradeFor}</Text>
+              <View style={styles.tradeHeader}>
+                <Ionicons name="swap-horizontal" size={24} color="#2196F3" />
+                <Text style={styles.tradeTitle}>Intercambio</Text>
+              </View>
+              <View style={styles.tradeContent}>
+                <Text style={styles.tradeLabel}>Busco a cambio:</Text>
+                <Text style={styles.tradeText}>{product.tradeFor}</Text>
+              </View>
             </View>
           )}
 
@@ -304,6 +340,78 @@ const ProductDetailScreen = () => {
               <Text style={styles.metaText}>{product.views} vistas</Text>
             </View>
           </View>
+
+          {/* Información especial para donaciones */}
+          {product.type === 'donacion' && (
+            <View style={styles.coordinationSection}>
+              <View style={styles.coordinationHeader}>
+                <Ionicons name="calendar" size={20} color="#59C6C0" />
+                <Text style={styles.coordinationTitle}>¿Cómo coordinar la donación?</Text>
+              </View>
+              <View style={styles.coordinationSteps}>
+                <View style={styles.step}>
+                  <View style={styles.stepNumber}>
+                    <Text style={styles.stepNumberText}>1</Text>
+                  </View>
+                  <Text style={styles.stepText}>Contacta al donante para coordinar</Text>
+                </View>
+                <View style={styles.step}>
+                  <View style={styles.stepNumber}>
+                    <Text style={styles.stepNumberText}>2</Text>
+                  </View>
+                  <Text style={styles.stepText}>Acuerda lugar y horario de entrega</Text>
+                </View>
+                <View style={styles.step}>
+                  <View style={styles.stepNumber}>
+                    <Text style={styles.stepNumberText}>3</Text>
+                  </View>
+                  <Text style={styles.stepText}>Recoge el producto en el lugar acordado</Text>
+                </View>
+              </View>
+              <View style={styles.coordinationNote}>
+                <Ionicons name="information-circle" size={16} color="#FFA500" />
+                <Text style={styles.coordinationNoteText}>
+                  Recuerda ser puntual y respetuoso con el donante
+                </Text>
+              </View>
+            </View>
+          )}
+
+          {/* Información especial para trueque */}
+          {product.type === 'trueque' && (
+            <View style={styles.coordinationSection}>
+              <View style={styles.coordinationHeader}>
+                <Ionicons name="handshake" size={20} color="#2196F3" />
+                <Text style={styles.coordinationTitle}>¿Cómo coordinar el intercambio?</Text>
+              </View>
+              <View style={styles.coordinationSteps}>
+                <View style={styles.step}>
+                  <View style={styles.stepNumber}>
+                    <Text style={styles.stepNumberText}>1</Text>
+                  </View>
+                  <Text style={styles.stepText}>Contacta al vendedor para negociar</Text>
+                </View>
+                <View style={styles.step}>
+                  <View style={styles.stepNumber}>
+                    <Text style={styles.stepNumberText}>2</Text>
+                  </View>
+                  <Text style={styles.stepText}>Acuerda el intercambio y condiciones</Text>
+                </View>
+                <View style={styles.step}>
+                  <View style={styles.stepNumber}>
+                    <Text style={styles.stepNumberText}>3</Text>
+                  </View>
+                  <Text style={styles.stepText}>Coordina lugar y horario de encuentro</Text>
+                </View>
+              </View>
+              <View style={styles.coordinationNote}>
+                <Ionicons name="information-circle" size={16} color="#FFA500" />
+                <Text style={styles.coordinationNoteText}>
+                  Asegúrate de que ambos productos estén en buen estado antes del intercambio
+                </Text>
+              </View>
+            </View>
+          )}
 
           {/* Descripción */}
           <View style={styles.section}>
@@ -333,14 +441,30 @@ const ProductDetailScreen = () => {
                   <Ionicons name="person" size={24} color="#666" />
                 </View>
               )}
-              <Text style={styles.sellerName}>{product.userName}</Text>
+              <Text style={styles.sellerName}>
+                {product.userName && product.userName !== 'Usuario' 
+                  ? product.userName 
+                  : 'Nombre no disponible'}
+              </Text>
             </View>
           </View>
 
           {/* Publicado */}
-          <Text style={styles.publishedDate}>
-            Publicado el {new Date(product.publishedAt).toLocaleDateString('es-MX')}
-          </Text>
+          {product.publishedAt && (
+            <Text style={styles.publishedDate}>
+              Publicado el {(() => {
+                try {
+                  const date = new Date(product.publishedAt);
+                  if (isNaN(date.getTime())) {
+                    return 'fecha no disponible';
+                  }
+                  return date.toLocaleDateString('es-MX');
+                } catch (error) {
+                  return 'fecha no disponible';
+                }
+              })()}
+            </Text>
+          )}
         </View>
       </ScrollView>
 
@@ -348,22 +472,56 @@ const ProductDetailScreen = () => {
       <View style={styles.actions}>
         {isOwner ? (
           <View style={styles.ownerActions}>
-            <TouchableOpacity style={styles.editButton} onPress={handleEdit}>
-              <Ionicons name="pencil" size={20} color="white" />
-              <Text style={styles.buttonText}>Editar</Text>
+            <TouchableOpacity 
+              style={styles.messagesButton} 
+              onPress={() => navigation.navigate('ProductConversations', { productId: product.id, productTitle: product.title })}
+            >
+              <Ionicons name="chatbubble" size={20} color="white" />
+              <Text style={styles.buttonText}>
+                Mensajes {product.messages > 0 && `(${product.messages})`}
+              </Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.soldButton} onPress={handleMarkAsSold}>
-              <Ionicons name="checkmark-circle" size={20} color="white" />
-              <Text style={styles.buttonText}>Vendido</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.deleteButton} onPress={handleDelete}>
-              <Ionicons name="trash" size={20} color="white" />
-            </TouchableOpacity>
+            <View style={{ flexDirection: 'row', gap: 10, width: '100%' }}>
+              <TouchableOpacity style={styles.editButton} onPress={handleEdit}>
+                <Ionicons name="pencil" size={20} color="white" />
+                <Text style={styles.buttonText}>Editar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.soldButton} onPress={handleMarkAsSold}>
+                <Ionicons name="checkmark-circle" size={20} color="white" />
+                <Text style={styles.buttonText}>
+                  {product.type === 'donacion' ? 'Donado' : 
+                   product.type === 'trueque' ? 'Intercambiado' : 
+                   'Vendido'}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.deleteButton} onPress={handleDelete}>
+                <Ionicons name="trash" size={20} color="white" />
+              </TouchableOpacity>
+            </View>
           </View>
         ) : (
-          <TouchableOpacity style={styles.contactButton} onPress={handleContactSeller}>
-            <Ionicons name="chatbubble" size={20} color="white" />
-            <Text style={styles.contactButtonText}>Contactar vendedor</Text>
+          <TouchableOpacity 
+            style={[
+              styles.contactButton,
+              product.type === 'donacion' && styles.donationButton,
+              product.type === 'trueque' && styles.tradeButton,
+            ]} 
+            onPress={handleContactSeller}
+          >
+            <Ionicons 
+              name={
+                product.type === 'donacion' ? 'heart' : 
+                product.type === 'trueque' ? 'swap-horizontal' : 
+                'chatbubble'
+              } 
+              size={20} 
+              color="white" 
+            />
+            <Text style={styles.contactButtonText}>
+              {product.type === 'donacion' ? 'Contactar donante' : 
+               product.type === 'trueque' ? 'Contactar para intercambio' : 
+               'Contactar vendedor'}
+            </Text>
           </TouchableOpacity>
         )}
       </View>
@@ -390,7 +548,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 15,
-    paddingTop: 50,
     paddingBottom: 15,
     backgroundColor: 'rgba(0,0,0,0.3)',
     zIndex: 10,
@@ -472,18 +629,66 @@ const styles = StyleSheet.create({
     fontFamily: 'Montserrat',
     marginBottom: 8,
   },
+  donationInfo: {
+    backgroundColor: '#FFF5F5',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    borderLeftWidth: 4,
+    borderLeftColor: '#FF6B6B',
+  },
+  donationHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 8,
+  },
+  donationTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#FF6B6B',
+    fontFamily: 'Montserrat',
+  },
+  donationSubtitle: {
+    fontSize: 14,
+    color: '#666',
+    fontFamily: 'Montserrat',
+    lineHeight: 20,
+  },
   tradeInfo: {
+    backgroundColor: '#E3F2FD',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    borderLeftWidth: 4,
+    borderLeftColor: '#2196F3',
+  },
+  tradeHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
     marginBottom: 12,
+  },
+  tradeTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#2196F3',
+    fontFamily: 'Montserrat',
+  },
+  tradeContent: {
+    gap: 4,
+  },
+  tradeLabel: {
+    fontSize: 14,
+    color: '#666',
+    fontFamily: 'Montserrat',
+    fontWeight: '600',
   },
   tradeText: {
     fontSize: 16,
     color: '#2196F3',
     fontFamily: 'Montserrat',
     fontWeight: '600',
-    flex: 1,
   },
   title: {
     fontSize: 24,
@@ -507,6 +712,75 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
     fontFamily: 'Montserrat',
+  },
+  coordinationSection: {
+    backgroundColor: '#F7FAFC',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#E9ECEF',
+  },
+  coordinationHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 16,
+  },
+  coordinationTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+    fontFamily: 'Montserrat',
+  },
+  coordinationSteps: {
+    gap: 12,
+    marginBottom: 16,
+  },
+  step: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+  },
+  stepNumber: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#96d2d3',
+    justifyContent: 'center',
+    alignItems: 'center',
+    flexShrink: 0,
+  },
+  stepNumberText: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: 'white',
+    fontFamily: 'Montserrat',
+  },
+  stepText: {
+    fontSize: 14,
+    color: '#666',
+    fontFamily: 'Montserrat',
+    lineHeight: 20,
+    flex: 1,
+    paddingTop: 4,
+  },
+  coordinationNote: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    backgroundColor: '#FFF9E6',
+    padding: 12,
+    borderRadius: 8,
+    borderLeftWidth: 3,
+    borderLeftColor: '#FFA500',
+  },
+  coordinationNoteText: {
+    fontSize: 13,
+    color: '#666',
+    fontFamily: 'Montserrat',
+    lineHeight: 18,
+    flex: 1,
   },
   section: {
     marginBottom: 20,
@@ -571,8 +845,19 @@ const styles = StyleSheet.create({
     borderTopColor: '#E0E0E0',
   },
   ownerActions: {
-    flexDirection: 'row',
+    flexDirection: 'column',
     gap: 10,
+    width: '100%',
+  },
+  messagesButton: {
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 14,
+    borderRadius: 8,
+    backgroundColor: '#96d2d3',
   },
   editButton: {
     flex: 1,
@@ -582,7 +867,8 @@ const styles = StyleSheet.create({
     gap: 8,
     paddingVertical: 14,
     borderRadius: 8,
-    backgroundColor: '#59C6C0',
+    backgroundColor: '#96d2d3',
+    minWidth: 0,
   },
   soldButton: {
     flex: 1,
@@ -593,12 +879,13 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     borderRadius: 8,
     backgroundColor: '#4CAF50',
+    minWidth: 0,
   },
   deleteButton: {
     width: 50,
+    height: 50,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 14,
     borderRadius: 8,
     backgroundColor: '#F44336',
   },
@@ -615,7 +902,13 @@ const styles = StyleSheet.create({
     gap: 10,
     paddingVertical: 16,
     borderRadius: 8,
-    backgroundColor: '#59C6C0',
+    backgroundColor: '#96d2d3',
+  },
+  donationButton: {
+    backgroundColor: '#FF6B6B',
+  },
+  tradeButton: {
+    backgroundColor: '#2196F3',
   },
   contactButtonText: {
     color: 'white',

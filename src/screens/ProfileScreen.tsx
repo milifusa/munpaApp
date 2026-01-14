@@ -569,11 +569,11 @@ const ProfileScreen: React.FC = () => {
 const styles = StyleSheet.create({
   mainContainer: {
     flex: 1,
-    backgroundColor: '#887CBC',
+    backgroundColor: '#96d2d3',
   },
   container: {
     flex: 1,
-    backgroundColor: '#887CBC',
+    backgroundColor: '#96d2d3',
   },
   scrollContent: {
     paddingBottom: 30,
@@ -592,7 +592,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: 5,
     right: 5,
-    backgroundColor: '#887CBC',
+    backgroundColor: '#96d2d3',
     borderRadius: 20,
     width: 36,
     height: 36,
@@ -707,7 +707,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   actionButton: {
-    backgroundColor: '#887CBC',
+    backgroundColor: '#96d2d3',
     borderRadius: 12,
     padding: 16,
     flexDirection: 'row',

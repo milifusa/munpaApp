@@ -12,10 +12,12 @@ import {
   RefreshControl,
   ActivityIndicator,
   TextInput,
+  Modal,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
-import marketplaceService, { MarketplaceProduct, CATEGORIES } from '../services/marketplaceService';
+import marketplaceService, { MarketplaceProduct, MarketplaceCategory, CATEGORIES } from '../services/marketplaceService';
+import BannerCarousel from '../components/BannerCarousel';
 
 const MunpaMarketScreen = () => {
   const navigation = useNavigation<any>();
@@ -25,35 +27,90 @@ const MunpaMarketScreen = () => {
   const [selectedType, setSelectedType] = useState<'all' | 'venta' | 'donacion' | 'trueque'>('all');
   const [selectedCategory, setSelectedCategory] = useState<string | undefined>(undefined);
   const [searchQuery, setSearchQuery] = useState('');
+  const [showFilters, setShowFilters] = useState(false);
+  const [minPrice, setMinPrice] = useState<string>('');
+  const [maxPrice, setMaxPrice] = useState<string>('');
+  const [selectedCondition, setSelectedCondition] = useState<string | undefined>(undefined);
+  const [orderBy, setOrderBy] = useState<'reciente' | 'precio_asc' | 'precio_desc' | 'vistas'>('reciente');
+  const [categories, setCategories] = useState<MarketplaceCategory[]>([]);
+  const [loadingCategories, setLoadingCategories] = useState(false);
 
   useEffect(() => {
     loadProducts();
-  }, [selectedType, selectedCategory]);
+  }, [selectedType, selectedCategory, orderBy, minPrice, maxPrice, selectedCondition]);
+
+  // Cargar categorías solo una vez al montar el componente
+  useEffect(() => {
+    loadCategories();
+  }, []);
+
+  const loadCategories = async () => {
+    try {
+      setLoadingCategories(true);
+      const fetchedCategories = await marketplaceService.getCategories(true);
+      setCategories(fetchedCategories);
+      console.log('✅ [MARKET] Categorías cargadas:', fetchedCategories.length);
+    } catch (error) {
+      console.error('❌ [MARKET] Error cargando categorías:', error);
+      // Usar categorías por defecto si falla
+      setCategories(CATEGORIES);
+    } finally {
+      setLoadingCategories(false);
+    }
+  };
+
+  // Recargar productos cuando cambia la búsqueda (con debounce)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (searchQuery !== undefined) {
+        loadProducts();
+      }
+    }, 500); // Esperar 500ms después de que el usuario deje de escribir
+
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   const loadProducts = async () => {
     try {
       setLoading(true);
-      console.log('🛍️ [MARKET] Cargando productos con filtros:', {
-        type: selectedType,
-        category: selectedCategory,
-        search: searchQuery,
-      });
       
-      const response = await marketplaceService.getProducts({
+      const filters: any = {
         type: selectedType,
         category: selectedCategory,
         search: searchQuery,
         status: 'disponible',
-        orderBy: 'reciente',
+        orderBy: orderBy,
         limit: 50,
-      });
-      
-      console.log('🛍️ [MARKET] Respuesta completa:', JSON.stringify(response).substring(0, 200));
-      console.log('🛍️ [MARKET] Productos recibidos:', response.products?.length || 0);
-      console.log('🛍️ [MARKET] Primer producto:', response.products?.[0]);
+      };
+
+      // Agregar filtros de precio solo si están definidos y el tipo es venta
+      if (selectedType === 'venta' || selectedType === 'all') {
+        if (minPrice && !isNaN(Number(minPrice))) {
+          filters.minPrice = Number(minPrice);
+        }
+        if (maxPrice && !isNaN(Number(maxPrice))) {
+          filters.maxPrice = Number(maxPrice);
+        }
+      }
+
+      // Agregar filtro de condición si está seleccionada
+      if (selectedCondition) {
+        filters.condition = selectedCondition as 'nuevo' | 'como_nuevo' | 'buen_estado' | 'usado';
+      }
+
+      // Mapear ordenamiento
+      const orderByMap: Record<string, string> = {
+        'reciente': 'reciente',
+        'precio_asc': 'precio_asc',
+        'precio_desc': 'precio_desc',
+        'vistas': 'vistas',
+      };
+      filters.orderBy = orderByMap[orderBy] as any || 'reciente';
+
+      const response = await marketplaceService.getProducts(filters);
       
       const fetchedProducts = response.products || response.data?.products || response.data || [];
-      console.log('🛍️ [MARKET] Productos a mostrar:', fetchedProducts.length);
+      
       
       setProducts(Array.isArray(fetchedProducts) ? fetchedProducts : []);
     } catch (error) {
@@ -129,7 +186,7 @@ const MunpaMarketScreen = () => {
           
           {item.type === 'venta' && item.price && (
             <Text style={styles.productPrice}>
-              ${item.price.toLocaleString('es-MX')}
+              ${item.price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </Text>
           )}
           
@@ -156,7 +213,7 @@ const MunpaMarketScreen = () => {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#59C6C0" />
+      <StatusBar barStyle="light-content" backgroundColor="#96d2d3" />
       
       {/* Barra de búsqueda y acciones */}
       <View style={styles.searchBar}>
@@ -183,7 +240,32 @@ const MunpaMarketScreen = () => {
         >
           <Ionicons name="list" size={24} color="#59C6C0" />
         </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.actionButton, showFilters && styles.filterButtonActive]}
+          onPress={() => setShowFilters(!showFilters)}
+        >
+          <View style={styles.filterButtonContainer}>
+            <Ionicons name="options" size={24} color={showFilters ? "#FF6B6B" : "#59C6C0"} />
+            {(selectedCategory || minPrice || maxPrice || selectedCondition || orderBy !== 'reciente') && (
+              <View style={styles.filterBadge} />
+            )}
+          </View>
+        </TouchableOpacity>
       </View>
+
+
+
+      {/* Filtros de categoría (si hay categoría seleccionada) */}
+      {selectedCategory && (
+        <View style={styles.selectedCategoryContainer}>
+          <Text style={styles.selectedCategoryText}>
+            Categoría: {(categories.length > 0 ? categories : CATEGORIES).find(c => c.id === selectedCategory)?.name || selectedCategory}
+          </Text>
+          <TouchableOpacity onPress={() => setSelectedCategory(undefined)}>
+            <Ionicons name="close-circle" size={20} color="#59C6C0" />
+          </TouchableOpacity>
+        </View>
+      )}
 
       {/* Filtros de tipo */}
       <ScrollView
@@ -227,6 +309,29 @@ const MunpaMarketScreen = () => {
       </ScrollView>
 
       {/* Lista de productos */}
+            {/* Carrusel de Banners del Marketplace con banner de economía circular */}
+            <BannerCarousel 
+        section="marketplace" 
+        fallbackToHome={false}
+        customBanner={
+          <View style={styles.economyBanner}>
+            <View style={styles.economyBannerContent}>
+              <View style={styles.economyBannerIcon}>
+                <Ionicons name="leaf" size={18} color="#4CAF50" />
+              </View>
+              <View style={styles.economyBannerText}>
+                <Text style={styles.economyBannerTitle}>🌱 Economía Circular</Text>
+                <Text style={styles.economyBannerDescription}>
+                  Un espacio amigable para que mamás y papás podamos{' '}
+                  <Text style={styles.economyBannerHighlight}>vender</Text>,{' '}
+                  <Text style={styles.economyBannerHighlight}>donar</Text> o hacer{' '}
+                  <Text style={styles.economyBannerHighlight}>trueque</Text> de las cosas de bebé que ya no necesitamos. ¡Juntos creamos una comunidad de apoyo! 💚
+                </Text>
+              </View>
+            </View>
+          </View>
+        }
+      />
       {loading ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#59C6C0" />
@@ -251,6 +356,220 @@ const MunpaMarketScreen = () => {
         />
       )}
 
+      {/* Modal de filtros avanzados */}
+      <Modal
+        visible={showFilters}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowFilters(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Filtros de Búsqueda</Text>
+              <TouchableOpacity onPress={() => setShowFilters(false)}>
+                <Ionicons name="close" size={24} color="#333" />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
+              {/* Filtro de Categoría */}
+              <View style={styles.filterSection}>
+                <Text style={styles.filterSectionTitle}>Categoría</Text>
+                {loadingCategories ? (
+                  <View style={styles.categoriesLoading}>
+                    <ActivityIndicator size="small" color="#59C6C0" />
+                    <Text style={styles.categoriesLoadingText}>Cargando categorías...</Text>
+                  </View>
+                ) : (
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoryScroll}>
+                    <TouchableOpacity
+                      style={[styles.categoryChip, !selectedCategory && styles.categoryChipActive]}
+                      onPress={() => setSelectedCategory(undefined)}
+                    >
+                      <Text style={[styles.categoryChipText, !selectedCategory && styles.categoryChipTextActive]}>
+                        Todas
+                      </Text>
+                    </TouchableOpacity>
+                    {(categories.length > 0 ? categories : CATEGORIES).map((category) => {
+                    // Verificar si el icono es un emoji o un nombre de Ionicons
+                    const isEmoji = /[\u{1F300}-\u{1F9FF}]/u.test(category.icon);
+                    
+                    return (
+                      <TouchableOpacity
+                        key={category.id}
+                        style={[styles.categoryChip, selectedCategory === category.id && styles.categoryChipActive]}
+                        onPress={() => setSelectedCategory(category.id)}
+                      >
+                        {isEmoji ? (
+                          <Text style={styles.categoryEmoji}>{category.icon}</Text>
+                        ) : (
+                          <Ionicons 
+                            name={category.icon as any} 
+                            size={16} 
+                            color={selectedCategory === category.id ? 'white' : '#59C6C0'} 
+                            style={styles.categoryIcon}
+                          />
+                        )}
+                        <Text style={[styles.categoryChipText, selectedCategory === category.id && styles.categoryChipTextActive]}>
+                          {category.name}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                  </ScrollView>
+                )}
+              </View>
+
+              {/* Filtro de Precio (solo para venta) */}
+              {(selectedType === 'venta' || selectedType === 'all') && (
+                <View style={styles.filterSection}>
+                  <Text style={styles.filterSectionTitle}>Rango de Precio</Text>
+                  <View style={styles.priceInputs}>
+                    <View style={styles.priceInputContainer}>
+                      <Text style={styles.priceLabel}>Mínimo</Text>
+                      <TextInput
+                        style={styles.priceInput}
+                        placeholder="$0"
+                        value={minPrice}
+                        onChangeText={setMinPrice}
+                        keyboardType="numeric"
+                        placeholderTextColor="#999"
+                      />
+                    </View>
+                    <View style={styles.priceInputContainer}>
+                      <Text style={styles.priceLabel}>Máximo</Text>
+                      <TextInput
+                        style={styles.priceInput}
+                        placeholder="Sin límite"
+                        value={maxPrice}
+                        onChangeText={setMaxPrice}
+                        keyboardType="numeric"
+                        placeholderTextColor="#999"
+                      />
+                    </View>
+                  </View>
+                </View>
+              )}
+
+              {/* Filtro de Condición */}
+              <View style={styles.filterSection}>
+                <Text style={styles.filterSectionTitle}>Condición</Text>
+                <View style={styles.conditionOptions}>
+                  <TouchableOpacity
+                    style={[styles.conditionChip, !selectedCondition && styles.conditionChipActive]}
+                    onPress={() => setSelectedCondition(undefined)}
+                  >
+                    <Text style={[styles.conditionChipText, !selectedCondition && styles.conditionChipTextActive]}>
+                      Todas
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.conditionChip, selectedCondition === 'nuevo' && styles.conditionChipActive]}
+                    onPress={() => setSelectedCondition('nuevo')}
+                  >
+                    <Text style={[styles.conditionChipText, selectedCondition === 'nuevo' && styles.conditionChipTextActive]}>
+                      Nuevo
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.conditionChip, selectedCondition === 'como_nuevo' && styles.conditionChipActive]}
+                    onPress={() => setSelectedCondition('como_nuevo')}
+                  >
+                    <Text style={[styles.conditionChipText, selectedCondition === 'como_nuevo' && styles.conditionChipTextActive]}>
+                      Como Nuevo
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.conditionChip, selectedCondition === 'buen_estado' && styles.conditionChipActive]}
+                    onPress={() => setSelectedCondition('buen_estado')}
+                  >
+                    <Text style={[styles.conditionChipText, selectedCondition === 'buen_estado' && styles.conditionChipTextActive]}>
+                      Buen Estado
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.conditionChip, selectedCondition === 'usado' && styles.conditionChipActive]}
+                    onPress={() => setSelectedCondition('usado')}
+                  >
+                    <Text style={[styles.conditionChipText, selectedCondition === 'usado' && styles.conditionChipTextActive]}>
+                      Usado
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              {/* Ordenamiento */}
+              <View style={styles.filterSection}>
+                <Text style={styles.filterSectionTitle}>Ordenar por</Text>
+                <View style={styles.orderOptions}>
+                  <TouchableOpacity
+                    style={[styles.orderOption, orderBy === 'reciente' && styles.orderOptionActive]}
+                    onPress={() => setOrderBy('reciente')}
+                  >
+                    <Ionicons name="time" size={20} color={orderBy === 'reciente' ? 'white' : '#666'} />
+                    <Text style={[styles.orderOptionText, orderBy === 'reciente' && styles.orderOptionTextActive]}>
+                      Más Reciente
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.orderOption, orderBy === 'precio_asc' && styles.orderOptionActive]}
+                    onPress={() => setOrderBy('precio_asc')}
+                  >
+                    <Ionicons name="arrow-up" size={20} color={orderBy === 'precio_asc' ? 'white' : '#666'} />
+                    <Text style={[styles.orderOptionText, orderBy === 'precio_asc' && styles.orderOptionTextActive]}>
+                      Precio: Menor a Mayor
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.orderOption, orderBy === 'precio_desc' && styles.orderOptionActive]}
+                    onPress={() => setOrderBy('precio_desc')}
+                  >
+                    <Ionicons name="arrow-down" size={20} color={orderBy === 'precio_desc' ? 'white' : '#666'} />
+                    <Text style={[styles.orderOptionText, orderBy === 'precio_desc' && styles.orderOptionTextActive]}>
+                      Precio: Mayor a Menor
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.orderOption, orderBy === 'vistas' && styles.orderOptionActive]}
+                    onPress={() => setOrderBy('vistas')}
+                  >
+                    <Ionicons name="eye" size={20} color={orderBy === 'vistas' ? 'white' : '#666'} />
+                    <Text style={[styles.orderOptionText, orderBy === 'vistas' && styles.orderOptionTextActive]}>
+                      Más Vistos
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </ScrollView>
+
+            <View style={styles.modalFooter}>
+              <TouchableOpacity
+                style={styles.clearFiltersButton}
+                onPress={() => {
+                  setSelectedCategory(undefined);
+                  setMinPrice('');
+                  setMaxPrice('');
+                  setSelectedCondition(undefined);
+                  setOrderBy('reciente');
+                }}
+              >
+                <Text style={styles.clearFiltersText}>Limpiar Filtros</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.applyFiltersButton}
+                onPress={() => {
+                  setShowFilters(false);
+                  loadProducts();
+                }}
+              >
+                <Text style={styles.applyFiltersText}>Aplicar Filtros</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       {/* Botón flotante para crear producto */}
       <TouchableOpacity
         style={styles.fabButton}
@@ -272,7 +591,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 15,
-    paddingVertical: 10,
+    paddingVertical: 8,
     backgroundColor: 'white',
     gap: 10,
   },
@@ -299,26 +618,26 @@ const styles = StyleSheet.create({
     backgroundColor: 'white',
     borderBottomWidth: 1,
     borderBottomColor: '#E0E0E0',
-    maxHeight: 70,
+    maxHeight: 60,
   },
   typeFiltersContent: {
     paddingHorizontal: 15,
-    paddingVertical: 10,
-    gap: 10,
+    paddingVertical: 8,
+    gap: 8,
     alignItems: 'center',
   },
   typeFilterButton: {
-    paddingHorizontal: 20,
-    paddingVertical: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
     borderRadius: 20,
     backgroundColor: '#F5F5F5',
-    marginRight: 10,
+    marginRight: 8,
     justifyContent: 'center',
     alignItems: 'center',
-    height: 40,
+    height: 36,
   },
   typeFilterButtonActive: {
-    backgroundColor: '#59C6C0',
+    backgroundColor: '#96d2d3',
   },
   typeFilterText: {
     fontSize: 14,
@@ -461,6 +780,279 @@ const styles = StyleSheet.create({
     color: '#666',
     fontFamily: 'Montserrat',
   },
+  economyBanner: {
+    backgroundColor: '#E8F5E9',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#C8E6C9',
+    width: '100%',
+    marginHorizontal: 4,
+  },
+  economyBannerContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  economyBannerIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#C8E6C9',
+    justifyContent: 'center',
+    alignItems: 'center',
+    flexShrink: 0,
+  },
+  economyBannerText: {
+    flex: 1,
+  },
+  economyBannerTitle: {
+    fontSize: 13,
+    fontWeight: 'bold',
+    color: '#2E7D32',
+    fontFamily: 'Montserrat',
+    marginBottom: 2,
+  },
+  economyBannerDescription: {
+    fontSize: 11,
+    color: '#388E3C',
+    fontFamily: 'Montserrat',
+    lineHeight: 14,
+  },
+  economyBannerHighlight: {
+    fontWeight: 'bold',
+    color: '#1B5E20',
+  },
+  selectedCategoryContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#E3F2FD',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#BBDEFB',
+  },
+  selectedCategoryText: {
+    fontSize: 14,
+    color: '#1976D2',
+    fontWeight: '600',
+    fontFamily: 'Montserrat',
+  },
+  filterButtonActive: {
+    backgroundColor: '#FFE5E5',
+    borderRadius: 8,
+  },
+  filterButtonContainer: {
+    position: 'relative',
+  },
+  filterBadge: {
+    position: 'absolute',
+    top: -2,
+    right: -2,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#FF6B6B',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: 'white',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: '90%',
+    paddingBottom: Platform.OS === 'ios' ? 30 : 20,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E0E0E0',
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#333',
+    fontFamily: 'Montserrat',
+  },
+  modalBody: {
+    maxHeight: 500,
+    padding: 20,
+  },
+  filterSection: {
+    marginBottom: 24,
+  },
+  filterSectionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+    fontFamily: 'Montserrat',
+    marginBottom: 12,
+  },
+  categoryScroll: {
+    marginHorizontal: -4,
+  },
+  categoryChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 20,
+    backgroundColor: '#F5F5F5',
+    marginRight: 8,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+  },
+  categoryChipActive: {
+    backgroundColor: '#96d2d3',
+    borderColor: '#59C6C0',
+  },
+  categoryIcon: {
+    marginRight: 6,
+  },
+  categoryEmoji: {
+    fontSize: 16,
+    marginRight: 6,
+  },
+  categoryChipText: {
+    fontSize: 14,
+    color: '#666',
+    fontFamily: 'Montserrat',
+    fontWeight: '500',
+  },
+  categoryChipTextActive: {
+    color: 'white',
+  },
+  categoriesLoading: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 20,
+    gap: 12,
+  },
+  categoriesLoadingText: {
+    fontSize: 14,
+    color: '#666',
+    fontFamily: 'Montserrat',
+  },
+  priceInputs: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  priceInputContainer: {
+    flex: 1,
+  },
+  priceLabel: {
+    fontSize: 14,
+    color: '#666',
+    fontFamily: 'Montserrat',
+    marginBottom: 8,
+  },
+  priceInput: {
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    fontSize: 14,
+    color: '#333',
+    fontFamily: 'Montserrat',
+    backgroundColor: '#F9F9F9',
+  },
+  conditionOptions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  conditionChip: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 20,
+    backgroundColor: '#F5F5F5',
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+  },
+  conditionChipActive: {
+    backgroundColor: '#96d2d3',
+    borderColor: '#59C6C0',
+  },
+  conditionChipText: {
+    fontSize: 14,
+    color: '#666',
+    fontFamily: 'Montserrat',
+    fontWeight: '500',
+  },
+  conditionChipTextActive: {
+    color: 'white',
+  },
+  orderOptions: {
+    gap: 12,
+  },
+  orderOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: 12,
+    backgroundColor: '#F9F9F9',
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    gap: 12,
+  },
+  orderOptionActive: {
+    backgroundColor: '#96d2d3',
+    borderColor: '#59C6C0',
+  },
+  orderOptionText: {
+    fontSize: 14,
+    color: '#666',
+    fontFamily: 'Montserrat',
+    fontWeight: '500',
+  },
+  orderOptionTextActive: {
+    color: 'white',
+  },
+  modalFooter: {
+    flexDirection: 'row',
+    padding: 20,
+    borderTopWidth: 1,
+    borderTopColor: '#E0E0E0',
+    gap: 12,
+  },
+  clearFiltersButton: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 8,
+    backgroundColor: '#F5F5F5',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  clearFiltersText: {
+    fontSize: 16,
+    color: '#666',
+    fontFamily: 'Montserrat',
+    fontWeight: '600',
+  },
+  applyFiltersButton: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 8,
+    backgroundColor: '#96d2d3',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  applyFiltersText: {
+    fontSize: 16,
+    color: 'white',
+    fontFamily: 'Montserrat',
+    fontWeight: '600',
+  },
   fabButton: {
     position: 'absolute',
     bottom: 20,
@@ -468,7 +1060,7 @@ const styles = StyleSheet.create({
     width: 60,
     height: 60,
     borderRadius: 30,
-    backgroundColor: '#59C6C0',
+    backgroundColor: '#96d2d3',
     justifyContent: 'center',
     alignItems: 'center',
     ...Platform.select({

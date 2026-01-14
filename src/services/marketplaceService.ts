@@ -58,13 +58,14 @@ export interface ProductFilters {
   type?: 'venta' | 'donacion' | 'trueque' | 'all';
   category?: string;
   status?: string;
+  condition?: 'nuevo' | 'como_nuevo' | 'buen_estado' | 'usado';
   minPrice?: number;
   maxPrice?: number;
   location?: string;
   search?: string;
   page?: number;
   limit?: number;
-  orderBy?: 'reciente' | 'precio_asc' | 'precio_desc' | 'distancia';
+  orderBy?: 'reciente' | 'precio_asc' | 'precio_desc' | 'distancia' | 'vistas';
   // Para búsqueda por proximidad
   latitude?: number;
   longitude?: number;
@@ -175,6 +176,7 @@ class MarketplaceService {
       if (filters.type && filters.type !== 'all') queryParams.append('type', filters.type);
       if (filters.category) queryParams.append('category', filters.category);
       if (filters.status) queryParams.append('status', filters.status);
+      if (filters.condition) queryParams.append('condition', filters.condition);
       if (filters.minPrice) queryParams.append('minPrice', filters.minPrice.toString());
       if (filters.maxPrice) queryParams.append('maxPrice', filters.maxPrice.toString());
       if (filters.location) queryParams.append('location', filters.location);
@@ -317,7 +319,7 @@ class MarketplaceService {
       }
 
       const data = await response.json();
-      console.log('📦 [MARKETPLACE] Respuesta completa del servidor (getProductById):', JSON.stringify(data).substring(0, 300));
+      console.log('📦 [MARKETPLACE] Respuesta completa del servidor (getProductById):', JSON.stringify(data).substring(0, 500));
       
       // Manejar diferentes formatos de respuesta
       const product = data.product || data.data || data;
@@ -327,7 +329,41 @@ class MarketplaceService {
         throw new Error('Producto no encontrado');
       }
       
+      // Log detallado de la información del vendedor
+      console.log('👤 [MARKETPLACE] Información del vendedor recibida:', {
+        userId: product.userId || product.user_id,
+        userName: product.userName || product.user_name || 'NO TIENE',
+        userPhoto: product.userPhoto || product.user_photo ? 'Presente' : 'Ausente',
+        sellerName: product.sellerName || product.seller_name || 'NO TIENE',
+        sellerPhoto: product.sellerPhoto || product.seller_photo ? 'Presente' : 'Ausente',
+        allKeys: Object.keys(product).filter(key => 
+          key.toLowerCase().includes('user') || 
+          key.toLowerCase().includes('seller') ||
+          key.toLowerCase().includes('name')
+        ),
+      });
+      
+      // Normalizar el nombre del usuario - intentar diferentes campos
+      if (!product.userName || product.userName === 'Usuario' || product.userName === '') {
+        const possibleNames = [
+          product.sellerName,
+          product.seller_name,
+          product.user_name,
+          product.name,
+          product.displayName,
+          product.display_name,
+        ].filter(Boolean);
+        
+        if (possibleNames.length > 0) {
+          product.userName = possibleNames[0];
+          console.log('✅ [MARKETPLACE] Nombre del vendedor normalizado desde:', possibleNames[0]);
+        } else {
+          console.warn('⚠️ [MARKETPLACE] No se encontró nombre válido del vendedor. El backend debe enviar userName o sellerName');
+        }
+      }
+      
       console.log('✅ [MARKETPLACE] Producto encontrado:', product.id || product._id);
+      console.log('✅ [MARKETPLACE] Nombre del vendedor final:', product.userName);
       return product as MarketplaceProduct;
     } catch (error) {
       console.error('❌ [MARKETPLACE] Error en getProductById:', error);
@@ -661,6 +697,84 @@ class MarketplaceService {
     }
   }
 
+  // Obtener conversaciones de un producto específico (agrupadas por usuario)
+  async getProductConversations(productId: string, currentUserId: string): Promise<Array<{
+    otherUserId: string;
+    otherUserName: string;
+    otherUserPhoto?: string;
+    lastMessage: string;
+    lastMessageDate: string;
+    unreadCount: number;
+    totalMessages: number;
+  }>> {
+    try {
+      console.log('💬 [MARKETPLACE] Obteniendo conversaciones para producto:', productId);
+      console.log('👤 [MARKETPLACE] Usuario actual:', currentUserId);
+      
+      const messages = await this.getProductMessages(productId);
+      
+      // Agrupar mensajes por usuario (el otro usuario en la conversación)
+      const conversationsMap = new Map<string, {
+        otherUserId: string;
+        otherUserName: string;
+        otherUserPhoto?: string;
+        messages: MarketplaceMessage[];
+      }>();
+
+      messages.forEach((msg) => {
+        // Determinar quién es el otro usuario
+        const isMe = msg.senderId === currentUserId;
+        
+        // Si el mensaje es mío, el otro usuario es el receiver
+        // Si el mensaje no es mío, el otro usuario es el sender
+        const theOtherUserId = isMe ? msg.receiverId : msg.senderId;
+        const theOtherUserName = isMe ? (msg.receiverName || 'Usuario') : (msg.senderName || 'Usuario');
+        const theOtherUserPhoto = isMe ? undefined : msg.senderPhoto;
+
+        if (!conversationsMap.has(theOtherUserId)) {
+          conversationsMap.set(theOtherUserId, {
+            otherUserId: theOtherUserId,
+            otherUserName: theOtherUserName,
+            otherUserPhoto: theOtherUserPhoto,
+            messages: [],
+          });
+        }
+
+        const conversation = conversationsMap.get(theOtherUserId)!;
+        conversation.messages.push(msg);
+      });
+
+      // Convertir a array y ordenar por fecha del último mensaje
+      const conversations = Array.from(conversationsMap.values()).map(conv => {
+        // Ordenar mensajes por fecha
+        conv.messages.sort((a, b) => 
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        );
+
+        const lastMessage = conv.messages[0];
+        const unreadCount = conv.messages.filter(m => !m.isRead && m.senderId !== currentUserId).length;
+
+        return {
+          otherUserId: conv.otherUserId,
+          otherUserName: conv.otherUserName,
+          otherUserPhoto: conv.otherUserPhoto,
+          lastMessage: lastMessage.message,
+          lastMessageDate: lastMessage.createdAt,
+          unreadCount,
+          totalMessages: conv.messages.length,
+        };
+      }).sort((a, b) => 
+        new Date(b.lastMessageDate).getTime() - new Date(a.lastMessageDate).getTime()
+      );
+
+      console.log('✅ [MARKETPLACE] Conversaciones encontradas:', conversations.length);
+      return conversations;
+    } catch (error) {
+      console.error('❌ [MARKETPLACE] Error obteniendo conversaciones del producto:', error);
+      return [];
+    }
+  }
+
   // Obtener mensajes de un producto
   async getProductMessages(productId: string): Promise<MarketplaceMessage[]> {
     try {
@@ -685,10 +799,19 @@ class MarketplaceService {
       }
 
       const data = await response.json();
-      console.log('📦 [MARKETPLACE] Respuesta completa del servidor (getProductMessages):', JSON.stringify(data).substring(0, 300));
+      console.log('📦 [MARKETPLACE] Respuesta completa del servidor (getProductMessages):', JSON.stringify(data, null, 2).substring(0, 2000));
+      console.log('📦 [MARKETPLACE] Estructura de la respuesta (getProductMessages):', {
+        success: data.success,
+        message: data.message,
+        hasMessages: !!data.messages,
+        hasData: !!data.data,
+        isArray: Array.isArray(data),
+        keys: Object.keys(data),
+      });
       
       // Manejar diferentes formatos de respuesta
-      const messages = data.messages || data.data || (Array.isArray(data) ? data : []);
+      // Formato esperado: { success: true, message: "...", data: [...] } o { messages: [...] }
+      const messages = data.data || data.messages || (Array.isArray(data) ? data : []);
       
       if (!Array.isArray(messages)) {
         console.warn('⚠️ [MARKETPLACE] Los mensajes no son un array, retornando array vacío');
@@ -696,6 +819,33 @@ class MarketplaceService {
       }
       
       console.log('✅ [MARKETPLACE] Mensajes encontrados:', messages.length);
+      
+      // Log detallado de la estructura de los mensajes
+      if (messages.length > 0) {
+        console.log('📋 [MARKETPLACE] Estructura del primer mensaje:', {
+          id: messages[0].id,
+          senderId: messages[0].senderId,
+          senderName: messages[0].senderName || 'NO TIENE senderName',
+          senderPhoto: messages[0].senderPhoto || 'NO TIENE senderPhoto',
+          receiverId: messages[0].receiverId,
+          receiverName: messages[0].receiverName || 'NO TIENE receiverName',
+          message: messages[0].message?.substring(0, 50),
+          createdAt: messages[0].createdAt,
+          allKeys: Object.keys(messages[0]),
+        });
+        
+        // Verificar si algún mensaje tiene información del remitente
+        const messagesWithSenderInfo = messages.filter((m: any) => 
+          m.senderName && m.senderName !== 'Usuario' && m.senderName !== ''
+        );
+        console.log('📊 [MARKETPLACE] Mensajes con información del remitente:', messagesWithSenderInfo.length, 'de', messages.length);
+        
+        if (messagesWithSenderInfo.length === 0) {
+          console.warn('⚠️ [MARKETPLACE] ⚠️⚠️⚠️ NINGÚN MENSAJE TIENE senderName VÁLIDO ⚠️⚠️⚠️');
+          console.warn('⚠️ [MARKETPLACE] El backend debe enviar senderName y senderPhoto en cada mensaje');
+        }
+      }
+      
       return messages as MarketplaceMessage[];
     } catch (error) {
       console.error('❌ [MARKETPLACE] Error en getProductMessages:', error);
@@ -728,17 +878,123 @@ class MarketplaceService {
       }
 
       const data = await response.json();
-      console.log('📦 [MARKETPLACE] Respuesta completa del servidor (sendMessage):', JSON.stringify(data).substring(0, 300));
+      console.log('📦 [MARKETPLACE] Respuesta completa del servidor (sendMessage):', JSON.stringify(data, null, 2));
+      console.log('📦 [MARKETPLACE] Estructura de la respuesta:', {
+        success: data.success,
+        message: data.message,
+        hasMessage: !!data.message,
+        hasData: !!data.data,
+        isArray: Array.isArray(data),
+        keys: Object.keys(data),
+      });
       
       // Manejar diferentes formatos de respuesta
-      const sentMessage = data.message || data.data || data;
+      // Formato esperado: { success: true, message: "...", data: { ... } }
+      let sentMessage = data.data || data.message || data;
       
-      if (!sentMessage || typeof sentMessage !== 'object') {
-        console.error('❌ [MARKETPLACE] Mensaje inválido en la respuesta');
-        throw new Error('Error enviando mensaje: respuesta inválida');
+      // Si sentMessage es undefined, intentar data directamente
+      if (!sentMessage) {
+        sentMessage = data;
       }
       
-      console.log('✅ [MARKETPLACE] Mensaje enviado exitosamente');
+      // Log del mensaje extraído
+      if (sentMessage) {
+        const hasSenderName = !!(sentMessage.senderName && sentMessage.senderName !== 'Usuario');
+        const hasSenderPhoto = !!sentMessage.senderPhoto;
+        const hasReceiverName = !!(sentMessage.receiverName && sentMessage.receiverName !== 'Usuario');
+        const hasReceiverPhoto = !!sentMessage.receiverPhoto;
+        
+        console.log('📋 [MARKETPLACE] Mensaje extraído de la respuesta:', {
+          id: sentMessage.id,
+          senderId: sentMessage.senderId,
+          senderName: sentMessage.senderName || '❌ NO TIENE senderName',
+          senderPhoto: sentMessage.senderPhoto || '❌ NO TIENE senderPhoto',
+          receiverId: sentMessage.receiverId,
+          receiverName: sentMessage.receiverName || '❌ NO TIENE receiverName',
+          receiverPhoto: sentMessage.receiverPhoto || '❌ NO TIENE receiverPhoto',
+          message: sentMessage.message?.substring(0, 50),
+          createdAt: sentMessage.createdAt,
+        });
+        
+        // Verificación clara de la información recibida
+        if (hasSenderName && hasSenderPhoto) {
+          console.log('✅ [MARKETPLACE] ✅✅✅ INFORMACIÓN COMPLETA DEL REMITENTE RECIBIDA ✅✅✅');
+          console.log('✅ [MARKETPLACE] senderName:', sentMessage.senderName);
+          console.log('✅ [MARKETPLACE] senderPhoto:', sentMessage.senderPhoto);
+        } else {
+          console.warn('⚠️ [MARKETPLACE] ⚠️⚠️⚠️ FALTA INFORMACIÓN DEL REMITENTE ⚠️⚠️⚠️');
+          if (!hasSenderName) console.warn('⚠️ [MARKETPLACE] Falta senderName');
+          if (!hasSenderPhoto) console.warn('⚠️ [MARKETPLACE] Falta senderPhoto');
+        }
+      }
+      
+      // Si la respuesta es un array, tomar el primer elemento
+      if (Array.isArray(sentMessage) && sentMessage.length > 0) {
+        sentMessage = sentMessage[0];
+      }
+      
+      // Si sentMessage no es un objeto válido, intentar construir uno desde los datos disponibles
+      if (!sentMessage || typeof sentMessage !== 'object') {
+        console.warn('⚠️ [MARKETPLACE] Respuesta no tiene formato esperado, intentando construir mensaje...');
+        console.warn('⚠️ [MARKETPLACE] Tipo de respuesta:', typeof sentMessage);
+        console.warn('⚠️ [MARKETPLACE] Contenido de data:', data);
+        
+        // Si data tiene los campos necesarios directamente, usarlos
+        if (data.id || data.message || data.productId) {
+          sentMessage = {
+            id: data.id || `msg_${Date.now()}`,
+            productId: data.productId || productId,
+            productTitle: data.productTitle || '',
+            senderId: data.senderId || data.userId || '',
+            senderName: data.senderName || data.userName || 'Usuario',
+            senderPhoto: data.senderPhoto || data.userPhoto,
+            receiverId: data.receiverId || '',
+            receiverName: data.receiverName || '',
+            message: data.message || message,
+            isRead: data.isRead || false,
+            createdAt: data.createdAt || new Date().toISOString(),
+          };
+        } else {
+          console.error('❌ [MARKETPLACE] No se pudo construir mensaje desde la respuesta');
+          throw new Error('Error enviando mensaje: respuesta inválida');
+        }
+      }
+      
+      // Validar que el mensaje tenga los campos mínimos necesarios
+      if (!sentMessage.id || !sentMessage.message) {
+        console.warn('⚠️ [MARKETPLACE] Mensaje construido pero faltan campos:', sentMessage);
+        // Aún así intentar retornar el mensaje con valores por defecto
+        sentMessage = {
+          ...sentMessage,
+          id: sentMessage.id || `msg_${Date.now()}`,
+          message: sentMessage.message || message,
+          createdAt: sentMessage.createdAt || new Date().toISOString(),
+        };
+      }
+      
+      console.log('✅ [MARKETPLACE] Mensaje enviado exitosamente:', sentMessage.id);
+      console.log('📋 [MARKETPLACE] Información del mensaje enviado:', {
+        id: sentMessage.id,
+        senderId: sentMessage.senderId,
+        senderName: sentMessage.senderName || 'NO TIENE senderName',
+        senderPhoto: sentMessage.senderPhoto || 'NO TIENE senderPhoto',
+        receiverId: sentMessage.receiverId,
+        receiverName: sentMessage.receiverName || 'NO TIENE receiverName',
+        message: sentMessage.message?.substring(0, 50),
+        createdAt: sentMessage.createdAt,
+        allKeys: Object.keys(sentMessage),
+      });
+      
+      // Verificar si el mensaje tiene la información necesaria
+      if (!sentMessage.senderName || sentMessage.senderName === 'Usuario') {
+        console.warn('⚠️ [MARKETPLACE] ⚠️⚠️⚠️ EL MENSAJE NO TIENE senderName VÁLIDO ⚠️⚠️⚠️');
+        console.warn('⚠️ [MARKETPLACE] El backend debe enviar senderName en la respuesta de sendMessage');
+      }
+      if (!sentMessage.senderPhoto) {
+        console.warn('⚠️ [MARKETPLACE] ⚠️⚠️⚠️ EL MENSAJE NO TIENE senderPhoto ⚠️⚠️⚠️');
+        console.warn('⚠️ [MARKETPLACE] El backend debe enviar senderPhoto en la respuesta de sendMessage');
+      }
+      
       return sentMessage as MarketplaceMessage;
     } catch (error) {
       console.error('❌ [MARKETPLACE] Error en sendMessage:', error);

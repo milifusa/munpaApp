@@ -47,12 +47,22 @@ const GlobalMenu: React.FC<GlobalMenuProps> = ({ visible, onClose }) => {
     },
     {
       id: 'children',
-      title: 'Datos de Hijos',
+      title: 'Mis Hijos',
       icon: 'people',
       onPress: () => {
         onClose();
         // @ts-ignore
-        navigation.navigate('ChildrenData');
+        navigation.navigate('ChildrenList');
+      },
+    },
+    {
+      id: 'notifications',
+      title: 'Notificaciones',
+      icon: 'notifications',
+      onPress: () => {
+        onClose();
+        // @ts-ignore
+        navigation.navigate('Notifications');
       },
     },
     {

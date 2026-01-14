@@ -2,10 +2,10 @@ import { StyleSheet } from 'react-native';
 
 // Paleta de colores
 export const colors = {
-  // Colores principales - Púrpura para Munpa
-  primary: '#887CBC', // Púrpura principal actualizado
-  primaryDark: '#7B68B0',
-  primaryLight: '#A99DD9',
+  // Colores principales - Verde azulado para Munpa
+  primary: '#96d2d3', // Verde azulado principal actualizado
+  primaryDark: '#7BBFC0',
+  primaryLight: '#B1E5E6',
 
   // Colores secundarios - Verde lima para botones
   secondary: '#B4C14B', // Verde lima actualizado
@@ -35,7 +35,7 @@ export const colors = {
   },
   
   // Colores de fondo
-  background: '#887CBC', // Fondo púrpura principal actualizado
+  background: '#F7FAFC', // Fondo blanco grisáceo
   surface: '#ffffff',
   card: '#A99DD9', // Input fields con púrpura más claro
   

@@ -11,7 +11,6 @@ export const trackingService = {
    * Debe llamarse después de que la app esté visible
    */
   requestTrackingPermission: async (): Promise<TrackingStatus> => {
-    console.log('🔒 [TRACKING] Solicitando permiso de tracking...');
     
     // Solo en iOS
     if (Platform.OS !== 'ios') {
@@ -22,19 +21,15 @@ export const trackingService = {
     try {
       // Verificar el estado actual
       const currentStatus = await getTrackingStatus();
-      console.log('📊 [TRACKING] Estado actual:', currentStatus);
 
       // Si ya se decidió (authorized o denied), no volver a preguntar
       if (currentStatus === 'authorized' || currentStatus === 'denied') {
-        console.log('✅ [TRACKING] Permiso ya decidido:', currentStatus);
         return currentStatus;
       }
 
       // Si está "not-determined", solicitar permiso
       if (currentStatus === 'not-determined') {
-        console.log('❓ [TRACKING] Permiso no determinado, solicitando...');
         const newStatus = await requestTrackingPermission();
-        console.log('📊 [TRACKING] Nuevo estado:', newStatus);
         return newStatus;
       }
 
@@ -57,7 +52,6 @@ export const trackingService = {
 
     try {
       const status = await getTrackingStatus();
-      console.log('📊 [TRACKING] Estado de tracking:', status);
       return status;
     } catch (error) {
       console.error('❌ [TRACKING] Error obteniendo estado:', error);
@@ -115,8 +109,6 @@ export const trackEvent = async (event: TrackingEvent): Promise<void> => {
     console.log('🚫 [TRACKING] Evento no enviado - tracking no autorizado:', event.eventName);
     return;
   }
-
-  console.log('📊 [TRACKING] Enviando evento:', event.eventName, event.properties);
   
   // Aquí irían tus servicios de analytics (Firebase Analytics, Mixpanel, etc.)
   // Por ejemplo:

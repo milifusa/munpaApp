@@ -14,6 +14,14 @@
       },
       "oauth_client": [
         {
+          "client_id": "975014449237-1704c3fmrl33cj993inh4pr8pdqvko5i.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.munpa.app",
+            "certificate_hash": "5e8f16062ea3cd2c4a0d547876baa6f38cabf625"
+          }
+        },
+        {
           "client_id": "975014449237-860t1fdicttqsvn2dk27s1n5eo26knn8.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {

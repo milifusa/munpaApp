@@ -109,7 +109,7 @@ const MyProductsScreen = () => {
 
           {item.type === 'venta' && item.price && (
             <Text style={styles.productPrice}>
-              ${item.price.toLocaleString('es-MX')}
+              ${item.price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </Text>
           )}
 
@@ -122,10 +122,19 @@ const MyProductsScreen = () => {
               <Ionicons name="heart" size={14} color="#666" />
               <Text style={styles.statText}>{item.favorites}</Text>
             </View>
-            <View style={styles.statItem}>
-              <Ionicons name="chatbubble" size={14} color="#666" />
-              <Text style={styles.statText}>{item.messages}</Text>
-            </View>
+            <TouchableOpacity
+              style={styles.statItem}
+              onPress={(e) => {
+                e.stopPropagation();
+                navigation.navigate('ProductConversations', { productId: item.id, productTitle: item.title });
+              }}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="chatbubble" size={14} color={item.messages > 0 ? "#59C6C0" : "#666"} />
+              <Text style={[styles.statText, item.messages > 0 && styles.statTextUnread]}>
+                {item.messages}
+              </Text>
+            </TouchableOpacity>
           </View>
 
           <View
@@ -145,9 +154,9 @@ const MyProductsScreen = () => {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#59C6C0" />
+      <StatusBar barStyle="light-content" backgroundColor="#96d2d3" />
       {/* Header */}
-      <View style={[styles.header, { paddingTop: Math.max(insets.top, Platform.OS === 'ios' ? 50 : 15) }]}>
+      <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
         <TouchableOpacity onPress={() => navigation.goBack()}>
           <Ionicons name="arrow-back" size={24} color="white" />
         </TouchableOpacity>
@@ -229,7 +238,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F5F5F5',
   },
   header: {
-    backgroundColor: '#59C6C0',
+    backgroundColor: '#96d2d3',
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -260,7 +269,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   filterButtonActive: {
-    backgroundColor: '#59C6C0',
+    backgroundColor: '#96d2d3',
   },
   filterText: {
     fontSize: 13,
@@ -300,7 +309,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 30,
     paddingVertical: 14,
     borderRadius: 8,
-    backgroundColor: '#59C6C0',
+    backgroundColor: '#96d2d3',
   },
   createButtonText: {
     fontSize: 14,
@@ -377,6 +386,10 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#666',
     fontFamily: 'Montserrat',
+  },
+  statTextUnread: {
+    color: '#59C6C0',
+    fontWeight: 'bold',
   },
   statusBadge: {
     alignSelf: 'flex-start',

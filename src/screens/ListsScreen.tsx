@@ -14,10 +14,12 @@ import {
   Platform,
   Image,
   Dimensions,
+  SafeAreaView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '../contexts/AuthContext';
 import { listsService } from '../services/api';
@@ -73,6 +75,7 @@ const getProgressIcon = (completedItemsCount: number, itemsCount: number) => {
 const ListsScreen = () => {
   const navigation = useNavigation<any>();
   const { user, isAuthenticated } = useAuth();
+  const insets = useSafeAreaInsets();
   
   // Estados principales
   const [myLists, setMyLists] = useState<List[]>([]);
@@ -418,16 +421,24 @@ const ListsScreen = () => {
     <View style={styles.container}>
       {/* Header con tabs */}
       <LinearGradient
-        colors={['#887CBC', '#59C6C0']}
+        colors={['#59C6C0', '#4DB8B3']}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 0 }}
-        style={styles.headerGradient}
+        style={[styles.headerGradient, { paddingTop: Platform.OS === 'ios' ? Math.max(insets.top, 10) + 10 : 50 }]}
       >
         <View style={styles.header}>
           <View style={styles.headerTop}>
-            <View style={styles.headerTitleContainer}>
-              <Ionicons name="list" size={28} color="white" />
-              <Text style={styles.headerTitle}>Mis Listas</Text>
+            <View style={styles.headerLeftContainer}>
+              <TouchableOpacity
+                style={styles.backButton}
+                onPress={() => navigation.goBack()}
+              >
+                <Ionicons name="arrow-back" size={24} color="white" />
+              </TouchableOpacity>
+              <View style={styles.headerTitleContainer}>
+                <Ionicons name="list" size={28} color="white" />
+                <Text style={styles.headerTitle}>Mis Listas</Text>
+              </View>
             </View>
             {/* Botón crear lista */}
             <TouchableOpacity
@@ -510,11 +521,12 @@ const ListsScreen = () => {
         animationType="slide"
         presentationStyle="pageSheet"
       >
-        <KeyboardAvoidingView 
-          style={styles.modalContainer}
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        >
-          <View style={styles.modalHeader}>
+        <SafeAreaView style={{ flex: 1 }}>
+          <KeyboardAvoidingView 
+            style={styles.modalContainer}
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          >
+            <View style={[styles.modalHeader, { paddingTop: insets.top }]}>
             <TouchableOpacity onPress={resetCreateForm} style={styles.closeButton}>
               <Ionicons name="close" size={24} color="#666" />
             </TouchableOpacity>
@@ -628,7 +640,8 @@ const ListsScreen = () => {
               )}
             </TouchableOpacity>
           </View>
-        </KeyboardAvoidingView>
+          </KeyboardAvoidingView>
+        </SafeAreaView>
       </Modal>
     </View>
   );
@@ -927,7 +940,6 @@ const styles = StyleSheet.create({
 
   // Header con tabs
   headerGradient: {
-    paddingTop: 50,
     paddingBottom: 20,
   },
   header: {
@@ -938,6 +950,16 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 20,
+  },
+  headerLeftContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    flex: 1,
+  },
+  backButton: {
+    padding: 8,
+    marginRight: 4,
   },
   headerTitleContainer: {
     flexDirection: 'row',
@@ -984,7 +1006,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   activeTabBadge: {
-    backgroundColor: '#887CBC',
+    backgroundColor: '#96d2d3',
   },
   tabBadgeText: {
     fontSize: 12,
@@ -1050,7 +1072,7 @@ const styles = StyleSheet.create({
   },
   progressBar: {
     height: '100%',
-    backgroundColor: '#59C6C0',
+    backgroundColor: '#96d2d3',
   },
   cardContent: {
     padding: 20,
@@ -1161,7 +1183,7 @@ const styles = StyleSheet.create({
   stat: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F8F9FA',
+    backgroundColor: '#F7FAFC',
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 8,
@@ -1187,7 +1209,7 @@ const styles = StyleSheet.create({
   // Listas públicas - acciones
   publicListActions: {
     flexDirection: 'row',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#F7FAFC',
     paddingHorizontal: 18,
     paddingVertical: 14,
     justifyContent: 'space-between',
@@ -1198,7 +1220,7 @@ const styles = StyleSheet.create({
   actionButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F8F9FA',
+    backgroundColor: '#F7FAFC',
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 20,
@@ -1226,7 +1248,7 @@ const styles = StyleSheet.create({
   addListButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#59C6C0',
+    backgroundColor: '#96d2d3',
     paddingHorizontal: 18,
     paddingVertical: 10,
     borderRadius: 22,
@@ -1270,7 +1292,7 @@ const styles = StyleSheet.create({
     marginBottom: 32,
   },
   emptyButton: {
-    backgroundColor: '#59C6C0',
+    backgroundColor: '#96d2d3',
     paddingHorizontal: 28,
     paddingVertical: 14,
     borderRadius: 25,
@@ -1292,7 +1314,7 @@ const styles = StyleSheet.create({
   // Modal estilos
   modalContainer: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#F7FAFC',
   },
   modalHeader: {
     flexDirection: 'row',
@@ -1300,7 +1322,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 20,
     paddingVertical: 15,
-    backgroundColor: '#F8F9FA',
+    backgroundColor: '#F7FAFC',
     borderBottomWidth: 1,
     borderBottomColor: '#E0E0E0',
   },
@@ -1332,7 +1354,7 @@ const styles = StyleSheet.create({
     marginTop: 15,
   },
   textInput: {
-    backgroundColor: '#F8F9FA',
+    backgroundColor: '#F7FAFC',
     borderWidth: 1,
     borderColor: '#E0E0E0',
     borderRadius: 12,
@@ -1380,7 +1402,7 @@ const styles = StyleSheet.create({
   },
   imageOption: {
     alignItems: 'center',
-    backgroundColor: '#F8F9FA',
+    backgroundColor: '#F7FAFC',
     paddingVertical: 20,
     paddingHorizontal: 30,
     borderRadius: 12,
@@ -1402,7 +1424,7 @@ const styles = StyleSheet.create({
   privacyOption: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F8F9FA',
+    backgroundColor: '#F7FAFC',
     padding: 15,
     borderRadius: 12,
     borderWidth: 1,
@@ -1422,7 +1444,7 @@ const styles = StyleSheet.create({
     width: 10,
     height: 10,
     borderRadius: 5,
-    backgroundColor: '#59C6C0',
+    backgroundColor: '#96d2d3',
   },
   privacyInfo: {
     flex: 1,
@@ -1444,7 +1466,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     paddingHorizontal: 20,
     paddingVertical: 15,
-    backgroundColor: '#F8F9FA',
+    backgroundColor: '#F7FAFC',
     borderTopWidth: 1,
     borderTopColor: '#E0E0E0',
   },
@@ -1467,7 +1489,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 15,
-    backgroundColor: '#59C6C0',
+    backgroundColor: '#96d2d3',
     borderRadius: 12,
     marginLeft: 10,
   },

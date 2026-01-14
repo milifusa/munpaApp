@@ -1,8 +1,8 @@
-import React from 'react';
-import { NavigationContainer } from '@react-navigation/native';
+import React, { useRef } from 'react';
+import { NavigationContainer, NavigationContainerRef } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { View, ActivityIndicator, StyleSheet, TouchableOpacity, Platform, Image } from 'react-native';
+import { View, ActivityIndicator, StyleSheet, TouchableOpacity, Platform, Image, Linking, Text } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '../contexts/AuthContext';
@@ -10,6 +10,7 @@ import { useMenu } from '../contexts/MenuContext';
 import { useNavigation } from '@react-navigation/native';
 import GlobalMenu from '../components/GlobalMenu';
 import DouliChatOverlay from '../components/DouliChatOverlay';
+import { useDeepLinking, setNavigationRef } from '../hooks/useDeepLinking';
 
 // Importar pantallas
 import LoginScreen from '../screens/LoginScreen';
@@ -20,6 +21,9 @@ import ForgotPasswordScreen from '../screens/ForgotPasswordScreen';
 import ResetPasswordScreen from '../screens/ResetPasswordScreen';
 import ChildrenDataScreen from '../screens/ChildrenDataScreen';
 import ChildProfileScreen from '../screens/ChildProfileScreen';
+import ShareChildScreen from '../screens/ShareChildScreen';
+import ChildInvitationsScreen from '../screens/ChildInvitationsScreen';
+import AcceptInvitationScreen from '../screens/AcceptInvitationScreen';
 import DoulaChatScreen from '../screens/DoulaChatScreen';
 import MunpaMarketScreen from '../screens/MunpaMarketScreen';
 import ProductDetailScreen from '../screens/ProductDetailScreen';
@@ -27,11 +31,13 @@ import CreateProductScreen from '../screens/CreateProductScreen';
 import MyProductsScreen from '../screens/MyProductsScreen';
 import MarketplaceFavoritesScreen from '../screens/MarketplaceFavoritesScreen';
 import MarketplaceMessagesScreen from '../screens/MarketplaceMessagesScreen';
+import ProductConversationsScreen from '../screens/ProductConversationsScreen';
 import CommunitiesScreen from '../screens/CommunitiesScreen';
 import CommunityRequestsScreen from '../screens/CommunityRequestsScreen';
 import CommunityPostsScreen from '../screens/CommunityPostsScreen';
 import CreatePostScreen from '../screens/CreatePostScreen';
 import CommentsScreen from '../screens/CommentsScreen';
+import PostDetailScreen from '../screens/PostDetailScreen';
 import ListsScreen from '../screens/ListsScreen';
 import ListDetailScreen from '../screens/ListDetailScreen';
 import ItemCommentsScreen from '../screens/ItemCommentsScreen';
@@ -41,36 +47,23 @@ import RecommendationDetailScreen from '../screens/RecommendationDetailScreen';
 import FavoritesScreen from '../screens/FavoritesScreen';
 import FavoritesMapScreen from '../screens/FavoritesMapScreen';
 import WishlistScreen from '../screens/WishlistScreen';
+import NotificationsScreen from '../screens/NotificationsScreen';
+import SleepTrackerScreen from '../screens/SleepTrackerScreen';
+import EditSleepEventScreen from '../screens/EditSleepEventScreen';
+import ChildrenListScreen from '../screens/ChildrenListScreen';
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
 
-// Componente del botón de menú para usar en headers
-const MenuButton = () => {
+// Componente del botón de perfil (ahora abre el menú)
+const ProfileButton = () => {
+  const { user } = useAuth();
   const { openMenu } = useMenu();
   
   return (
     <TouchableOpacity
-      style={styles.menuButton}
-      onPress={openMenu}
-    >
-      <Ionicons name="menu" size={24} color="white" />
-    </TouchableOpacity>
-  );
-};
-
-// Componente del botón de perfil para usar en headers
-const ProfileButton = () => {
-  const { user } = useAuth();
-  const navigation = useNavigation<any>();
-  
-  return (
-    <TouchableOpacity
       style={styles.profileButton}
-      onPress={() => {
-        // Navegar a Profile (fuera de tabs)
-        navigation.navigate('Profile');
-      }}
+      onPress={openMenu}
     >
       {user?.photoURL ? (
         <Image
@@ -86,6 +79,141 @@ const ProfileButton = () => {
   );
 };
 
+// Componente para mostrar las caritas de los hijos en el header
+const ChildrenHeaderTitle = () => {
+  const [children, setChildren] = React.useState<any[]>([]);
+  const [selectedChildId, setSelectedChildId] = React.useState<string | null>(null);
+  const [loading, setLoading] = React.useState(true);
+  const navigation = useNavigation<any>();
+
+  React.useEffect(() => {
+    const loadChildren = async () => {
+      try {
+        const authToken = await AsyncStorage.getItem('authToken');
+        if (!authToken) return;
+
+        const response = await fetch('https://api.munpa.online/api/auth/children', {
+          headers: {
+            'Authorization': `Bearer ${authToken}`,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        const data = await response.json();
+        let childrenData = [];
+        if (Array.isArray(data)) {
+          childrenData = data;
+        } else if (data?.children && Array.isArray(data.children)) {
+          childrenData = data.children;
+        } else if (data?.data?.children && Array.isArray(data.data.children)) {
+          childrenData = data.data.children;
+        } else if (data?.data && Array.isArray(data.data)) {
+          childrenData = data.data;
+        }
+        
+        // Filtrar hijos válidos
+        const validChildren = childrenData.filter((c: any) => c && c.id && c.name);
+        setChildren(validChildren);
+        
+        // Cargar el hijo seleccionado guardado o seleccionar el primero
+        const savedChildId = await AsyncStorage.getItem('selectedChildId');
+        if (savedChildId && validChildren.find((c: any) => c.id === savedChildId)) {
+          setSelectedChildId(savedChildId);
+        } else if (validChildren.length > 0 && validChildren[0].id) {
+          setSelectedChildId(validChildren[0].id);
+          await AsyncStorage.setItem('selectedChildId', validChildren[0].id);
+        }
+      } catch (error) {
+        console.error('Error cargando hijos para header:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadChildren();
+  }, []);
+
+  const handleSelectChild = async (child: any) => {
+    setSelectedChildId(child.id);
+    await AsyncStorage.setItem('selectedChildId', child.id);
+    
+    // Notificar al HomeScreen sobre el cambio
+    navigation.setParams({ selectedChildId: child.id, refresh: Date.now() });
+  };
+
+  const handleAddChild = () => {
+    navigation.navigate('ChildrenData', {
+      childrenCount: 1,
+      gender: 'F',
+    });
+  };
+
+  if (loading) {
+    return null;
+  }
+
+  // Filtrar hijos válidos antes de renderizar
+  const validChildren = Array.isArray(children) 
+    ? children.filter(child => child && child.id && child.name)
+    : [];
+
+  return (
+    <View style={styles.childrenHeaderContainer}>
+      {validChildren.slice(0, 3).map((child, index) => (
+        <TouchableOpacity
+          key={child.id}
+          style={[
+            styles.childHeaderItem,
+            index > 0 && styles.childHeaderItemOverlap,
+          ]}
+          onPress={() => handleSelectChild(child)}
+        >
+          <View
+            style={[
+              styles.childHeaderAvatar,
+              child.id === selectedChildId && styles.childHeaderAvatarSelected,
+            ]}
+          >
+            {child.photoUrl ? (
+              <Image
+                source={{ uri: child.photoUrl }}
+                style={styles.childHeaderImage}
+              />
+            ) : (
+              <View style={styles.childHeaderPlaceholder}>
+                <Text style={styles.childHeaderEmoji}>
+                  {child.isUnborn ? '🤰' : '👶'}
+                </Text>
+              </View>
+            )}
+          </View>
+          <Text style={styles.childHeaderName} numberOfLines={1}>
+            {child.name}
+          </Text>
+        </TouchableOpacity>
+      ))}
+      {validChildren.length > 3 && (
+        <View style={[styles.childHeaderItem, styles.childHeaderItemOverlap]}>
+          <View style={styles.childHeaderMoreBadge}>
+            <Text style={styles.childHeaderMoreText}>+{validChildren.length - 3}</Text>
+          </View>
+        </View>
+      )}
+      
+      {/* Botón Agregar Hijo */}
+      <TouchableOpacity
+        style={[styles.childHeaderItem, styles.addChildHeaderButton, validChildren.length > 0 && styles.childHeaderItemOverlap]}
+        onPress={handleAddChild}
+      >
+        <View style={styles.childHeaderAvatar}>
+          <Ionicons name="add" size={28} color="#96d2d3" />
+        </View>
+        <Text style={styles.childHeaderName}>Agregar</Text>
+      </TouchableOpacity>
+    </View>
+  );
+};
+
 // Navegador para usuarios autenticados
 const AuthenticatedNavigator = () => {
   const [initialRoute, setInitialRoute] = React.useState<string | null>(null);
@@ -97,7 +225,6 @@ const AuthenticatedNavigator = () => {
     const checkChildren = async () => {
       // Si es el mismo usuario, no verificar de nuevo
       if (user && userIdRef.current === user.id && initialRoute) {
-        console.log('✅ Mismo usuario, usando ruta guardada:', initialRoute);
         return;
       }
       
@@ -114,14 +241,12 @@ const AuthenticatedNavigator = () => {
       
       try {
         const hasChildrenStored = await AsyncStorage.getItem('hasChildren');
-        console.log('🔍 Verificando si tiene hijos guardados:', hasChildrenStored);
         
         // Siempre verificar con el backend si es null o false (para asegurar que esté actualizado)
         if (hasChildrenStored === null || hasChildrenStored === 'false') {
           // Primera vez que el usuario inicia sesión, verificar perfil y luego hijos
           try {
             const authToken = await AsyncStorage.getItem('authToken');
-            console.log('🔑 Token para verificar datos:', authToken ? authToken.substring(0, 20) + '...' : 'null');
             
             if (!authToken) {
               console.log('⚠️ No hay token, ir a MainTabs por defecto');
@@ -223,13 +348,13 @@ const AuthenticatedNavigator = () => {
     <Stack.Navigator
       screenOptions={{
         headerStyle: {
-          backgroundColor: '#887CBC',
+          backgroundColor: '#96d2d3',
         },
         headerTintColor: 'white',
         headerTitleStyle: {
           fontWeight: 'bold',
         },
-        headerLeft: () => <MenuButton />,
+        headerRight: () => <ProfileButton />,
       }}
       initialRouteName={initialRoute}
     >
@@ -266,11 +391,70 @@ const AuthenticatedNavigator = () => {
         }}
       />
       <Stack.Screen
+        name="ChildrenList"
+        component={ChildrenListScreen}
+        options={{
+          headerShown: false,
+        }}
+      />
+      <Stack.Screen
+        name="ShareChild"
+        component={ShareChildScreen}
+        options={{
+          headerShown: false,
+        }}
+      />
+      <Stack.Screen
+        name="ChildInvitations"
+        component={ChildInvitationsScreen}
+        options={{
+          headerShown: false,
+        }}
+      />
+      <Stack.Screen
+        name="AcceptInvitation"
+        component={AcceptInvitationScreen}
+        options={{
+          headerShown: false,
+        }}
+      />
+      <Stack.Screen
         name="Profile"
         component={ProfileScreen}
         options={{
           title: 'Mi Perfil',
           headerShown: true,
+        }}
+      />
+      <Stack.Screen
+        name="SleepTracker"
+        component={SleepTrackerScreen}
+        options={{
+          title: 'Seguimiento de Sueño',
+          headerShown: false,
+        }}
+      />
+      <Stack.Screen
+        name="EditSleepEvent"
+        component={EditSleepEventScreen}
+        options={{
+          title: 'Editar Siesta',
+          headerShown: false,
+        }}
+      />
+      <Stack.Screen
+        name="Notifications"
+        component={NotificationsScreen}
+        options={{
+          title: 'Notificaciones',
+          headerShown: true,
+          headerStyle: {
+            backgroundColor: '#96d2d3',
+          },
+          headerTintColor: 'white',
+          headerTitleStyle: {
+            fontWeight: 'bold',
+          },
         }}
       />
       <Stack.Screen
@@ -280,21 +464,13 @@ const AuthenticatedNavigator = () => {
           title: 'DOULI',
           headerShown: true,
           headerStyle: {
-            backgroundColor: '#59C6C0',
+            backgroundColor: '#96d2d3',
           },
           headerTintColor: 'white',
           headerTitleStyle: {
             fontWeight: 'bold',
           },
-          headerLeft: () => null,
-          headerRight: () => (
-            <TouchableOpacity
-              style={styles.closeButton}
-              onPress={() => navigation.goBack()}
-            >
-              <Ionicons name="close" size={28} color="white" />
-            </TouchableOpacity>
-          ),
+          headerRight: () => <ProfileButton />,
         })}
       />
       <Stack.Screen
@@ -326,6 +502,13 @@ const AuthenticatedNavigator = () => {
         }}
       />
       <Stack.Screen
+        name="ProductConversations"
+        component={ProductConversationsScreen}
+        options={{
+          headerShown: false,
+        }}
+      />
+      <Stack.Screen
         name="MarketplaceMessages"
         component={MarketplaceMessagesScreen}
         options={{
@@ -342,13 +525,13 @@ const HomeStackNavigator = () => {
     <Stack.Navigator
       screenOptions={{
         headerStyle: {
-          backgroundColor: '#59C6C0',
+          backgroundColor: '#96d2d3',
+          height: 100, // Altura moderada // Altura reducida
         },
         headerTintColor: 'white',
         headerTitleStyle: {
           fontWeight: 'bold',
         },
-        headerLeft: () => <MenuButton />,
         headerRight: () => <ProfileButton />,
       }}
     >
@@ -356,8 +539,9 @@ const HomeStackNavigator = () => {
         name="HomeMain"
         component={HomeScreen}
         options={{
-          title: 'Inicio',
+          headerTitle: () => <ChildrenHeaderTitle />,
           headerShown: true,
+          headerTitleAlign: 'left', // Alineado a la izquierda en iOS
         }}
       />
       <Stack.Screen
@@ -384,6 +568,14 @@ const HomeStackNavigator = () => {
           headerShown: false, // Usamos header personalizado
         }}
       />
+      <Stack.Screen
+        name="PostDetail"
+        component={PostDetailScreen}
+        options={{
+          title: 'Post Completo',
+          headerShown: false, // Usamos header personalizado
+        }}
+      />
     </Stack.Navigator>
   );
 };
@@ -394,13 +586,13 @@ const CommunitiesStackNavigator = () => {
     <Stack.Navigator
       screenOptions={{
         headerStyle: {
-          backgroundColor: '#59C6C0',
+          backgroundColor: '#96d2d3',
+          height: 100, // Altura moderada
         },
         headerTintColor: 'white',
         headerTitleStyle: {
           fontWeight: 'bold',
         },
-        headerLeft: () => <MenuButton />,
         headerRight: () => <ProfileButton />,
       }}
     >
@@ -408,8 +600,9 @@ const CommunitiesStackNavigator = () => {
         name="CommunitiesMain"
         component={CommunitiesScreen}
         options={{
-          title: 'Comunidades',
+          headerTitle: () => <ChildrenHeaderTitle />,
           headerShown: true,
+          headerTitleAlign: 'left',
         }}
       />
       <Stack.Screen
@@ -444,49 +637,43 @@ const CommunitiesStackNavigator = () => {
           headerShown: false, // Usamos header personalizado
         }}
       />
+      <Stack.Screen
+        name="PostDetail"
+        component={PostDetailScreen}
+        options={{
+          title: 'Post Completo',
+          headerShown: false, // Usamos header personalizado
+        }}
+      />
     </Stack.Navigator>
   );
 };
 
-// Stack Navigator para Lists con sus sub-pantallas
-const ListsStackNavigator = () => {
+// Stack Navigator para Doula Chat
+const DoulaStackNavigator = () => {
   return (
     <Stack.Navigator
       screenOptions={{
         headerStyle: {
-          backgroundColor: '#59C6C0',
+          backgroundColor: '#96d2d3',
+          height: 100, // Altura moderada
         },
         headerTintColor: 'white',
         headerTitleStyle: {
           fontWeight: 'bold',
         },
-        headerLeft: () => <MenuButton />,
         headerRight: () => <ProfileButton />,
       }}
     >
       <Stack.Screen
-        name="ListsMain"
-        component={ListsScreen}
-        options={{
-          title: 'Listas',
+        name="DoulaMain"
+        component={DoulaChatScreen}
+        options={({ navigation }) => ({
+          headerTitle: () => <ChildrenHeaderTitle />,
           headerShown: true,
-        }}
-      />
-      <Stack.Screen
-        name="ListDetail"
-        component={ListDetailScreen}
-        options={{
-          title: 'Detalle de Lista',
-          headerShown: false, // Usamos header personalizado
-        }}
-      />
-      <Stack.Screen
-        name="ItemComments"
-        component={ItemCommentsScreen}
-        options={{
-          title: 'Comentarios del Item',
-          headerShown: false, // Usamos header personalizado
-        }}
+          headerTitleAlign: 'left',
+          headerRight: () => <ProfileButton />,
+        })}
       />
     </Stack.Navigator>
   );
@@ -498,13 +685,13 @@ const RecommendationsStackNavigator = () => {
     <Stack.Navigator
       screenOptions={{
         headerStyle: {
-          backgroundColor: '#59C6C0',
+          backgroundColor: '#96d2d3',
+          height: 100, // Altura moderada
         },
         headerTintColor: 'white',
         headerTitleStyle: {
           fontWeight: 'bold',
         },
-        headerLeft: () => <MenuButton />,
         headerRight: () => <ProfileButton />,
       }}
     >
@@ -512,8 +699,9 @@ const RecommendationsStackNavigator = () => {
         name="RecommendationsMain"
         component={RecommendationsScreen}
         options={{
-          title: 'Recomendaciones',
+          headerTitle: () => <ChildrenHeaderTitle />,
           headerShown: true,
+          headerTitleAlign: 'left',
         }}
       />
       <Stack.Screen
@@ -530,6 +718,30 @@ const RecommendationsStackNavigator = () => {
         options={{
           title: 'Detalle',
           headerShown: false, // Usamos header personalizado en la pantalla
+        }}
+      />
+      <Stack.Screen
+        name="ListsMain"
+        component={ListsScreen}
+        options={{
+          title: 'Listas',
+          headerShown: false, // Usamos header personalizado
+        }}
+      />
+      <Stack.Screen
+        name="ListDetail"
+        component={ListDetailScreen}
+        options={{
+          title: 'Detalle de Lista',
+          headerShown: false, // Usamos header personalizado
+        }}
+      />
+      <Stack.Screen
+        name="ItemComments"
+        component={ItemCommentsScreen}
+        options={{
+          title: 'Comentarios del Item',
+          headerShown: false, // Usamos header personalizado
         }}
       />
       <Stack.Screen
@@ -569,7 +781,7 @@ const MainTabNavigator = () => {
       <Tab.Navigator
         screenOptions={{
           tabBarStyle: {
-            backgroundColor: '#887CBC',
+            backgroundColor: '#96d2d3',
             borderTopWidth: 0,
             paddingTop: Platform.OS === 'ios' ? 8 : 12,
             paddingBottom: Platform.OS === 'ios' ? 30 : 22,
@@ -581,7 +793,7 @@ const MainTabNavigator = () => {
           tabBarLabelStyle: {
             fontSize: Platform.OS === 'ios' ? 10 : 11,
             fontWeight: '500',
-            marginTop: Platform.OS === 'ios' ? -3 : -2,
+            marginTop: Platform.OS === 'ios' ? 4 : 6,
             marginBottom: 0,
           },
         }}
@@ -590,7 +802,7 @@ const MainTabNavigator = () => {
         name="Home"
         component={HomeStackNavigator}
         options={{
-          tabBarLabel: 'Hijos',
+          tabBarLabel: 'Inicio',
           tabBarIcon: ({ color, size, focused }) => (
             <Image 
               source={require('../../assets/inicio.png')} 
@@ -621,40 +833,44 @@ const MainTabNavigator = () => {
         }}
       />
       <Tab.Screen
-        name="MunpaMarket"
-        component={MunpaMarketScreen}
+        name="Doula"
+        component={DoulaStackNavigator}
         options={{
           tabBarLabel: () => null,
-          headerShown: true,
-          headerTitle: 'MUNPA MARKET',
-          headerStyle: {
-            backgroundColor: '#59C6C0',
-          },
-          headerTintColor: 'white',
-          headerTitleStyle: {
-            fontWeight: 'bold',
-          },
-          headerLeft: () => <MenuButton />,
-          headerRight: () => <ProfileButton />,
+          headerShown: false,
           tabBarIcon: ({ color, size, focused }) => (
             <View style={[
               styles.doulaIconContainer,
               focused && styles.doulaIconActive
             ]}>
-              <Ionicons 
-                name="cart" 
-                size={50} 
-                color="white"
+              <Image 
+                source={require('../../assets/douli.png')} 
+                style={{ 
+                  width: 90, 
+                  height: 100, // Altura moderada
+                }} 
+                resizeMode="contain"
               />
             </View>
           ),
         }}
       />
       <Tab.Screen
-        name="Lists"
-        component={ListsStackNavigator}
+        name="MunpaMarket"
+        component={MunpaMarketScreen}
         options={{
-          tabBarLabel: 'Listas',
+          tabBarLabel: 'Market',
+          headerShown: true,
+          headerTitle: () => <ChildrenHeaderTitle />,
+          headerTitleAlign: 'left',
+          headerStyle: {
+            backgroundColor: '#96d2d3',
+          },
+          headerTintColor: 'white',
+          headerTitleStyle: {
+            fontWeight: 'bold',
+          },
+          headerRight: () => <ProfileButton />,
           tabBarIcon: ({ color, size, focused }) => (
             <Image 
               source={require('../../assets/listas.png')} 
@@ -666,19 +882,37 @@ const MainTabNavigator = () => {
             />
           ),
         }}
-        listeners={({ navigation }) => ({
-          tabPress: (e) => {
-            // Resetear el stack al presionar el tab
-            navigation.reset({
-              index: 0,
-              routes: [{ name: 'Lists', state: { routes: [{ name: 'ListsMain' }] } }],
-            });
-          },
-        })}
       />
       <Tab.Screen
         name="Recommendations"
         component={RecommendationsStackNavigator}
+        listeners={({ navigation }) => ({
+          tabPress: (e) => {
+            // Resetear el stack a RecommendationsMain cuando se presiona el tab
+            const state = navigation.getState();
+            const recommendationsTab = state.routes.find((r: any) => r.name === 'Recommendations');
+            
+            if (recommendationsTab) {
+              const recommendationsState = recommendationsTab.state;
+              // Si hay más de una pantalla en el stack, resetear
+              if (recommendationsState && typeof recommendationsState.index === 'number' && recommendationsState.index > 0) {
+                e.preventDefault();
+                navigation.reset({
+                  index: 0,
+                  routes: [
+                    {
+                      name: 'Recommendations',
+                      state: {
+                        routes: [{ name: 'RecommendationsMain' }],
+                        index: 0,
+                      },
+                    },
+                  ],
+                });
+              }
+            }
+          },
+        })}
         options={{
           tabBarLabel: 'Recomendaciones',
           tabBarIcon: ({ color, size, focused }) => (
@@ -694,9 +928,6 @@ const MainTabNavigator = () => {
         }}
       />
       </Tab.Navigator>
-      
-      {/* Chat flotante de DOULI sobre el tab bar */}
-      <DouliChatOverlay />
     </View>
   );
 };
@@ -707,7 +938,7 @@ const AuthNavigator = () => {
     <Stack.Navigator
       screenOptions={{
         headerStyle: {
-          backgroundColor: '#887CBC',
+          backgroundColor: '#96d2d3',
         },
         headerTintColor: 'white',
         headerTitleStyle: {
@@ -770,6 +1001,110 @@ const LoadingScreen = () => (
 const AppNavigator = () => {
   const { isAuthenticated, isLoading } = useAuth();
   const { isMenuOpen, closeMenu } = useMenu();
+  const navigationRef = useRef<NavigationContainerRef<any>>(null);
+
+  // Activar deep linking
+  useDeepLinking();
+
+  // Establecer navigationRef global para deep linking
+  React.useEffect(() => {
+    // Establecer inmediatamente si ya está disponible
+    if (navigationRef.current) {
+      setNavigationRef(navigationRef.current);
+    }
+    
+    // También establecer después de un pequeño delay para asegurar que esté listo
+    const timer = setTimeout(() => {
+      if (navigationRef.current) {
+        setNavigationRef(navigationRef.current);
+      }
+    }, 200);
+    
+    return () => {
+      clearTimeout(timer);
+      setNavigationRef(null);
+    };
+  }, [isAuthenticated, navigationRef.current]);
+
+  // Configurar función global para navegación desde notificaciones
+  React.useEffect(() => {
+    (global as any).handleNotificationNavigation = ({ type, screen, data }: any) => {
+      if (!navigationRef.current) {
+        console.warn('⚠️ [NAV] Navigation ref no está disponible');
+        return;
+      }
+
+      console.log('🧭 [NAV] Navegando desde notificación:', { type, screen, data });
+
+      try {
+        switch (type) {
+          case 'new_message':
+            // Navegar a MarketplaceMessagesScreen
+            navigationRef.current.navigate('MarketplaceMessages', {
+              productId: data?.productId,
+              otherUserId: data?.senderId,
+            });
+            break;
+
+          case 'purchase':
+          case 'reservation':
+          case 'interest':
+            // Navegar a MyProductsScreen
+            navigationRef.current.navigate('MyProducts');
+            break;
+
+          case 'admin_notification':
+          case 'broadcast':
+            // Navegar a la pantalla especificada
+            if (screen) {
+              let screenName = screen.replace('Screen', '');
+              
+              // Mapear pantallas conocidas a sus rutas correctas
+              if (screenName === 'Home' || screenName === 'HomeMain') {
+                // Home está dentro de MainTabs
+                navigationRef.current.navigate('MainTabs');
+                return;
+              }
+              
+              // Intentar navegación directa primero (para pantallas en AuthenticatedNavigator)
+              const directScreens = ['MyProducts', 'MarketplaceMessages', 'ProductDetail', 'CreateProduct', 'MarketplaceFavorites', 'Notifications', 'Profile', 'Doula'];
+              if (directScreens.includes(screenName)) {
+                try {
+                  navigationRef.current.navigate(screenName as any);
+                  return;
+                } catch (err) {
+                  console.warn(`⚠️ [NAV] No se pudo navegar directamente a ${screenName}, intentando navegación anidada...`);
+                }
+              }
+              
+              // Para otras pantallas, intentar navegación anidada a través de MainTabs
+              try {
+                navigationRef.current.navigate('MainTabs', {
+                  screen: screenName as any,
+                });
+              } catch (err) {
+                console.warn(`⚠️ [NAV] No se pudo navegar a ${screenName}, navegando a MainTabs por defecto`);
+                navigationRef.current.navigate('MainTabs');
+              }
+            } else {
+              // Navegar a MainTabs (que tiene Home como tab por defecto)
+              navigationRef.current.navigate('MainTabs');
+            }
+            break;
+
+          default:
+            // Navegar a MainTabs por defecto (que tiene Home como tab por defecto)
+            navigationRef.current.navigate('MainTabs');
+        }
+      } catch (error) {
+        console.error('❌ [NAV] Error navegando desde notificación:', error);
+      }
+    };
+
+    return () => {
+      delete (global as any).handleNotificationNavigation;
+    };
+  }, []);
 
   if (isLoading) {
     return <LoadingScreen />;
@@ -777,12 +1112,13 @@ const AppNavigator = () => {
 
   return (
     <NavigationContainer
+      ref={navigationRef}
       theme={{
         dark: false,
         colors: {
-          background: '#887CBC',
+          background: '#96d2d3',
           primary: '#B4C14B',
-          card: '#887CBC',
+          card: '##96d2d3',
           text: '#FFFFFF',
           border: '#A99DD9',
           notification: '#B4C14B',
@@ -811,6 +1147,9 @@ const AppNavigator = () => {
       
       {/* Menú Global */}
       <GlobalMenu visible={isMenuOpen} onClose={closeMenu} />
+      
+      {/* Burbuja de Douli con mensajes de valor */}
+      {isAuthenticated && <DouliChatOverlay />}
     </NavigationContainer>
   );
 };
@@ -820,14 +1159,10 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#887CBC',
-  },
-  menuButton: {
-    padding: 8,
-    marginLeft: 8,
+    backgroundColor: '#96d2d3',
   },
   doulaIconContainer: {
-    backgroundColor: '#887CBC',
+    backgroundColor: '#96d2d3',
     borderRadius: 50,
     padding: 0,
     width: 80,
@@ -846,7 +1181,7 @@ const styles = StyleSheet.create({
     top: -10,
   },
   doulaIconActive: {
-    backgroundColor: '#887CBC',
+    backgroundColor: '#96d2d3',
     transform: [{ scale: 1.05 }],
     shadowOpacity: 0.4,
     shadowRadius: 16,
@@ -882,6 +1217,90 @@ const styles = StyleSheet.create({
   closeButton: {
     padding: 8,
     marginRight: 8,
+  },
+  childrenHeaderContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'flex-start',
+    paddingLeft: 16,
+    paddingRight: 8,
+    paddingBottom: 8,
+    paddingTop: 20, // Aumentado para bajar los avatares
+    height: '100%',
+  },
+  childHeaderItem: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 4,
+  },
+  childHeaderItemOverlap: {
+    marginLeft: -10,
+  },
+  childHeaderAvatar: {
+    width: 45,
+    height: 45,
+    borderRadius: 22.5,
+    backgroundColor: '#FFF',
+    borderWidth: 3,
+    borderColor: '#96d2d3',
+    overflow: 'hidden',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  childHeaderAvatarSelected: {
+    borderColor: '#FFFFFF',
+    borderWidth: 4,
+    shadowColor: '#FFF',
+    shadowOffset: {
+      width: 0,
+      height: 0,
+    },
+    shadowOpacity: 0.8,
+    shadowRadius: 4,
+    elevation: 8,
+  },
+  childHeaderName: {
+    fontSize: 8,
+    color: '#FFF',
+    marginTop: 1,
+    fontWeight: '600',
+    maxWidth: 70,
+    textAlign: 'center',
+  },
+  childHeaderImage: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
+  },
+  childHeaderPlaceholder: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#F0F0F0',
+  },
+  childHeaderEmoji: {
+    fontSize: 24,
+  },
+  childHeaderMoreBadge: {
+    width: 45,
+    height: 45,
+    borderRadius: 22.5,
+    backgroundColor: '#FFF',
+    borderWidth: 3,
+    borderColor: '#96d2d3',
+    marginLeft: -15,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  childHeaderMoreText: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#96d2d3',
+  },
+  addChildHeaderButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });
 

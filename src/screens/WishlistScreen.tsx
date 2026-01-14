@@ -241,7 +241,7 @@ const WishlistScreen = ({ navigation }: any) => {
     <SafeAreaView style={styles.container}>
       <View style={styles.content}>
         {/* Header */}
-        <StatusBar barStyle="light-content" backgroundColor="#59C6C0" />
+        <StatusBar barStyle="light-content" backgroundColor="#96d2d3" />
         <LinearGradient colors={['#59C6C0', '#4AB8B3']} style={[styles.header, { paddingTop: Math.max(insets.top, Platform.OS === 'ios' ? 15 : 10) }]}>
         <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
           <Ionicons name="arrow-back" size={24} color="#FFF" />
@@ -320,11 +320,11 @@ const WishlistScreen = ({ navigation }: any) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#59C6C0',
+    backgroundColor: '#96d2d3',
   },
   content: {
     flex: 1,
-    backgroundColor: '#F8F9FA',
+    backgroundColor: '#F7FAFC',
   },
   scrollView: {
     flex: 1,
@@ -365,7 +365,7 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   card: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#F7FAFC',
     borderRadius: 16,
     marginBottom: 20,
     shadowColor: '#000',
@@ -527,7 +527,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: '#59C6C0',
+    backgroundColor: '#96d2d3',
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 25,
@@ -563,7 +563,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: '#59C6C0',
+    backgroundColor: '#96d2d3',
     paddingHorizontal: 24,
     paddingVertical: 14,
     borderRadius: 25,

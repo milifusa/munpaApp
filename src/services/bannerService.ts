@@ -2,6 +2,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const API_BASE_URL = 'https://api.munpa.online/api';
 
+export type BannerSection = 'home' | 'marketplace' | 'products' | 'comunidades' | 'recomendaciones';
+
 export interface Banner {
   id: string;
   title: string;
@@ -16,6 +18,7 @@ export interface Banner {
   isActive: boolean;
   views: number;
   clicks: number;
+  section?: BannerSection; // NUEVO: Sección del banner
   createdAt?: string;
   updatedAt?: string;
   createdBy?: string;
@@ -47,37 +50,48 @@ class BannerService {
   }
 
   // Obtener banners activos (público)
-  async getActiveBanners(): Promise<Banner[]> {
+  // section: opcional, filtra banners por sección. Si no se proporciona, devuelve todos los banners activos
+  async getActiveBanners(section?: BannerSection): Promise<Banner[]> {
     try {
-      console.log('📢 [BANNERS] Obteniendo banners activos');
+      // Construir URL con parámetro de sección si se proporciona
+      let url = `${API_BASE_URL}/banners`;
+      if (section) {
+        url += `?section=${section}`;
+      }
       
-      const response = await fetch(`${API_BASE_URL}/banners`, {
+      
+      const response = await fetch(url, {
         method: 'GET',
         headers: await this.getHeaders(false),
       });
 
       if (!response.ok) {
         if (response.status === 404) {
-          console.warn('⚠️ [BANNERS] Endpoint no disponible (404), retornando array vacío');
           return [];
         }
         const errorData = await response.json().catch(() => ({}));
-        console.error('❌ [BANNERS] Error obteniendo banners:', errorData);
         throw new Error(errorData.message || 'Error obteniendo banners');
       }
 
       const data = await response.json();
-      console.log('📦 [BANNERS] Respuesta completa del servidor:', JSON.stringify(data).substring(0, 300));
       
       // Manejar diferentes formatos de respuesta
-      const banners = data.data || data.banners || (Array.isArray(data) ? data : []);
+      let banners = data.data || data.banners || (Array.isArray(data) ? data : []);
       
       if (!Array.isArray(banners)) {
         console.warn('⚠️ [BANNERS] Los banners no son un array, retornando array vacío');
         return [];
       }
       
-      console.log('✅ [BANNERS] Banners encontrados:', banners.length);
+      // Si se solicitó una sección específica, filtrar por esa sección en el frontend también
+      // (por si el backend no filtra correctamente)
+      if (section && banners.length > 0) {
+        const filteredBanners = banners.filter((banner: any) => {
+          const bannerSection = banner.section || 'home'; // Default a 'home' si no tiene sección
+          return bannerSection === section;
+        });
+        banners = filteredBanners;
+      }
       return banners as Banner[];
     } catch (error) {
       console.error('❌ [BANNERS] Error en getActiveBanners:', error);

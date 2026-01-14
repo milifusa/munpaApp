@@ -8,11 +8,14 @@ import {
   ActivityIndicator,
   Alert,
   Dimensions,
+  Platform,
 } from 'react-native';
-import { WebView } from 'react-native-webview';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { AppleMaps, GoogleMaps } from 'expo-maps';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import api from '../services/api';
+import { shareContentHelper } from '../utils/shareContentHelper';
 
 const { width, height } = Dimensions.get('window');
 
@@ -35,10 +38,21 @@ interface Recommendation {
 }
 
 const FavoritesMapScreen = ({ navigation }: any) => {
+  const insets = useSafeAreaInsets();
   const [favorites, setFavorites] = useState<Recommendation[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedMarker, setSelectedMarker] = useState<Recommendation | null>(null);
+  const [mapLoaded, setMapLoaded] = useState(false);
+  const [mapCenter, setMapCenter] = useState<{ latitude: number; longitude: number } | null>(null);
+
+  // Resetear mapLoaded cuando cambian los favoritos o el centro
+  useEffect(() => {
+    if (mapCenter && favorites.length > 0) {
+      console.log('🔄 [MAP] Reseteando mapLoaded a false para nuevo mapa');
+      setMapLoaded(false);
+    }
+  }, [mapCenter?.latitude, mapCenter?.longitude, favorites.length]);
 
   useEffect(() => {
     loadFavorites();
@@ -60,6 +74,14 @@ const FavoritesMapScreen = ({ navigation }: any) => {
       
       console.log('🗺️ [FAVORITES MAP] Favoritos con ubicación:', favoritesWithLocation.length);
       setFavorites(favoritesWithLocation);
+      
+      // Calcular el centro del mapa si hay favoritos
+      if (favoritesWithLocation.length > 0) {
+        const centerLat = favoritesWithLocation.reduce((sum, f) => sum + (f.latitude || 0), 0) / favoritesWithLocation.length;
+        const centerLng = favoritesWithLocation.reduce((sum, f) => sum + (f.longitude || 0), 0) / favoritesWithLocation.length;
+        setMapCenter({ latitude: centerLat, longitude: centerLng });
+        console.log('🗺️ [FAVORITES MAP] Centro del mapa calculado:', { latitude: centerLat, longitude: centerLng });
+      }
     } catch (error: any) {
       console.error('❌ [FAVORITES MAP] Error cargando favoritos:', error);
       setError(error.message || 'Error al cargar favoritos');
@@ -68,185 +90,37 @@ const FavoritesMapScreen = ({ navigation }: any) => {
     }
   };
 
-  const generateMapHTML = () => {
-    if (favorites.length === 0) {
-      return `
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <style>
-            body { margin: 0; padding: 0; display: flex; justify-content: center; align-items: center; height: 100vh; background: #f5f5f5; }
-            .message { text-align: center; padding: 20px; color: #666; }
-          </style>
-        </head>
-        <body>
-          <div class="message">
-            <h2>No hay favoritos con ubicación</h2>
-            <p>Agrega favoritos con dirección para verlos en el mapa</p>
-          </div>
-        </body>
-        </html>
-      `;
-    }
-
-    // Calcular el centro del mapa (promedio de todas las coordenadas)
-    const centerLat = favorites.reduce((sum, f) => sum + (f.latitude || 0), 0) / favorites.length;
-    const centerLng = favorites.reduce((sum, f) => sum + (f.longitude || 0), 0) / favorites.length;
-
-    // Generar marcadores
-    const markersData = favorites.map((fav, index) => ({
-      lat: fav.latitude,
-      lng: fav.longitude,
-      title: fav.name.replace(/"/g, '\\"').replace(/'/g, "\\'"),
-      info: (fav.category?.name || 'Sin categoría').replace(/"/g, '\\"').replace(/'/g, "\\'"),
-      id: fav.id,
-      number: index + 1
-    }));
-
-    const markersJSON = JSON.stringify(markersData);
-
-    // Google Maps API Key
-    const GOOGLE_MAPS_API_KEY = "AIzaSyCKFJ0Im2SQG6V4U_PZc2vd1DBIm6E6-kc";
-
-    return `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-        <style>
-          * { margin: 0; padding: 0; box-sizing: border-box; }
-          html, body, #map { height: 100%; width: 100%; }
-          .info-window {
-            padding: 10px;
-            max-width: 200px;
-          }
-          .info-window h3 {
-            margin: 0 0 5px 0;
-            font-size: 14px;
-            font-weight: bold;
-            color: #333;
-          }
-          .info-window p {
-            margin: 0;
-            font-size: 12px;
-            color: #666;
-          }
-          .info-window button {
-            margin-top: 8px;
-            padding: 6px 12px;
-            background: #887CBC;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            font-size: 12px;
-            cursor: pointer;
-            width: 100%;
-          }
-        </style>
-      </head>
-      <body>
-        <div id="map"></div>
-        <script src="https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}"></script>
-        <script>
-          const markers = ${markersJSON};
-          
-          function initMap() {
-            const map = new google.maps.Map(document.getElementById('map'), {
-              center: { lat: ${centerLat}, lng: ${centerLng} },
-              zoom: 12,
-              styles: [
-                {
-                  featureType: 'poi',
-                  elementType: 'labels',
-                  stylers: [{ visibility: 'off' }]
-                }
-              ]
-            });
-
-            const bounds = new google.maps.LatLngBounds();
-
-            markers.forEach((markerData) => {
-              const marker = new google.maps.Marker({
-                position: { lat: markerData.lat, lng: markerData.lng },
-                map: map,
-                title: markerData.title,
-                icon: {
-                  path: google.maps.SymbolPath.CIRCLE,
-                  scale: 10,
-                  fillColor: '#FF6B6B',
-                  fillOpacity: 1,
-                  strokeColor: '#FFFFFF',
-                  strokeWeight: 3,
-                },
-                label: {
-                  text: String(markerData.number),
-                  color: 'white',
-                  fontSize: '12px',
-                  fontWeight: 'bold'
-                }
-              });
-
-              bounds.extend({ lat: markerData.lat, lng: markerData.lng });
-
-              const infoWindow = new google.maps.InfoWindow({
-                content: 
-                  '<div class="info-window">' +
-                    '<h3>' + markerData.title + '</h3>' +
-                    '<p>' + markerData.info + '</p>' +
-                    '<button onclick="handleMarkerClick(\'' + markerData.id + '\')">' +
-                      'Ver Detalles' +
-                    '</button>' +
-                  '</div>'
-              });
-
-              marker.addListener('click', function() {
-                infoWindow.open(map, marker);
-              });
-            });
-
-            // Ajustar el mapa para mostrar todos los marcadores
-            if (markers.length > 1) {
-              map.fitBounds(bounds);
-            }
-          }
-
-          function handleMarkerClick(id) {
-            window.ReactNativeWebView.postMessage(JSON.stringify({
-              type: 'markerClick',
-              id: id
-            }));
-          }
-
-          initMap();
-        </script>
-      </body>
-      </html>
-    `;
-  };
-
-  const handleWebViewMessage = (event: any) => {
-    try {
-      const data = JSON.parse(event.nativeEvent.data);
-      if (data.type === 'markerClick') {
-        const recommendation = favorites.find(f => f.id === data.id);
-        if (recommendation) {
-          navigation.navigate('RecommendationDetail', {
-            recommendationId: recommendation.id,
-          });
+  // Ocultar loading cuando el mapa se carga
+  // En Android, onMapLoaded debería ejecutarse, pero agregamos un timeout de respaldo
+  useEffect(() => {
+    if (mapCenter && favorites.length > 0) {
+      console.log('⏱️ [MAP] Iniciando timeout de respaldo para ocultar loading');
+      const timeoutId = setTimeout(() => {
+        if (!mapLoaded) {
+          console.log('⚠️ [MAP] onMapLoaded no se ejecutó, ocultando loading después de 3 segundos (timeout de respaldo)');
+          setMapLoaded(true);
         }
-      }
-    } catch (error) {
-      console.error('Error parsing webview message:', error);
+      }, 3000); // 3 segundos de respaldo
+
+      return () => {
+        clearTimeout(timeoutId);
+      };
     }
+  }, [mapCenter, favorites, mapLoaded]);
+
+  const handleMarkerClick = (recommendation: Recommendation) => {
+    setSelectedMarker(recommendation);
+    navigation.navigate('RecommendationDetail', {
+      recommendationId: recommendation.id,
+    });
   };
 
   if (isLoading) {
     return (
       <SafeAreaView style={styles.container}>
         <LinearGradient
-          colors={['#887CBC', '#59C6C0']}
-          style={styles.header}
+          colors={['#59C6C0', '#4DB8B3']}
+          style={[styles.header, { paddingTop: insets.top + 10 }]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 0 }}
         >
@@ -262,7 +136,7 @@ const FavoritesMapScreen = ({ navigation }: any) => {
           <View style={{ width: 40 }} />
         </LinearGradient>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#887CBC" />
+          <ActivityIndicator size="large" color="#59C6C0" />
           <Text style={styles.loadingText}>Cargando mapa...</Text>
         </View>
       </SafeAreaView>
@@ -273,8 +147,8 @@ const FavoritesMapScreen = ({ navigation }: any) => {
     return (
       <SafeAreaView style={styles.container}>
         <LinearGradient
-          colors={['#887CBC', '#59C6C0']}
-          style={styles.header}
+          colors={['#59C6C0', '#4DB8B3']}
+          style={[styles.header, { paddingTop: insets.top + 10 }]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 0 }}
         >
@@ -304,8 +178,8 @@ const FavoritesMapScreen = ({ navigation }: any) => {
     return (
       <SafeAreaView style={styles.container}>
         <LinearGradient
-          colors={['#887CBC', '#59C6C0']}
-          style={styles.header}
+          colors={['#59C6C0', '#4DB8B3']}
+          style={[styles.header, { paddingTop: insets.top + 10 }]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 0 }}
         >
@@ -340,8 +214,8 @@ const FavoritesMapScreen = ({ navigation }: any) => {
   return (
     <SafeAreaView style={styles.container}>
       <LinearGradient
-        colors={['#887CBC', '#59C6C0']}
-        style={styles.header}
+        colors={['#59C6C0', '#4DB8B3']}
+        style={[styles.header, { paddingTop: insets.top + 10 }]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 0 }}
       >
@@ -357,27 +231,169 @@ const FavoritesMapScreen = ({ navigation }: any) => {
             {favorites.length} {favorites.length === 1 ? 'lugar' : 'lugares'}
           </Text>
         </View>
-        <TouchableOpacity
-          style={styles.refreshButton}
-          onPress={loadFavorites}
-        >
-          <Ionicons name="refresh" size={24} color="white" />
-        </TouchableOpacity>
+        <View style={styles.headerActions}>
+          <TouchableOpacity
+            style={styles.headerActionButton}
+            onPress={() => shareContentHelper.shareRecommendationsFavorites()}
+          >
+            <Ionicons name="share-outline" size={24} color="white" />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.headerActionButton}
+            onPress={loadFavorites}
+          >
+            <Ionicons name="refresh" size={24} color="white" />
+          </TouchableOpacity>
+        </View>
       </LinearGradient>
 
-      <WebView
-        source={{ html: generateMapHTML() }}
-        style={styles.map}
-        onMessage={handleWebViewMessage}
-        javaScriptEnabled={true}
-        domStorageEnabled={true}
-        startInLoadingState={true}
-        renderLoading={() => (
-          <View style={styles.mapLoading}>
-            <ActivityIndicator size="large" color="#887CBC" />
-          </View>
-        )}
-      />
+      {mapCenter ? (
+        <View style={styles.mapContainer}>
+          {(() => {
+            console.log('🔍 [MAP] ========== RENDERIZANDO MAPA ==========');
+            console.log('🔍 [MAP] mapCenter:', mapCenter);
+            console.log('🔍 [MAP] favorites.length:', favorites.length);
+            console.log('🔍 [MAP] Platform.OS:', Platform.OS);
+            console.log('🔍 [MAP] GoogleMaps disponible:', typeof GoogleMaps !== 'undefined');
+            console.log('🔍 [MAP] AppleMaps disponible:', typeof AppleMaps !== 'undefined');
+
+            const hasAppleMaps = Platform.OS === 'ios' && AppleMaps && AppleMaps.View;
+            const hasGoogleMaps = Platform.OS === 'android' && GoogleMaps && GoogleMaps.View;
+
+            if (hasAppleMaps || hasGoogleMaps) {
+              console.log('✅ [MAP] Renderizando', Platform.OS === 'ios' ? 'AppleMaps.View' : 'GoogleMaps.View');
+
+              // Crear marcadores según la plataforma
+              const markers = favorites.map((fav, index) => {
+                if (Platform.OS === 'ios') {
+                  return {
+                    id: `marker-${fav.id}`,
+                    coordinates: {
+                      latitude: fav.latitude!,
+                      longitude: fav.longitude!,
+                    },
+                    title: fav.name,
+                    subtitle: fav.category?.name || 'Sin categoría',
+                  };
+                } else {
+                  return {
+                    id: `marker-${fav.id}`,
+                    coordinates: {
+                      latitude: fav.latitude!,
+                      longitude: fav.longitude!,
+                    },
+                    title: fav.name,
+                  };
+                }
+              });
+
+              console.log('📍 [MAP] Marcadores creados:', markers.length);
+
+              console.log('🔍 [MAP] Estado mapLoaded:', mapLoaded);
+              console.log('🔍 [MAP] Renderizando mapa con', markers.length, 'marcadores');
+              
+              return (
+                <>
+                  {!mapLoaded ? (
+                    <View style={styles.mapLoadingOverlay}>
+                      <ActivityIndicator size="large" color="#59C6C0" />
+                      <Text style={styles.mapLoadingText}>Cargando mapa...</Text>
+                    </View>
+                  ) : null}
+                  {Platform.OS === 'ios' ? (
+                    <AppleMaps.View
+                      style={styles.map}
+                      cameraPosition={{
+                        latitude: mapCenter.latitude,
+                        longitude: mapCenter.longitude,
+                        zoom: favorites.length > 1 ? 12 : 15,
+                      } as any}
+                      annotations={markers}
+                      onCameraMove={(event: any) => {
+                        if (!mapLoaded) {
+                          console.log('✅ [MAP] Mapa está cargado (detectado por onCameraMove)');
+                          setMapLoaded(true);
+                        }
+                      }}
+                      onMarkerClick={(event: any) => {
+                        console.log('📍 [MAP] onMarkerClick ejecutado (iOS):', event);
+                        const coordinate = event.coordinates || event.coordinate;
+                        if (coordinate) {
+                          const clickedMarker = markers.find(m => 
+                            Math.abs(m.coordinates.latitude - coordinate.latitude) < 0.001 &&
+                            Math.abs(m.coordinates.longitude - coordinate.longitude) < 0.001
+                          );
+                          if (clickedMarker) {
+                            const recommendation = favorites.find(f => f.id === clickedMarker.id.replace('marker-', ''));
+                            if (recommendation) {
+                              handleMarkerClick(recommendation);
+                            }
+                          }
+                        }
+                      }}
+                    />
+                  ) : (
+                    <GoogleMaps.View
+                      style={[styles.map, { width: '100%', height: '100%' }]}
+                      cameraPosition={{
+                        latitude: mapCenter.latitude,
+                        longitude: mapCenter.longitude,
+                        zoom: favorites.length > 1 ? 12 : 15,
+                      } as any}
+                      markers={markers}
+                      onMapLoaded={() => {
+                        console.log('✅ [MAP] ========== onMapLoaded EJECUTADO (Android) ==========');
+                        console.log('✅ [MAP] Mapa cargado correctamente (Android)');
+                        console.log('✅ [MAP] onMapLoaded ejecutado, ocultando loading');
+                        setMapLoaded(true);
+                      }}
+                      onMapReady={() => {
+                        console.log('✅ [MAP] onMapReady ejecutado (Android)');
+                        setMapLoaded(true);
+                      }}
+                      onMarkerClick={(event: any) => {
+                        console.log('📍 [MAP] onMarkerClick ejecutado (Android):', event);
+                        const coordinate = event.coordinate || event.coordinates;
+                        if (coordinate) {
+                          const clickedMarker = markers.find(m => 
+                            Math.abs(m.coordinates.latitude - coordinate.latitude) < 0.001 &&
+                            Math.abs(m.coordinates.longitude - coordinate.longitude) < 0.001
+                          );
+                          if (clickedMarker) {
+                            const recommendation = favorites.find(f => f.id === clickedMarker.id.replace('marker-', ''));
+                            if (recommendation) {
+                              handleMarkerClick(recommendation);
+                            }
+                          }
+                        }
+                      }}
+                    />
+                  )}
+                </>
+              );
+            } else {
+              console.warn('⚠️ [MAP] MapComponent no disponible');
+              return (
+                <View style={styles.mapErrorContainer}>
+                  <Ionicons name="map-outline" size={48} color="#999" style={{ marginBottom: 16 }} />
+                  <Text style={styles.mapErrorText}>
+                    El mapa no está disponible.{'\n\n'}
+                    Por favor, ejecuta:{'\n'}
+                    <Text style={{ fontFamily: 'monospace', fontSize: 12 }}>
+                      {Platform.OS === 'ios' ? 'npx expo run:ios' : 'npx expo run:android'}
+                    </Text>
+                  </Text>
+                </View>
+              );
+            }
+          })()}
+        </View>
+      ) : (
+        <View style={styles.mapErrorContainer}>
+          <Ionicons name="map-outline" size={48} color="#999" style={{ marginBottom: 16 }} />
+          <Text style={styles.mapErrorText}>No hay ubicaciones para mostrar</Text>
+        </View>
+      )}
     </SafeAreaView>
   );
 };
@@ -411,6 +427,16 @@ const styles = StyleSheet.create({
     color: 'rgba(255, 255, 255, 0.9)',
     marginTop: 2,
   },
+  headerActions: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  headerActionButton: {
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   refreshButton: {
     padding: 8,
   },
@@ -440,7 +466,7 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   retryButton: {
-    backgroundColor: '#887CBC',
+    backgroundColor: '#96d2d3',
     paddingHorizontal: 32,
     paddingVertical: 12,
     borderRadius: 25,
@@ -472,7 +498,7 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   emptyButton: {
-    backgroundColor: '#887CBC',
+    backgroundColor: '#96d2d3',
     paddingHorizontal: 32,
     paddingVertical: 12,
     borderRadius: 25,
@@ -483,12 +509,22 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
-  map: {
+  mapContainer: {
     flex: 1,
-    width: width,
-    height: height,
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#f0f0f0',
+    position: 'relative',
+    minHeight: 400,
   },
-  mapLoading: {
+  map: {
+    width: '100%',
+    height: '100%',
+    flex: 1,
+    backgroundColor: '#e0e0e0',
+    minHeight: 400,
+  },
+  mapLoadingOverlay: {
     position: 'absolute',
     top: 0,
     left: 0,
@@ -496,7 +532,27 @@ const styles = StyleSheet.create({
     bottom: 0,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    zIndex: 1000,
+  },
+  mapLoadingText: {
+    marginTop: 12,
+    fontSize: 16,
+    color: '#59C6C0',
+    fontWeight: '600',
+  },
+  mapErrorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 32,
+    backgroundColor: '#F5F7FA',
+  },
+  mapErrorText: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
+    lineHeight: 24,
   },
 });
 

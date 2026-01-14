@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, ReactNode, useCallback } from 'react';
 import {
   View,
   Image,
@@ -11,8 +11,8 @@ import {
   ActivityIndicator,
   Text,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
-import bannerService, { Banner } from '../services/bannerService';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import bannerService, { Banner, BannerSection } from '../services/bannerService';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const BANNER_WIDTH = SCREEN_WIDTH - 40;
@@ -20,17 +20,25 @@ const BANNER_HEIGHT = 100; // Altura horizontal (aspect ratio ~4:1)
 
 interface BannerCarouselProps {
   style?: any;
+  section?: BannerSection; // NUEVO: Sección para filtrar banners
+  fallbackToHome?: boolean; // Si no hay banners de la sección, mostrar banners de home
+  customBanner?: ReactNode; // Banner personalizado adicional (ej: economía circular)
 }
 
-const BannerCarousel: React.FC<BannerCarouselProps> = ({ style }) => {
+const BannerCarousel: React.FC<BannerCarouselProps> = ({ style, section, fallbackToHome = true, customBanner }) => {
   const navigation = useNavigation<any>();
   const [banners, setBanners] = useState<Banner[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [loading, setLoading] = useState(true);
   const scrollViewRef = useRef<ScrollView>(null);
   const autoScrollTimerRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // Calcular el índice del banner personalizado
+  const customBannerIndex = customBanner ? banners.length : -1;
+  const totalItems = banners.length + (customBanner ? 1 : 0);
   const viewedBannersRef = useRef<Set<string>>(new Set());
 
+  // Cargar banners cuando cambie la sección o el fallback
   useEffect(() => {
     loadBanners();
 
@@ -40,10 +48,63 @@ const BannerCarousel: React.FC<BannerCarouselProps> = ({ style }) => {
         clearInterval(autoScrollTimerRef.current);
       }
     };
-  }, []);
+  }, [section, fallbackToHome]); // Recargar cuando cambie la sección o el fallback
+
+  // Recargar banners cada vez que la pantalla reciba el foco
+  // Esto permite verificar si se activaron o desactivaron banners
+  useFocusEffect(
+    useCallback(() => {
+      
+      // Función para recargar banners
+      const reloadBanners = async () => {
+        try {
+          setLoading(true);
+          let fetchedBanners = await bannerService.getActiveBanners(section);
+          
+          // Si no hay banners y hay fallback a home, intentar cargar banners de home
+          if (fetchedBanners.length === 0 && fallbackToHome && section && section !== 'home') {
+            const homeBanners = await bannerService.getActiveBanners('home');
+            if (homeBanners.length > 0) {
+              fetchedBanners = homeBanners;
+            }
+          } else if (fetchedBanners.length === 0 && !fallbackToHome) {
+            console.log('⚠️ [BANNER CAROUSEL] No hay banners para', section, 'y fallbackToHome está desactivado, no se mostrará nada');
+          }
+          
+          setBanners(fetchedBanners);
+          
+          // Registrar vista del primer banner
+          if (fetchedBanners.length > 0) {
+            viewedBannersRef.current.clear(); // Limpiar vistas previas para registrar de nuevo
+            // Registrar vista del primer banner
+            const firstBannerId = fetchedBanners[0].id;
+            if (!viewedBannersRef.current.has(firstBannerId)) {
+              viewedBannersRef.current.add(firstBannerId);
+              bannerService.registerView(firstBannerId);
+            }
+          } else {
+            console.log('⚠️ [BANNER CAROUSEL] No hay banners para mostrar en la sección:', section || 'todas');
+          }
+        } catch (error) {
+          console.error('❌ [BANNER CAROUSEL] Error cargando banners:', error);
+        } finally {
+          setLoading(false);
+        }
+      };
+      
+      reloadBanners();
+
+      return () => {
+        // Limpiar timer cuando la pantalla pierda el foco
+        if (autoScrollTimerRef.current) {
+          clearInterval(autoScrollTimerRef.current);
+        }
+      };
+    }, [section, fallbackToHome])
+  );
 
   useEffect(() => {
-    if (banners.length > 0) {
+    if (totalItems > 0) {
       startAutoRotation();
     }
 
@@ -52,17 +113,30 @@ const BannerCarousel: React.FC<BannerCarouselProps> = ({ style }) => {
         clearInterval(autoScrollTimerRef.current);
       }
     };
-  }, [banners]);
+  }, [banners, customBanner, totalItems]);
 
   const loadBanners = async () => {
     try {
       setLoading(true);
-      const fetchedBanners = await bannerService.getActiveBanners();
+       let fetchedBanners = await bannerService.getActiveBanners(section);
+      
+      // Si no hay banners y hay fallback a home, intentar cargar banners de home
+      if (fetchedBanners.length === 0 && fallbackToHome && section && section !== 'home') {
+        const homeBanners = await bannerService.getActiveBanners('home');
+        if (homeBanners.length > 0) {
+          fetchedBanners = homeBanners;
+        }
+      } else if (fetchedBanners.length === 0 && !fallbackToHome) {
+        console.log('⚠️ [BANNER CAROUSEL] No hay banners para', section, 'y fallbackToHome está desactivado, no se mostrará nada');
+      }
+      
       setBanners(fetchedBanners);
       
       // Registrar vista del primer banner
       if (fetchedBanners.length > 0) {
         registerView(fetchedBanners[0].id);
+      } else {
+        console.log('⚠️ [BANNER CAROUSEL] No hay banners para mostrar en la sección:', section || 'todas');
       }
     } catch (error) {
       console.error('❌ [BANNER CAROUSEL] Error cargando banners:', error);
@@ -72,7 +146,9 @@ const BannerCarousel: React.FC<BannerCarouselProps> = ({ style }) => {
   };
 
   const startAutoRotation = () => {
-    if (banners.length <= 1) return;
+    // Solo auto-rotar si hay más de un item y no estamos en el banner personalizado
+    if (totalItems <= 1) return;
+    if (currentIndex >= banners.length) return; // No auto-rotar si estamos en el banner personalizado
 
     // Limpiar timer anterior
     if (autoScrollTimerRef.current) {
@@ -87,7 +163,7 @@ const BannerCarousel: React.FC<BannerCarouselProps> = ({ style }) => {
 
     // Función para avanzar al siguiente banner
     const nextBanner = () => {
-      const nextIndex = (currentIndex + 1) % banners.length;
+      const nextIndex = (currentIndex + 1) % totalItems;
       setCurrentIndex(nextIndex);
       
       scrollViewRef.current?.scrollTo({
@@ -95,10 +171,12 @@ const BannerCarousel: React.FC<BannerCarouselProps> = ({ style }) => {
         animated: true,
       });
 
-      // Registrar vista del nuevo banner
-      const banner = banners[nextIndex];
-      if (banner) {
-        registerView(banner.id);
+      // Registrar vista solo si es un banner real
+      if (nextIndex < banners.length) {
+        const banner = banners[nextIndex];
+        if (banner) {
+          registerView(banner.id);
+        }
       }
     };
 
@@ -162,14 +240,16 @@ const BannerCarousel: React.FC<BannerCarouselProps> = ({ style }) => {
             }
           } else if (route === 'lists') {
             if (linkParts[1]) {
-              // Navegar a detalle de lista específica (usando ruta anidada)
-              navigation.navigate('Lists', {
+              // Navegar a detalle de lista (ahora dentro de Recommendations)
+              navigation.navigate('Recommendations', {
                 screen: 'ListDetail',
                 params: { listId: linkParts[1] },
               });
             } else {
-              // Navegar a la pantalla principal de listas
-              navigation.navigate('Lists');
+              // Navegar a listas dentro de Recommendations
+              navigation.navigate('Recommendations', {
+                screen: 'ListsMain',
+              });
             }
           } else if (route === 'recommendations') {
             if (linkParts[1] === 'category' && linkParts[2]) {
@@ -203,33 +283,42 @@ const BannerCarousel: React.FC<BannerCarouselProps> = ({ style }) => {
     const offsetX = event.nativeEvent.contentOffset.x;
     const newIndex = Math.round(offsetX / BANNER_WIDTH);
     
-    if (newIndex !== currentIndex && newIndex >= 0 && newIndex < banners.length) {
+    if (newIndex !== currentIndex && newIndex >= 0 && newIndex < totalItems) {
       setCurrentIndex(newIndex);
       
-      // Registrar vista del nuevo banner
-      const banner = banners[newIndex];
-      if (banner) {
-        registerView(banner.id);
+      // Registrar vista del nuevo banner solo si no es el banner personalizado
+      if (newIndex < banners.length) {
+        const banner = banners[newIndex];
+        if (banner) {
+          registerView(banner.id);
+        }
       }
 
-      // Reiniciar auto-rotación con la nueva duración
+      // Reiniciar auto-rotación con la nueva duración (solo para banners reales)
       if (autoScrollTimerRef.current) {
         clearInterval(autoScrollTimerRef.current);
       }
       
-      const duration = (banner?.duration || 5) * 1000;
-      autoScrollTimerRef.current = setInterval(() => {
-        const nextIndex = (newIndex + 1) % banners.length;
-        setCurrentIndex(nextIndex);
-        scrollViewRef.current?.scrollTo({
-          x: nextIndex * BANNER_WIDTH,
-          animated: true,
-        });
-        const nextBanner = banners[nextIndex];
-        if (nextBanner) {
-          registerView(nextBanner.id);
-        }
-      }, duration);
+      // Solo auto-rotar si hay más de un item y no estamos en el banner personalizado
+      if (totalItems > 1 && newIndex < banners.length) {
+        const banner = banners[newIndex];
+        const duration = (banner?.duration || 5) * 1000;
+        autoScrollTimerRef.current = setInterval(() => {
+          const nextIndex = (newIndex + 1) % totalItems;
+          setCurrentIndex(nextIndex);
+          scrollViewRef.current?.scrollTo({
+            x: nextIndex * BANNER_WIDTH,
+            animated: true,
+          });
+          // Registrar vista si es un banner real
+          if (nextIndex < banners.length) {
+            const nextBanner = banners[nextIndex];
+            if (nextBanner) {
+              registerView(nextBanner.id);
+            }
+          }
+        }, duration);
+      }
     }
   };
 
@@ -241,7 +330,9 @@ const BannerCarousel: React.FC<BannerCarouselProps> = ({ style }) => {
     );
   }
 
-  if (banners.length === 0) {
+  // Si no hay banners ni banner personalizado, no mostrar nada
+  if (banners.length === 0 && !customBanner) {
+    console.log('⚠️ [BANNER CAROUSEL] No hay banners para mostrar, retornando null');
     return null;
   }
 
@@ -259,6 +350,7 @@ const BannerCarousel: React.FC<BannerCarouselProps> = ({ style }) => {
         snapToAlignment="center"
         contentContainerStyle={styles.scrollContent}
       >
+        {/* Banners del backend */}
         {banners.map((banner, index) => (
           <TouchableOpacity
             key={banner.id}
@@ -273,12 +365,19 @@ const BannerCarousel: React.FC<BannerCarouselProps> = ({ style }) => {
             />
           </TouchableOpacity>
         ))}
+        
+        {/* Banner personalizado (ej: economía circular) */}
+        {customBanner && (
+          <View style={styles.customBannerContainer}>
+            {customBanner}
+          </View>
+        )}
       </ScrollView>
 
       {/* Indicadores de página */}
-      {banners.length > 1 && (
+      {totalItems > 1 && (
         <View style={styles.indicators}>
-          {banners.map((_, index) => (
+          {Array.from({ length: totalItems }).map((_, index) => (
             <View
               key={index}
               style={[
@@ -295,12 +394,10 @@ const BannerCarousel: React.FC<BannerCarouselProps> = ({ style }) => {
 
 const styles = StyleSheet.create({
   container: {
-    marginVertical: 8,
+    marginVertical: 4,
   },
   loadingContainer: {
     height: BANNER_HEIGHT,
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   scrollContent: {
     paddingHorizontal: 20,
@@ -316,6 +413,10 @@ const styles = StyleSheet.create({
   bannerImage: {
     width: '100%',
     height: '100%',
+  },
+  customBannerContainer: {
+    width: BANNER_WIDTH,
+    marginRight: 0,
   },
   indicators: {
     flexDirection: 'row',

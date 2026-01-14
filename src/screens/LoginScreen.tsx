@@ -213,7 +213,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#887CBC', // Fondo púrpura principal actualizado
+    backgroundColor: '#96d2d3', // Fondo púrpura principal actualizado
     paddingBottom: 0,
   },
   scrollContainer: {
@@ -314,7 +314,7 @@ const styles = StyleSheet.create({
   },
   // Botón de Google - Blanco con borde
   googleButton: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#F7FAFC',
     borderWidth: 1,
     borderColor: '#E0E0E0',
   },

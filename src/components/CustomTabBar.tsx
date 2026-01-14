@@ -17,7 +17,7 @@ const CustomTabBar: React.FC<CustomTabBarProps> = ({ state, descriptors, navigat
   const currentRoute = useRoute();
   console.log('🔍 CustomTabBar: useRoute ejecutado, ruta:', currentRoute.name);
   
-  const { isVisible, currentMessage, hideMessage, handleChatPress, showWelcomeMessage, showMessage } = useDouliChat(currentRoute.name);
+  const { isVisible, currentMessage, hideMessage, handleChatPress } = useDouliChat(currentRoute.name);
   
   console.log('🔍 CustomTabBar: Hook ejecutado, valores:', { isVisible, currentMessage: currentMessage?.text });
 
@@ -64,9 +64,9 @@ const CustomTabBar: React.FC<CustomTabBarProps> = ({ state, descriptors, navigat
       // DOULI siempre navega a la pantalla de chat
       navigation.navigate('Doula');
       // Mostrar mensaje de bienvenida después de un pequeño delay
-      setTimeout(() => {
-        showWelcomeMessage();
-      }, 500);
+      // setTimeout(() => {
+      //   showWelcomeMessage();
+      // }, 500);
     } else {
       navigation.navigate(routeName);
     }
@@ -129,24 +129,13 @@ const CustomTabBar: React.FC<CustomTabBarProps> = ({ state, descriptors, navigat
         );
       })}
       
-      {/* Chat flotante de DOULI */}
+      {/* Chat flotante de DOULI con mensajes de valor */}
       <DouliChatBubble
         message={currentMessage?.text || ''}
         isVisible={isVisible}
         onClose={hideMessage}
         onChatPress={handleChatPress}
       />
-      
-      {/* Botón de test temporal */}
-      <TouchableOpacity
-        style={styles.testButton}
-        onPress={() => {
-          console.log('🔍 CustomTabBar: Botón de test presionado');
-          showMessage();
-        }}
-      >
-        <Text style={styles.testButtonText}>Test DOULI</Text>
-      </TouchableOpacity>
     </View>
   );
 };

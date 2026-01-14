@@ -450,11 +450,11 @@ const CommunityRequestsScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#F7FAFC',
   },
   safeArea: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#F7FAFC',
   },
   
   header: {
@@ -462,11 +462,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
-    paddingTop: Platform.OS === 'ios' ? 15 : 10,
+    paddingTop: Platform.OS === 'ios' ? 10 : 10,
     paddingBottom: 15,
     borderBottomWidth: 1,
     borderBottomColor: '#E5E5E5',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#F7FAFC',
   },
   
   backButton: {
@@ -490,7 +490,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 20,
     paddingVertical: 15,
-    backgroundColor: '#F8F9FA',
+    backgroundColor: '#F7FAFC',
   },
   
   communityName: {
@@ -624,7 +624,7 @@ const styles = StyleSheet.create({
   },
   
   messageContainer: {
-    backgroundColor: '#F8F9FA',
+    backgroundColor: '#F7FAFC',
     padding: 15,
     borderRadius: 8,
     marginBottom: 15,

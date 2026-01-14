@@ -1,21 +1,95 @@
 import { axiosInstance } from './api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+// Función para obtener la extensión desde un tipo MIME
+const getExtensionFromMimeType = (mimeType: string): string => {
+  const mimeLower = mimeType.toLowerCase();
+  if (mimeLower.includes('png')) return 'png';
+  if (mimeLower.includes('gif')) return 'gif';
+  if (mimeLower.includes('webp')) return 'webp';
+  if (mimeLower.includes('jpeg') || mimeLower.includes('jpg')) return 'jpg';
+  return 'jpg'; // Por defecto
+};
+
+// Función para detectar el tipo MIME y extensión basándose en la URI
+const getImageTypeAndExtension = (uri: string): { mimeType: string; extension: string; fileName: string } => {
+  // Extraer la extensión del archivo de la URI
+  const uriLower = uri.toLowerCase();
+  let extension = 'jpg';
+  let mimeType = 'image/jpeg';
+  
+  // Intentar detectar por extensión en la URI
+  if (uriLower.includes('.png') || uriLower.endsWith('png')) {
+    extension = 'png';
+    mimeType = 'image/png';
+  } else if (uriLower.includes('.gif') || uriLower.endsWith('gif')) {
+    extension = 'gif';
+    mimeType = 'image/gif';
+  } else if (uriLower.includes('.webp') || uriLower.endsWith('webp')) {
+    extension = 'webp';
+    mimeType = 'image/webp';
+  } else if (uriLower.includes('.jpeg') || uriLower.includes('.jpg') || uriLower.endsWith('jpeg') || uriLower.endsWith('jpg')) {
+    extension = 'jpg';
+    mimeType = 'image/jpeg';
+  }
+  // Si no se detecta extensión (común en iOS con URIs como ph:// o assets-library://)
+  // Por defecto usamos JPEG que es el formato más común y compatible
+  // El backend debería aceptar JPEG como formato por defecto
+  
+  // Generar nombre de archivo único
+  const timestamp = Date.now();
+  const randomSuffix = Math.random().toString(36).substring(2, 8);
+  const fileName = `image_${timestamp}_${randomSuffix}.${extension}`;
+  
+  console.log('🔍 [IMAGE UPLOAD] Detección de tipo:', {
+    uri: uri.substring(0, 50) + '...',
+    detectedExtension: extension,
+    detectedMimeType: mimeType,
+    fileName
+  });
+  
+  return { mimeType, extension, fileName };
+};
+
 // Servicio para subir imágenes y obtener URLs
 export const imageUploadService = {
   // Subir imagen y obtener URL
-  uploadImage: async (uri: string, type: string = 'community') => {
-    console.log('📤 [IMAGE UPLOAD] Subiendo imagen a /api/communities/upload-photo:', { uri, type });
+  uploadImage: async (uri: string, type: string = 'community', providedMimeType?: string) => {
+    console.log('📤 [IMAGE UPLOAD] Subiendo imagen a /api/communities/upload-photo:', { uri, type, providedMimeType });
     console.log('📤 [IMAGE UPLOAD] URI recibida:', uri);
     console.log('📤 [IMAGE UPLOAD] Tipo recibido:', type);
+    console.log('📤 [IMAGE UPLOAD] Tipo MIME proporcionado:', providedMimeType);
     
     try {
+      // Usar el tipo MIME proporcionado si está disponible, sino detectarlo desde la URI
+      let mimeType: string;
+      let fileName: string;
+      
+      if (providedMimeType) {
+        // Si tenemos el tipo MIME real del ImagePicker, usarlo
+        mimeType = providedMimeType;
+        const extension = getExtensionFromMimeType(providedMimeType);
+        const timestamp = Date.now();
+        const randomSuffix = Math.random().toString(36).substring(2, 8);
+        fileName = `image_${timestamp}_${randomSuffix}.${extension}`;
+        console.log('📤 [IMAGE UPLOAD] Usando tipo MIME proporcionado:', mimeType);
+      } else {
+        // Si no hay tipo MIME, intentar detectarlo desde la URI
+        const detected = getImageTypeAndExtension(uri);
+        mimeType = detected.mimeType;
+        fileName = detected.fileName;
+        console.log('📤 [IMAGE UPLOAD] Tipo MIME detectado desde URI:', mimeType);
+      }
+      
+      console.log('📤 [IMAGE UPLOAD] Tipo MIME final:', mimeType);
+      console.log('📤 [IMAGE UPLOAD] Nombre de archivo:', fileName);
+      
       // Crear FormData para enviar la imagen
       const formData = new FormData();
       formData.append('image', {
         uri: uri,
-        type: 'image/jpeg',
-        name: 'image.jpg'
+        type: mimeType,
+        name: fileName
       } as any);
       formData.append('type', type);
       
@@ -69,11 +143,12 @@ export const imageUploadService = {
   },
 
   // Subir imagen específicamente para comunidades
-  uploadCommunityImage: async (uri: string) => {
+  uploadCommunityImage: async (uri: string, mimeType?: string) => {
     console.log('🖼️ [IMAGE UPLOAD] uploadCommunityImage llamado con URI:', uri);
+    console.log('🖼️ [IMAGE UPLOAD] Tipo MIME proporcionado:', mimeType);
     console.log('🖼️ [IMAGE UPLOAD] Tipo de URI:', typeof uri);
     try {
-      const result = await imageUploadService.uploadImage(uri, 'community');
+      const result = await imageUploadService.uploadImage(uri, 'community', mimeType);
       console.log('✅ [IMAGE UPLOAD] uploadCommunityImage completado, resultado:', result);
       return result;
     } catch (error) {

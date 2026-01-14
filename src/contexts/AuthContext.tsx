@@ -4,6 +4,10 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { authService, User } from '../services/api';
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import appleAuth from '@invertase/react-native-apple-authentication';
+import notificationService from '../services/notificationService';
+import sentryService from '../services/sentryService';
+import { initializeApp, getApps } from 'firebase/app';
+import { getAuth, signInWithCredential, GoogleAuthProvider } from 'firebase/auth';
 
 interface AuthContextType {
   user: User | null;
@@ -42,12 +46,31 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const isAuthenticated = !!user;
 
-  // Configurar Google Sign-In al iniciar la app
+  // Configurar Google Sign-In y Firebase al iniciar la app
   useEffect(() => {
+    console.log('⚙️ [GOOGLE SIGN-IN] Configurando Google Sign-In...');
     GoogleSignin.configure({
       webClientId: '975014449237-9crsati0bs65e787cb5no3ntu2utmqe1.apps.googleusercontent.com',
+      iosClientId: '975014449237-9crsati0bs65e787cb5no3ntu2utmqe1.apps.googleusercontent.com', // Agregado para evitar crash en iOS
       offlineAccess: true,
     });
+    console.log('✅ [GOOGLE SIGN-IN] Configuración completada');
+    
+    // Inicializar Firebase si no está ya inicializado
+    if (getApps().length === 0) {
+      console.log('🔥 [FIREBASE] Inicializando Firebase...');
+      const firebaseConfig = {
+        apiKey: Platform.OS === 'ios' ? 'AIzaSyDOR0D2ZvAjwYvAjwgYZ5HGGyxo8zLZzF0' : 'AIzaSyDDX0_GPvfxwnmC4H0Rs1cUEyz44IAY1S4',
+        authDomain: 'mumpabackend.firebaseapp.com',
+        projectId: 'mumpabackend',
+        storageBucket: 'mumpabackend.firebasestorage.app',
+        messagingSenderId: '975014449237',
+        appId: Platform.OS === 'ios' ? '1:975014449237:ios:2d54adfc178e18629dc4dc' : '1:975014449237:android:46c06caf478b53489dc4dc',
+      };
+      initializeApp(firebaseConfig);
+      console.log('✅ [FIREBASE] Firebase inicializado para', Platform.OS);
+    }
+    
     checkAuthStatus();
   }, []);
 
@@ -68,6 +91,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             try {
               await authService.verifyToken();
               setUser(userData);
+              
             } catch (verifyError) {
               console.log('❌ Token inválido o expirado, limpiando datos');
               await AsyncStorage.removeItem('authToken');
@@ -132,8 +156,35 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       
       console.log('✅ Login completado, actualizando estado...');
       setUser(user);
-    } catch (error) {
+      
+      // Configurar usuario en Sentry
+      sentryService.setUser({
+        id: user.id,
+        email: user.email,
+        username: user.name,
+      });
+      
+      // Registrar token de notificaciones después del login
+      // Esperar un poco más para asegurar que el token esté guardado
+      setTimeout(async () => {
+        console.log('🔔 [AUTH] Inicializando notificaciones después del login...');
+        try {
+          // Verificar si hay un token pendiente
+          const pendingToken = await AsyncStorage.getItem('fcm_token_pending');
+          if (pendingToken) {
+            console.log('🔄 [AUTH] Registrando token pendiente...');
+            await notificationService.registerToken(pendingToken);
+          } else {
+            // Si no hay token pendiente, intentar obtener uno nuevo
+            await notificationService.initialize();
+          }
+        } catch (error) {
+          console.error('❌ [AUTH] Error inicializando notificaciones después del login:', error);
+        }
+      }, 2000);
+    } catch (error: any) {
       console.error('❌ Error en login:', error);
+      sentryService.captureException(error, { context: 'login', email });
       throw error;
     }
   };
@@ -141,45 +192,75 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const loginWithGoogle = async () => {
     console.log('🔑 Iniciando proceso de login con Google...');
     try {
-      // Verificar si Google Play Services están disponibles
-      await GoogleSignin.hasPlayServices();
+      // Verificar configuración
+      console.log('🔍 [GOOGLE SIGN-IN] Verificando configuración...');
+      console.log('🔍 [GOOGLE SIGN-IN] Web Client ID:', '975014449237-9crsati0bs65e787cb5no3ntu2utmqe1.apps.googleusercontent.com');
+      
+      // Verificar si Google Play Services están disponibles (solo Android)
+      if (Platform.OS === 'android') {
+        try {
+          await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
+          console.log('✅ [GOOGLE SIGN-IN] Google Play Services disponibles');
+        } catch (playServicesError: any) {
+          console.error('❌ [GOOGLE SIGN-IN] Error con Google Play Services:', playServicesError);
+          throw new Error('Google Play Services no están disponibles. Por favor, actualiza Google Play Services desde la Play Store.');
+        }
+      }
       
       // Realizar sign in con Google
+      console.log('📱 [GOOGLE SIGN-IN] Iniciando sign in...');
       const userInfo = await GoogleSignin.signIn();
       console.log('📋 Información completa del usuario de Google:', JSON.stringify(userInfo, null, 2));
       
-      // Extraer datos del usuario de Google
-      const googleUser = userInfo.data?.user || (userInfo as any).user;
+      // Obtener idToken de la respuesta (esto resuelve el DEVELOPER_ERROR)
+      const idToken = userInfo.data?.idToken || (userInfo as any).idToken;
       
-      if (!googleUser || !googleUser.email) {
-        console.error('❌ No se pudo obtener información del usuario');
-        throw new Error('No se pudo obtener información del usuario de Google');
+      if (!idToken) {
+        console.error('❌ No se pudo obtener idToken de Google');
+        throw new Error('No se pudo obtener idToken de Google. Por favor, intenta de nuevo.');
       }
       
-      console.log('👤 Datos del usuario extraídos:', {
-        email: googleUser.email,
-        name: googleUser.name,
-        id: googleUser.id,
-        photo: googleUser.photo
-      });
+      console.log('🔑 [GOOGLE SIGN-IN] idToken obtenido:', idToken.substring(0, 50) + '...');
       
-      console.log('📤 Enviando al backend (endpoint simplificado)...');
+      // Extraer datos del usuario de Google para logs
+      const googleUser = userInfo.data?.user || (userInfo as any).user;
+      if (googleUser) {
+        console.log('👤 Datos del usuario extraídos:', {
+          email: googleUser.email,
+          name: googleUser.name,
+          id: googleUser.id,
+          photo: googleUser.photo
+        });
+      }
       
-      // Enviar los datos del usuario directamente al backend (endpoint simplificado)
-      const response = await authService.googleLoginSimple({
-        email: googleUser.email,
-        displayName: googleUser.name || '',
-        photoURL: googleUser.photo,
-        googleId: googleUser.id
-      });
+      // Usar Firebase Auth para obtener un token de Firebase ID
+      console.log('🔥 [FIREBASE AUTH] Autenticando con Firebase usando token de Google...');
+      let firebaseIdToken: string;
+      try {
+        const auth = getAuth();
+        const credential = GoogleAuthProvider.credential(idToken);
+        const firebaseUserCredential = await signInWithCredential(auth, credential);
+        firebaseIdToken = await firebaseUserCredential.user.getIdToken();
+        console.log('✅ [FIREBASE AUTH] Token de Firebase ID obtenido:', firebaseIdToken.substring(0, 50) + '...');
+      } catch (firebaseError: any) {
+        console.error('❌ [FIREBASE AUTH] Error autenticando con Firebase:', firebaseError);
+        // Si Firebase Auth falla, intentar usar el token de Google directamente
+        console.log('⚠️ [FIREBASE AUTH] Intentando usar token de Google directamente...');
+        firebaseIdToken = idToken;
+      }
+      
+      console.log('📤 Enviando token al backend...');
+      
+      // Enviar token al backend (Firebase ID token o Google OAuth token como fallback)
+      const response = await authService.googleLogin(firebaseIdToken);
       console.log('📋 Respuesta completa del login con Google:', response);
       
-      // Tu backend retorna: { success, message, isNewUser, data: { uid, email, displayName, photoURL, emailVerified, customToken } }
+      // El backend retorna: { success, message, data: { uid, email, displayName, photoUrl, customToken }, isNewUser }
       if (!response.success) {
         throw new Error(response.message || 'Error en login con Google');
       }
       
-      const { customToken, displayName: userName, email: userEmail, uid, photoURL } = response.data;
+      const { customToken, displayName: userName, email: userEmail, uid, photoUrl } = response.data;
       
       console.log('🔑 Token extraído:', customToken ? 'Sí' : 'No');
       console.log('👤 Datos del usuario extraídos:', { displayName: userName, email: userEmail, uid });
@@ -194,7 +275,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         id: uid,
         email: userEmail,
         name: userName,
-        photoURL: photoURL,
+        photoURL: photoUrl || googleUser?.photo,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
@@ -203,32 +284,72 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       await AsyncStorage.setItem('authToken', customToken);
       await AsyncStorage.setItem('userData', JSON.stringify(user));
       
-      // Si el nombre de Google es diferente al del backend, sincronizar
-      if (googleUser.name && googleUser.name !== userName) {
-        console.log('🔄 Sincronizando nombre de Google con backend...');
-        console.log(`   Nombre en Google: "${googleUser.name}"`);
-        console.log(`   Nombre en backend: "${userName}"`);
-        // El backend debería actualizar el nombre automáticamente, 
-        // pero por si acaso, guardamos el de Google en el usuario local
-        user.name = googleUser.name;
-        await AsyncStorage.setItem('userData', JSON.stringify(user));
-      }
-      
       console.log('✅ Login con Google completado, actualizando estado...');
       setUser(user);
+      
+      // Configurar usuario en Sentry
+      sentryService.setUser({
+        id: user.id,
+        email: user.email,
+        username: user.name,
+      });
+      
+      // Registrar token de notificaciones después del login
+      setTimeout(async () => {
+        console.log('🔔 [AUTH] Inicializando notificaciones después del login con Google...');
+        try {
+          const pendingToken = await AsyncStorage.getItem('fcm_token_pending');
+          if (pendingToken) {
+            console.log('🔄 [AUTH] Registrando token pendiente...');
+            await notificationService.registerToken(pendingToken);
+          } else {
+            await notificationService.initialize();
+          }
+        } catch (error) {
+          console.error('❌ [AUTH] Error inicializando notificaciones después del login con Google:', error);
+        }
+      }, 2000);
     } catch (error: any) {
-      console.error('❌ Error en login con Google:', error);
+      console.error('❌ [GOOGLE SIGN-IN] Error completo:', error);
+      console.error('❌ [GOOGLE SIGN-IN] Error message:', error?.message);
+      console.error('❌ [GOOGLE SIGN-IN] Error code:', error?.code);
       
       // Si el usuario canceló el sign in
-      if (error.code === 'SIGN_IN_CANCELLED') {
-        throw new Error('Login con Google cancelado');
+      if (error.code === 'SIGN_IN_CANCELLED' || error?.message?.includes('cancel')) {
+        console.log('ℹ️ [GOOGLE SIGN-IN] Usuario canceló el login');
+        // No mostrar alerta si el usuario canceló
+        return; // Salir sin error
       }
       
       // Si Google Play Services no están disponibles
       if (error.code === 'PLAY_SERVICES_NOT_AVAILABLE') {
-        throw new Error('Google Play Services no están disponibles');
+        Alert.alert(
+          'Google Play Services',
+          'Google Play Services no están disponibles. Por favor, actualiza Google Play Services desde la Play Store.',
+          [{ text: 'OK' }]
+        );
+        throw error;
       }
       
+      // Manejar DEVELOPER_ERROR (aunque ahora debería estar resuelto con el nuevo endpoint)
+      if (error?.code === 'DEVELOPER_ERROR' || error?.message?.includes('DEVELOPER_ERROR')) {
+        console.error('❌ [GOOGLE SIGN-IN] DEVELOPER_ERROR detectado');
+        Alert.alert(
+          'Error de Configuración',
+          'El login con Google no está configurado correctamente.\n\n' +
+          'Por favor, verifica:\n' +
+          '• Que el SHA-1 esté registrado en Google Cloud Console\n' +
+          '• Que el package name sea "com.munpa.app"\n' +
+          '• Revisa SOLUCIONAR_ERROR_GOOGLE_SIGNIN.md',
+          [{ text: 'OK' }]
+        );
+      } else {
+        Alert.alert(
+          'Error',
+          error?.message || 'No se pudo iniciar sesión con Google. Por favor, intenta de nuevo.',
+          [{ text: 'OK' }]
+        );
+      }
       throw error;
     }
   };
@@ -325,6 +446,29 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       
       console.log('✅ Login con Apple completado, actualizando estado...');
       setUser(userData);
+      
+      // Configurar usuario en Sentry
+      sentryService.setUser({
+        id: userData.id,
+        email: userData.email,
+        username: userData.name,
+      });
+      
+      // Registrar token de notificaciones después del login
+      setTimeout(async () => {
+        console.log('🔔 [AUTH] Inicializando notificaciones después del login con Apple...');
+        try {
+          const pendingToken = await AsyncStorage.getItem('fcm_token_pending');
+          if (pendingToken) {
+            console.log('🔄 [AUTH] Registrando token pendiente...');
+            await notificationService.registerToken(pendingToken);
+          } else {
+            await notificationService.initialize();
+          }
+        } catch (error) {
+          console.error('❌ [AUTH] Error inicializando notificaciones después del login con Apple:', error);
+        }
+      }, 2000);
     } catch (error: any) {
       console.error('❌ Error en login con Apple:', error);
       console.error('📋 Error code:', error.code);
@@ -386,8 +530,32 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       
       console.log('✅ Registro completado, actualizando estado...');
       setUser(user);
-    } catch (error) {
+      
+      // Configurar usuario en Sentry
+      sentryService.setUser({
+        id: user.id,
+        email: user.email,
+        username: user.name,
+      });
+      
+      // Registrar token de notificaciones después del registro
+      setTimeout(async () => {
+        console.log('🔔 [AUTH] Inicializando notificaciones después del registro...');
+        try {
+          const pendingToken = await AsyncStorage.getItem('fcm_token_pending');
+          if (pendingToken) {
+            console.log('🔄 [AUTH] Registrando token pendiente...');
+            await notificationService.registerToken(pendingToken);
+          } else {
+            await notificationService.initialize();
+          }
+        } catch (error) {
+          console.error('❌ [AUTH] Error inicializando notificaciones después del registro:', error);
+        }
+      }, 2000);
+    } catch (error: any) {
       console.error('❌ Error en registro:', error);
+      sentryService.captureException(error, { context: 'signup' });
       throw error;
     }
   };
@@ -395,29 +563,56 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const logout = async () => {
     console.log('🚪 Iniciando proceso de logout...');
     try {
+      // Eliminar token de notificaciones del backend
+      await notificationService.removeToken().catch((error) => {
+        console.error('❌ [AUTH] Error eliminando token de notificaciones:', error);
+      });
+      
       // Limpiar token, userData y hasChildren
       await AsyncStorage.multiRemove(['authToken', 'userData', 'hasChildren']);
       setUser(null);
+      
+      // Limpiar usuario de Sentry
+      sentryService.clearUser();
+      
       console.log('✅ Logout completado exitosamente, datos limpiados');
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Error durante logout:', error);
+      sentryService.captureException(error, { context: 'logout' });
       setUser(null);
       throw error;
     }
   };
 
-  const updateProfile = async (data: { name?: string; email?: string; gender?: 'M' | 'F'; childrenCount?: number; isPregnant?: boolean; gestationWeeks?: number; photoURL?: string }) => {
+  const updateProfile = async (data: { name?: string; displayName?: string; email?: string; gender?: 'M' | 'F'; childrenCount?: number; isPregnant?: boolean; gestationWeeks?: number; photoURL?: string }) => {
     console.log('✏️ Iniciando actualización de perfil...');
     try {
+      // Preparar datos para el backend
+      const profileData: any = {};
+      if (data.displayName) profileData.displayName = data.displayName;
+      if (data.name) profileData.displayName = data.name; // Si viene name, usar como displayName
+      if (data.email) profileData.email = data.email;
+      if (data.gender) profileData.gender = data.gender;
+      if (data.childrenCount !== undefined) profileData.childrenCount = data.childrenCount;
+      if (data.isPregnant !== undefined) profileData.isPregnant = data.isPregnant;
+      if (data.gestationWeeks !== undefined) profileData.gestationWeeks = data.gestationWeeks;
+      if (data.photoURL !== undefined) profileData.photoURL = data.photoURL;
+
+      // Llamar al backend para actualizar el perfil
+      const response = await authService.updateProfile(profileData);
+      
+      console.log('✅ Perfil actualizado en el backend:', response);
+
+      // Actualizar estado local
       if (user) {
         const updatedUser: User = {
           ...user,
-          name: data.name || user.name,
+          name: data.displayName || data.name || user.name,
           email: data.email || user.email,
           gender: data.gender || user.gender,
-          childrenCount: data.childrenCount || user.childrenCount,
-          isPregnant: data.isPregnant || user.isPregnant,
-          gestationWeeks: data.gestationWeeks || user.gestationWeeks,
+          childrenCount: data.childrenCount !== undefined ? data.childrenCount : user.childrenCount,
+          isPregnant: data.isPregnant !== undefined ? data.isPregnant : user.isPregnant,
+          gestationWeeks: data.gestationWeeks !== undefined ? data.gestationWeeks : user.gestationWeeks,
           photoURL: data.photoURL !== undefined ? data.photoURL : user.photoURL,
           updatedAt: new Date().toISOString(),
         };
