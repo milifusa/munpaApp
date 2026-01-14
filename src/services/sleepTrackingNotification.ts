@@ -26,6 +26,32 @@ class SleepTrackingNotification {
   private currentNapData: ActiveNapData | null = null;
 
   /**
+   * Solicitar permisos de notificaciones
+   */
+  async requestPermissions(): Promise<boolean> {
+    try {
+      const { status: existingStatus } = await Notifications.getPermissionsAsync();
+      let finalStatus = existingStatus;
+      
+      if (existingStatus !== 'granted') {
+        const { status } = await Notifications.requestPermissionsAsync();
+        finalStatus = status;
+      }
+      
+      if (finalStatus !== 'granted') {
+        console.warn('⚠️ [NAP-NOTIF] Permisos de notificaciones no otorgados');
+        return false;
+      }
+      
+      console.log('✅ [NAP-NOTIF] Permisos de notificaciones otorgados');
+      return true;
+    } catch (error) {
+      console.error('❌ [NAP-NOTIF] Error solicitando permisos:', error);
+      return false;
+    }
+  }
+
+  /**
    * Configurar categorías de notificaciones con acciones (botones)
    */
   async setupNotificationCategories(): Promise<void> {
@@ -79,6 +105,15 @@ class SleepTrackingNotification {
    */
   async startTracking(napData: ActiveNapData): Promise<void> {
     try {
+      console.log('🚀 [NAP-NOTIF] Iniciando tracking de siesta...');
+      
+      // Verificar y solicitar permisos
+      const hasPermission = await this.requestPermissions();
+      if (!hasPermission) {
+        console.warn('⚠️ [NAP-NOTIF] No hay permisos, no se puede mostrar notificación');
+        return;
+      }
+      
       this.currentNapData = napData;
 
       // Detener tracking anterior si existe
@@ -121,9 +156,14 @@ class SleepTrackingNotification {
    * Actualizar la notificación con el tiempo actual
    */
   private async updateNotification(): Promise<void> {
-    if (!this.currentNapData) return;
+    if (!this.currentNapData) {
+      console.warn('⚠️ [NAP-NOTIF] No hay datos de siesta para actualizar notificación');
+      return;
+    }
 
     try {
+      console.log('🔄 [NAP-NOTIF] Actualizando notificación...');
+      
       const now = new Date();
       const startTime = new Date(this.currentNapData.startTime);
       const elapsedMinutes = Math.floor((now.getTime() - startTime.getTime()) / 1000 / 60);
@@ -155,7 +195,13 @@ class SleepTrackingNotification {
 
       const categoryId = this.currentNapData.isPaused ? 'nap-tracking-paused' : 'nap-tracking-running';
 
-      await Notifications.scheduleNotificationAsync({
+      console.log('📱 [NAP-NOTIF] Programando notificación:', {
+        title: this.currentNapData.isPaused ? '⏸️ Siesta pausada' : '😴 Siesta',
+        body: bodyText,
+        categoryId
+      });
+
+      const notificationId = await Notifications.scheduleNotificationAsync({
         identifier: this.notificationId,
         content: {
           title: this.currentNapData.isPaused ? '⏸️ Siesta pausada' : '😴 Siesta',
@@ -171,6 +217,8 @@ class SleepTrackingNotification {
         },
         trigger: null, // Mostrar inmediatamente
       });
+      
+      console.log('✅ [NAP-NOTIF] Notificación programada con ID:', notificationId);
 
     } catch (error) {
       console.error('❌ [NAP-NOTIF] Error actualizando notificación:', error);
