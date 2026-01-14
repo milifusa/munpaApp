@@ -21,6 +21,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
+import * as Notifications from "expo-notifications";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from "../contexts/AuthContext";
 import {
@@ -31,6 +32,7 @@ import {
 } from "../services/api";
 import { imageUploadService } from "../services/imageUploadService";
 import sleepNotificationScheduler from "../services/sleepNotificationScheduler";
+import sleepTrackingNotification from "../services/sleepTrackingNotification";
 import {
   colors,
   typography,
@@ -159,6 +161,26 @@ const HomeScreen: React.FC = () => {
   useEffect(() => {
     loadData();
     loadUserProfile();
+    
+    // Configurar categorías de notificaciones para tracking de siestas
+    sleepTrackingNotification.setupNotificationCategories();
+    
+    // Configurar handler de respuestas a notificaciones
+    const subscription = Notifications.addNotificationResponseReceivedListener(async (response) => {
+      const action = response.actionIdentifier;
+      
+      if (action === 'pause-nap') {
+        await handlePauseSleep();
+      } else if (action === 'resume-nap') {
+        await handleResumeSleep();
+      } else if (action === 'stop-nap') {
+        await handleStopSleep();
+      }
+    });
+    
+    return () => {
+      subscription.remove();
+    };
   }, []);
 
   // Refrescar datos cuando se regrese a esta pantalla
@@ -461,6 +483,15 @@ const HomeScreen: React.FC = () => {
           (entry: SleepEntry) => !entry.endTime
         );
         setActiveSleep(activeSleepEntry || null);
+        
+        // Si hay siesta activa, iniciar notificación de tracking
+        if (activeSleepEntry && predictionRes.status === 'fulfilled' && predictionRes.value.prediction?.nextNap) {
+          await sleepTrackingNotification.startTracking({
+            startTime: activeSleepEntry.startTime,
+            expectedDuration: predictionRes.value.prediction.nextNap.expectedDuration,
+            isPaused: false,
+          });
+        }
       } else {
         setActiveSleep(null);
       }
@@ -493,12 +524,16 @@ const HomeScreen: React.FC = () => {
   };
 
   // Funciones para manejar pausas y detención de siesta
-  const handlePauseSleep = () => {
+  const handlePauseSleep = async () => {
     if (!activeSleep || isPaused) return;
     
     const now = new Date();
     setPauseStartTime(now);
     setIsPaused(true);
+    
+    // Actualizar notificación a estado pausado
+    await sleepTrackingNotification.updatePauseState(true);
+    
     Alert.alert('⏸️ Pausado', 'Siesta pausada. El tiempo no se contará hasta que reanudes.');
   };
 
@@ -533,6 +568,10 @@ const HomeScreen: React.FC = () => {
       
       setIsPaused(false);
       setPauseStartTime(null);
+      
+      // Actualizar notificación a estado activo
+      await sleepTrackingNotification.updatePauseState(false);
+      
       Alert.alert('▶️ Reanudado', 'Siesta reanudada. El tiempo se sigue contando.');
       
       // Recargar datos
@@ -568,6 +607,9 @@ const HomeScreen: React.FC = () => {
                 endTime: endTime.toISOString(),
                 duration,
               });
+              
+              // Detener notificación de tracking
+              await sleepTrackingNotification.stopTracking();
               
               setActiveSleep(null);
               setIsPaused(false);
@@ -1191,8 +1233,9 @@ const HomeScreen: React.FC = () => {
                   const { x: xStart, y: yStart, hour: startHour, minute: startMinute } = parseTimeToPosition(napStartTime, 140); // Radio en la órbita
                   
                   // Color según estado
+                  const isInProgress = nap.status === 'in_progress' || nap.isInProgress === true;
                   const isCompleted = nap.completed || nap.status === 'completed';
-                  const dotColor = isCompleted ? '#4CAF50' : '#56CCF2';
+                  const dotColor = isInProgress ? '#8B5CF6' : (isCompleted ? '#4CAF50' : '#56CCF2');
                   
                   // Calcular duración
                   const duration = nap.actualDuration || nap.expectedDuration || nap.duration || 0;
@@ -1252,7 +1295,7 @@ const HomeScreen: React.FC = () => {
                         <View style={[
                           styles.capsuleGlow,
                           { 
-                            backgroundColor: isCompleted ? '#66BB6A' : '#56CCF2',
+                            backgroundColor: isInProgress ? '#A78BFA' : (isCompleted ? '#66BB6A' : '#56CCF2'),
                             opacity: 0.4,
                           }
                         ]} />
@@ -1261,7 +1304,7 @@ const HomeScreen: React.FC = () => {
                           { backgroundColor: dotColor }
                         ]}>
                           <Ionicons 
-                            name={isCompleted ? "checkmark" : "moon"} 
+                            name={isCompleted ? "checkmark" : (isInProgress ? "hourglass" : "moon")} 
                             size={20} 
                             color="#FFF" 
                           />
@@ -1299,61 +1342,20 @@ const HomeScreen: React.FC = () => {
                 </View>
             </View>
             
-          {/* Mensaje de presión de sueño O botones de control de siesta */}
-          {activeSleep ? (
-            // Mostrar botones de control cuando hay siesta activa
-            <View style={styles.activeSleepControls}>
-              <View style={styles.activeSleepControlsInner}>
-                <View style={styles.activeSleepBadge}>
-                  <Ionicons name="moon" size={16} color="#FFF" />
-                  <Text style={styles.activeSleepBadgeText}>
-                    {isPaused ? 'Siesta Pausada' : 'Durmiendo siesta'}
-                  </Text>
-                  </View>
-                
-                <View style={styles.activeSleepButtonsRow}>
-                  {isPaused ? (
-            <TouchableOpacity
-                      style={[styles.activeSleepControlBtn, styles.activeSleepResumeBtn]}
-                      onPress={handleResumeSleep}
-                    >
-                      <Ionicons name="play" size={20} color="#FFF" />
-            </TouchableOpacity>
-                  ) : (
-                    <TouchableOpacity
-                      style={[styles.activeSleepControlBtn, styles.activeSleepPauseBtn]}
-                      onPress={handlePauseSleep}
-                    >
-                      <Ionicons name="pause" size={20} color="#FFF" />
-                    </TouchableOpacity>
-                  )}
-                  
-            <TouchableOpacity
-                    style={[styles.activeSleepControlBtn, styles.activeSleepStopBtn]}
-                    onPress={handleStopSleep}
-                  >
-                    <Ionicons name="stop" size={20} color="#FFF" />
-            </TouchableOpacity>
-          </View>
-              </View>
+          {/* Mensaje de presión de sueño - SOLO cuando NO hay siesta activa */}
+          {!activeSleep && !activitySuggestions && (
+            <View style={styles.motivationalSection}>
+              <Text
+                style={{
+                  fontSize: 14,
+                  color: "#FFF",
+                  textAlign: "center",
+                  fontWeight: "700",
+                }}
+              >
+                {getSleepPressureMessage()}
+              </Text>
             </View>
-          ) : (
-            // Mostrar mensaje de presión de sueño cuando NO hay siesta activa
-            // OCULTAR si hay actividades cargadas (se mostrarán abajo)
-            !activitySuggestions && (
-          <View style={styles.motivationalSection}>
-            <Text
-              style={{
-                fontSize: 14,
-                color: "#FFF",
-                textAlign: "center",
-                fontWeight: "700",
-              }}
-            >
-              {getSleepPressureMessage()}
-            </Text>
-          </View>
-            )
           )}
         </View>
           
@@ -1416,8 +1418,8 @@ const HomeScreen: React.FC = () => {
               return null;
             })()}
 
-            {/* Estado del bebé (energía) - cuando hay actividades */}
-            {activitySuggestions?.currentState && (
+            {/* Estado del bebé (energía) - cuando hay actividades Y NO está durmiendo */}
+            {!activeSleep && activitySuggestions?.currentState && (
               <View style={styles.sleepInfoCard}>
                 <View style={styles.sleepInfoIconContainer}>
                   <Ionicons name="flash" size={32} color="#F59E0B" />
@@ -1432,6 +1434,91 @@ const HomeScreen: React.FC = () => {
                 </View>
               </View>
             )}
+
+            {/* Cuando está durmiendo: mostrar tiempo hasta siguiente siesta o bedtime */}
+            {activeSleep && sleepPrediction?.prediction?.bedtime?.time && (() => {
+              // Buscar la siesta en progreso
+              const allNaps = sleepPrediction?.prediction?.dailySchedule?.allNaps || [];
+              
+              const inProgressNap = allNaps.find(
+                (nap: any) => nap.status === 'in_progress' || nap.isInProgress === true
+              );
+              
+              if (!inProgressNap) {
+                return null;
+              }
+              
+              const currentNapIndex = allNaps.findIndex(
+                (nap: any) => nap.status === 'in_progress' || nap.isInProgress === true
+              );
+              
+              // Buscar la siguiente siesta (después de la actual)
+              const nextNap = allNaps.find(
+                (nap: any, index: number) => 
+                  index > currentNapIndex && 
+                  (nap.type === 'prediction' || nap.status === 'upcoming')
+              );
+              
+              const now = new Date();
+              let timeText = '';
+              let labelText = '';
+              let iconName: any = 'time-outline';
+              let iconColor = '#887CBC';
+              
+              // Si hay siguiente siesta, intentar usarla
+              if (nextNap) {
+                const nextNapTime = new Date(nextNap.time);
+                const minutesUntil = Math.floor((nextNapTime.getTime() - now.getTime()) / 1000 / 60);
+                
+                // Solo usar si es futuro (positivo) Y falta más de 30 minutos
+                if (minutesUntil > 30) {
+                  timeText = formatDuration(minutesUntil, true);
+                  labelText = 'Para próxima siesta';
+                  iconName = 'moon-outline';
+                  iconColor = '#667eea';
+                }
+              }
+              
+              // Si no hay siguiente siesta válida o ya está muy cerca, mostrar bedtime
+              if (!timeText) {
+                const bedtimeISO = sleepPrediction.prediction.bedtime.time;
+                const timePart = bedtimeISO.split('T')[1];
+                const [hours, minutes] = timePart.split(':').map(Number);
+                
+                const bedtime = new Date();
+                bedtime.setHours(hours, minutes, 0, 0);
+                
+                // Si la hora ya pasó hoy, es para mañana
+                if (bedtime.getTime() < now.getTime()) {
+                  bedtime.setDate(bedtime.getDate() + 1);
+                }
+                
+                const minutesUntil = Math.floor((bedtime.getTime() - now.getTime()) / 1000 / 60);
+                
+                if (minutesUntil > 0) {
+                  timeText = formatDuration(minutesUntil, true);
+                  labelText = 'Para dormir';
+                  iconName = 'bed-outline';
+                  iconColor = '#4B5563';
+                }
+              }
+              
+              if (timeText) {
+                return (
+                  <View style={styles.sleepInfoCard}>
+                    <View style={styles.sleepInfoIconContainer}>
+                      <Ionicons name={iconName} size={32} color={iconColor} />
+                    </View>
+                    <View style={styles.sleepInfoContent}>
+                      <Text style={styles.sleepInfoValue}>{timeText}</Text>
+                      <Text style={styles.sleepInfoLabel}>{labelText}</Text>
+                    </View>
+                  </View>
+                );
+              }
+              
+              return null;
+            })()}
           </View>
         )}
 
@@ -1539,168 +1626,7 @@ const HomeScreen: React.FC = () => {
               </View>
             ) : (
               <>
-                {/* Estado actual del sueño */}
-                {activeSleep ? (
-                  <View style={styles.activeSleepCard}>
-                    <LinearGradient
-                      colors={['#667eea', '#764ba2']}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 1 }}
-                      style={styles.activeSleepGradient}
-                    >
-                      <View style={styles.activeSleepMainContent}>
-                        <View style={styles.activeSleepHeader}>
-                          <View style={styles.activeSleepBadgeContainer}>
-                            <Ionicons name="moon" size={16} color="#FFF" />
-                            <Text style={styles.activeSleepBadgeTitle}>
-                              {isPaused ? 'Siesta Pausada' : 'Durmiendo siesta'}
-                            </Text>
-                          </View>
-                          <TouchableOpacity
-                            onPress={() => {
-                              // @ts-ignore
-                              navigation.navigate('SleepTracker', { childId: selectedChild.id });
-                            }}
-                          >
-                            <Ionicons name="chevron-forward" size={20} color="rgba(255,255,255,0.8)" />
-                          </TouchableOpacity>
-                        </View>
-
-                        {/* Contador y barra de progreso - Mejorado SIEMPRE visible */}
-                        <View style={styles.activeSleepProgress}>
-                          {/* Stats con mejor diseño */}
-                          <View style={styles.sleepStatsRow}>
-                            <View style={styles.sleepStatBox}>
-                              <Text style={styles.sleepStatValue}>
-                                {formatDuration(elapsedSleepTime / 60, true)}
-                              </Text>
-                              <Text style={styles.sleepStatLabel}>Transcurrido</Text>
-                            </View>
-                            
-                            {(() => {
-                              // Buscar la siesta en progreso en allNaps
-                              const inProgressNap = sleepPrediction?.prediction?.dailySchedule?.allNaps?.find(
-                                (nap: any) => nap.status === 'in_progress' || nap.isInProgress === true
-                              );
-                              
-                              const expectedDuration = inProgressNap?.expectedDuration || 
-                                                     sleepPrediction?.prediction?.nextNap?.expectedDuration;
-                              
-                              return expectedDuration ? (
-                              <>
-                                <View style={styles.sleepStatDivider} />
-                                
-                                <View style={styles.sleepStatBox}>
-                                  <Text style={styles.sleepStatValue}>
-                                      {formatDuration(expectedDuration)}
-                                  </Text>
-                                  <Text style={styles.sleepStatLabel}>Esperado</Text>
-                                </View>
-                                
-                                <View style={styles.sleepStatDivider} />
-                                
-                                <View style={styles.sleepStatBox}>
-                                  <Text style={[
-                                    styles.sleepStatValue,
-                                      elapsedSleepTime / 60 >= expectedDuration && 
-                                    { color: '#FFD700' }
-                                  ]}>
-                                      {elapsedSleepTime / 60 >= expectedDuration
-                                        ? `+${formatDuration((elapsedSleepTime / 60) - expectedDuration, true)}`
-                                        : formatDuration(expectedDuration - (elapsedSleepTime / 60), true)
-                                    }
-                                  </Text>
-                                  <Text style={styles.sleepStatLabel}>
-                                      {elapsedSleepTime / 60 >= expectedDuration 
-                                      ? 'Extra' 
-                                      : 'Restante'}
-                                  </Text>
-                                </View>
-                              </>
-                              ) : null;
-                            })()}
-                          </View>
-                          
-                          {/* Barra de progreso mejorada - SIEMPRE visible */}
-                          {(() => {
-                            // Buscar la siesta en progreso
-                            const inProgressNap = sleepPrediction?.prediction?.dailySchedule?.allNaps?.find(
-                              (nap: any) => nap.status === 'in_progress' || nap.isInProgress === true
-                            );
-                            
-                            const expectedDuration = inProgressNap?.expectedDuration || 
-                                                   sleepPrediction?.prediction?.nextNap?.expectedDuration;
-                            
-                            return expectedDuration ? (
-                            <View style={styles.sleepProgressBarWrapper}>
-                              <View style={styles.sleepProgressBarBg}>
-                                <View 
-                                  style={[
-                                    styles.sleepProgressBarFill, 
-                                    { 
-                                      width: `${Math.min(
-                                          ((elapsedSleepTime / 60) / expectedDuration) * 100, 
-                                        100
-                                      )}%`,
-                                        backgroundColor: elapsedSleepTime / 60 >= expectedDuration
-                                        ? '#FFD700'
-                                        : '#4ECDC4'
-                                    }
-                                  ]} 
-                                />
-                              </View>
-                              <View style={styles.sleepProgressPercentage}>
-                                <Text style={styles.sleepProgressPercentageText}>
-                                  {Math.min(
-                                      Math.round(((elapsedSleepTime / 60) / expectedDuration) * 100), 
-                                    100
-                                  )}%
-                                </Text>
-                              </View>
-                            </View>
-                          ) : (
-                            <View style={styles.sleepProgressInfoBox}>
-                              <Ionicons name="information-circle-outline" size={16} color="rgba(255,255,255,0.8)" />
-                              <Text style={styles.sleepProgressInfoText}>
-                                Sin predicción disponible. El contador continúa...
-                              </Text>
-                            </View>
-                            );
-                          })()}
-                        </View>
-
-                        {/* Botones de control */}
-                        <View style={styles.sleepControlButtons}>
-                          {isPaused ? (
-                            <TouchableOpacity
-                              style={[styles.sleepControlButton, styles.sleepResumeButton]}
-                              onPress={handleResumeSleep}
-                            >
-                              <Ionicons name="play" size={20} color="#FFF" />
-                              <Text style={styles.sleepControlButtonText}>Reanudar</Text>
-                            </TouchableOpacity>
-                          ) : (
-                            <TouchableOpacity
-                              style={[styles.sleepControlButton, styles.sleepPauseButton]}
-                              onPress={handlePauseSleep}
-                            >
-                              <Ionicons name="pause" size={20} color="#FFF" />
-                              <Text style={styles.sleepControlButtonText}>Pausar</Text>
-                            </TouchableOpacity>
-                          )}
-                          
-                          <TouchableOpacity
-                            style={[styles.sleepControlButton, styles.sleepStopButton]}
-                            onPress={handleStopSleep}
-                          >
-                            <Ionicons name="stop" size={20} color="#FFF" />
-                            <Text style={styles.sleepControlButtonText}>Detener</Text>
-                          </TouchableOpacity>
-                        </View>
-                      </View>
-                    </LinearGradient>
-                  </View>
-                ) : null}
+                {/* Resto del contenido cuando no está cargando */}
 
               </>
             )}
@@ -1773,6 +1699,94 @@ const HomeScreen: React.FC = () => {
           </View>
         );
       })()}
+
+      {/* Barra FIJA de "Durmiendo siesta" - solo cuando HAY siesta activa */}
+      {selectedChild && activeSleep && (
+        <View style={styles.fixedSleepBarContainer}>
+          <View style={styles.fixedSleepBarInner}>
+            {/* Info y controles en una sola línea */}
+            <View style={styles.fixedSleepRow}>
+              {/* Ícono y tiempo */}
+              <View style={styles.fixedSleepTimeDisplay}>
+                <Ionicons name="moon" size={20} color="#FFF" />
+                <Text style={styles.fixedSleepTime}>
+                  {formatDuration(elapsedSleepTime / 60, true)}
+                </Text>
+              </View>
+              
+              {/* Barra de progreso compacta */}
+              {(() => {
+                const inProgressNap = sleepPrediction?.prediction?.dailySchedule?.allNaps?.find(
+                  (nap: any) => nap.status === 'in_progress' || nap.isInProgress === true
+                );
+                
+                const expectedDuration = inProgressNap?.expectedDuration || 
+                                       sleepPrediction?.prediction?.nextNap?.expectedDuration || 60;
+                const elapsedMinutes = elapsedSleepTime / 60;
+                const progress = Math.min((elapsedMinutes / expectedDuration) * 100, 100);
+                
+                return (
+                  <View style={styles.fixedSleepProgressBar}>
+                    <View 
+                      style={[
+                        styles.fixedSleepProgressFill, 
+                        { width: `${progress}%` }
+                      ]} 
+                    />
+                  </View>
+                );
+              })()}
+              
+              {/* Tiempo restante */}
+              {(() => {
+                const inProgressNap = sleepPrediction?.prediction?.dailySchedule?.allNaps?.find(
+                  (nap: any) => nap.status === 'in_progress' || nap.isInProgress === true
+                );
+                
+                const expectedDuration = inProgressNap?.expectedDuration || 
+                                       sleepPrediction?.prediction?.nextNap?.expectedDuration || 60;
+                const elapsedMinutes = elapsedSleepTime / 60;
+                const remainingMinutes = Math.max(expectedDuration - elapsedMinutes, 0);
+                
+                return (
+                  <View style={styles.fixedSleepRemaining}>
+                    <Ionicons name="flag" size={14} color="#FFF" />
+                    <Text style={styles.fixedSleepRemainingText}>
+                      {formatDuration(remainingMinutes, false)}
+                    </Text>
+                  </View>
+                );
+              })()}
+              
+              {/* Botones de control */}
+              <View style={styles.fixedSleepButtons}>
+                {isPaused ? (
+                  <TouchableOpacity
+                    style={styles.fixedSleepBtn}
+                    onPress={handleResumeSleep}
+                  >
+                    <Ionicons name="play" size={20} color="#FFF" />
+                  </TouchableOpacity>
+                ) : (
+                  <TouchableOpacity
+                    style={styles.fixedSleepBtn}
+                    onPress={handlePauseSleep}
+                  >
+                    <Ionicons name="pause" size={20} color="#FFF" />
+                  </TouchableOpacity>
+                )}
+                
+                <TouchableOpacity
+                  style={styles.fixedSleepBtn}
+                  onPress={handleStopSleep}
+                >
+                  <Ionicons name="stop" size={20} color="#FFF" />
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </View>
+      )}
 
 
       {/* OCULTAR TODA LA SECCIÓN DE PROGRESO DE HOY */}
@@ -3191,7 +3205,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#2ECC71',
   },
   napIndicatorInProgress: {
-    backgroundColor: '#F59E0B', // Naranja para en progreso
+    backgroundColor: '#8B5CF6', // Morado para en progreso
   },
   napIndicatorNext: {
     backgroundColor: '#96d2d3',
@@ -4406,6 +4420,81 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#FFF',
     textTransform: 'lowercase',
+  },
+  // Barra fija de siesta activa
+  fixedSleepBarContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    backgroundColor: 'rgba(44, 62, 80, 0.98)',
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.2)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 15,
+  },
+  fixedSleepBarInner: {
+    width: '100%',
+  },
+  fixedSleepRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  fixedSleepTimeDisplay: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    minWidth: 80,
+  },
+  fixedSleepTime: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FFF',
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+  },
+  fixedSleepProgressBar: {
+    flex: 2,
+    height: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 4,
+    overflow: 'hidden',
+    marginHorizontal: 12,
+  },
+  fixedSleepProgressFill: {
+    height: '100%',
+    backgroundColor: '#FFF',
+    borderRadius: 4,
+  },
+  fixedSleepRemaining: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    minWidth: 50,
+  },
+  fixedSleepRemainingText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#FFF',
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+  },
+  fixedSleepButtons: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  fixedSleepBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });
 

@@ -50,8 +50,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   useEffect(() => {
     console.log('⚙️ [GOOGLE SIGN-IN] Configurando Google Sign-In...');
     GoogleSignin.configure({
-      webClientId: '975014449237-9crsati0bs65e787cb5no3ntu2utmqe1.apps.googleusercontent.com',
-      iosClientId: '975014449237-9crsati0bs65e787cb5no3ntu2utmqe1.apps.googleusercontent.com', // Agregado para evitar crash en iOS
+      webClientId: '975014449237-9crsati0bs65e787cb5no3ntu2utmqe1.apps.googleusercontent.com', // Para servidor backend
+      iosClientId: '975014449237-1d0vk75uqm3oqd3psjmcjvc1la9232kb.apps.googleusercontent.com', // CLIENT_ID específico de iOS
       offlineAccess: true,
     });
     console.log('✅ [GOOGLE SIGN-IN] Configuración completada');
@@ -195,6 +195,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       // Verificar configuración
       console.log('🔍 [GOOGLE SIGN-IN] Verificando configuración...');
       console.log('🔍 [GOOGLE SIGN-IN] Web Client ID:', '975014449237-9crsati0bs65e787cb5no3ntu2utmqe1.apps.googleusercontent.com');
+      console.log('🔍 [GOOGLE SIGN-IN] iOS Client ID:', '975014449237-1d0vk75uqm3oqd3psjmcjvc1la9232kb.apps.googleusercontent.com');
       
       // Verificar si Google Play Services están disponibles (solo Android)
       if (Platform.OS === 'android') {
