@@ -56,6 +56,20 @@ class SleepTrackingNotification {
    */
   async setupNotificationCategories(): Promise<void> {
     try {
+      console.log('⚙️ [NAP-NOTIF] Configurando categorías de notificaciones...');
+      
+      // Configurar handler PRIMERO
+      Notifications.setNotificationHandler({
+        handleNotification: async () => {
+          console.log('📬 [NAP-NOTIF] Handler de notificación llamado');
+          return {
+            shouldShowAlert: true,
+            shouldPlaySound: false,
+            shouldSetBadge: false,
+          };
+        },
+      });
+      
       // Definir acciones para cuando está corriendo
       await Notifications.setNotificationCategoryAsync('nap-tracking-running', [
         {
@@ -163,10 +177,17 @@ class SleepTrackingNotification {
 
     try {
       console.log('🔄 [NAP-NOTIF] Actualizando notificación...');
+      console.log('📊 [NAP-NOTIF] Datos actuales:', {
+        startTime: this.currentNapData.startTime,
+        expectedDuration: this.currentNapData.expectedDuration,
+        isPaused: this.currentNapData.isPaused
+      });
       
       const now = new Date();
       const startTime = new Date(this.currentNapData.startTime);
       const elapsedMinutes = Math.floor((now.getTime() - startTime.getTime()) / 1000 / 60);
+      
+      console.log('⏱️ [NAP-NOTIF] Tiempo transcurrido:', elapsedMinutes, 'minutos');
       
       const hours = Math.floor(elapsedMinutes / 60);
       const mins = elapsedMinutes % 60;
@@ -177,10 +198,6 @@ class SleepTrackingNotification {
       if (this.currentNapData.expectedDuration) {
         const remaining = this.currentNapData.expectedDuration - elapsedMinutes;
         if (remaining > 0) {
-          const remHours = Math.floor(remaining / 60);
-          const remMins = remaining % 60;
-          const remText = remHours > 0 ? `${remHours}:${remMins.toString().padStart(2, '0')}` : `${remMins} min`;
-          
           // Calcular hora de finalización
           const endTime = new Date(startTime.getTime() + this.currentNapData.expectedDuration * 60000);
           const endTimeText = endTime.toLocaleTimeString('es-MX', { 
@@ -193,32 +210,51 @@ class SleepTrackingNotification {
         }
       }
 
-      const categoryId = this.currentNapData.isPaused ? 'nap-tracking-paused' : 'nap-tracking-running';
+      const title = this.currentNapData.isPaused ? '⏸️ Siesta pausada' : '😴 Siesta';
 
-      console.log('📱 [NAP-NOTIF] Programando notificación:', {
-        title: this.currentNapData.isPaused ? '⏸️ Siesta pausada' : '😴 Siesta',
-        body: bodyText,
-        categoryId
+      console.log('📱 [NAP-NOTIF] Mostrando notificación:', {
+        title,
+        body: bodyText
       });
 
       // Primero cancelar notificación anterior si existe
       await Notifications.dismissNotificationAsync(this.notificationId);
+      console.log('🗑️ [NAP-NOTIF] Notificación anterior cancelada');
       
-      // Presentar notificación inmediatamente (no programar)
-      await Notifications.presentNotificationAsync({
-        title: this.currentNapData.isPaused ? '⏸️ Siesta pausada' : '😴 Siesta',
-        body: bodyText,
-        data: {
-          type: 'nap-tracking',
-          startTime: this.currentNapData.startTime,
-        },
-        sound: false,
-      });
-      
-      console.log('✅ [NAP-NOTIF] Notificación presentada');
+      // Presentar notificación inmediatamente
+      try {
+        await Notifications.presentNotificationAsync({
+          title,
+          body: bodyText,
+          data: {
+            type: 'nap-tracking',
+            startTime: this.currentNapData.startTime,
+          },
+          sound: false,
+        });
+        console.log('✅ [NAP-NOTIF] Notificación presentada exitosamente');
+      } catch (presentError) {
+        console.error('❌ [NAP-NOTIF] Error al presentar notificación:', presentError);
+        // Intentar con método alternativo
+        console.log('🔄 [NAP-NOTIF] Intentando método alternativo (schedule)...');
+        await Notifications.scheduleNotificationAsync({
+          content: {
+            title,
+            body: bodyText,
+            data: {
+              type: 'nap-tracking',
+              startTime: this.currentNapData.startTime,
+            },
+            sound: false,
+          },
+          trigger: null,
+        });
+        console.log('✅ [NAP-NOTIF] Notificación programada con método alternativo');
+      }
 
     } catch (error) {
       console.error('❌ [NAP-NOTIF] Error actualizando notificación:', error);
+      console.error('❌ [NAP-NOTIF] Stack trace:', (error as Error).stack);
     }
   }
 
