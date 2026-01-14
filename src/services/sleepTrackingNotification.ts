@@ -201,24 +201,21 @@ class SleepTrackingNotification {
         categoryId
       });
 
-      const notificationId = await Notifications.scheduleNotificationAsync({
-        identifier: this.notificationId,
-        content: {
-          title: this.currentNapData.isPaused ? '⏸️ Siesta pausada' : '😴 Siesta',
-          body: bodyText,
-          categoryIdentifier: categoryId,
-          sound: false,
-          sticky: true, // Para Android
-          priority: Notifications.AndroidNotificationPriority.HIGH,
-          data: {
-            type: 'nap-tracking',
-            startTime: this.currentNapData.startTime,
-          },
+      // Primero cancelar notificación anterior si existe
+      await Notifications.dismissNotificationAsync(this.notificationId);
+      
+      // Presentar notificación inmediatamente (no programar)
+      await Notifications.presentNotificationAsync({
+        title: this.currentNapData.isPaused ? '⏸️ Siesta pausada' : '😴 Siesta',
+        body: bodyText,
+        data: {
+          type: 'nap-tracking',
+          startTime: this.currentNapData.startTime,
         },
-        trigger: null, // Mostrar inmediatamente
+        sound: false,
       });
       
-      console.log('✅ [NAP-NOTIF] Notificación programada con ID:', notificationId);
+      console.log('✅ [NAP-NOTIF] Notificación presentada');
 
     } catch (error) {
       console.error('❌ [NAP-NOTIF] Error actualizando notificación:', error);
