@@ -128,12 +128,17 @@ class SleepTrackingNotification {
         return;
       }
       
+      // PRIMERO: Detener intervalo anterior si existe
+      if (this.updateInterval) {
+        clearInterval(this.updateInterval);
+        this.updateInterval = null;
+      }
+      
+      // SEGUNDO: Guardar los datos ANTES de actualizar
       this.currentNapData = napData;
+      console.log('💾 [NAP-NOTIF] Datos de siesta guardados:', napData);
 
-      // Detener tracking anterior si existe
-      await this.stopTracking();
-
-      // Configurar handler de comportamiento de notificaciones
+      // TERCERO: Configurar handler de comportamiento de notificaciones
       Notifications.setNotificationHandler({
         handleNotification: async () => ({
           shouldShowAlert: true,
@@ -142,10 +147,10 @@ class SleepTrackingNotification {
         }),
       });
 
-      // Mostrar notificación inicial
+      // CUARTO: Mostrar notificación inicial
       await this.updateNotification();
 
-      // Actualizar cada minuto
+      // QUINTO: Actualizar cada minuto
       this.updateInterval = setInterval(() => {
         this.updateNotification();
       }, 60000); // 1 minuto
