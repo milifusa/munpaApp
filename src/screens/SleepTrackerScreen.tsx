@@ -18,6 +18,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../contexts/AuthContext';
 import { sleepService } from '../services/api';
+import sleepTrackingNotification from '../services/sleepTrackingNotification';
 import { SleepEntry, SleepPrediction, SleepStats } from '../types/sleep';
 
 // Función para formatear hora SIN conversión (para predicciones que ya vienen en hora local)
@@ -302,6 +303,14 @@ const SleepTrackerScreen = ({ navigation, route }: any) => {
       
       if (response.success && response.sleepEvent) {
         setActiveSleep(response.sleepEvent);
+        
+        // Iniciar notificación de tracking
+        await sleepTrackingNotification.startTracking({
+          startTime: response.sleepEvent.startTime,
+          expectedDuration: response.sleepEvent.expectedDuration,
+          isPaused: false,
+        });
+        
         Alert.alert('✓ Iniciado', `Seguimiento de ${selectedSleepType === 'nap' ? 'siesta' : 'noche'} iniciado`);
         loadData(); // Recargar para actualizar la UI
       }
@@ -333,6 +342,9 @@ const SleepTrackerScreen = ({ navigation, route }: any) => {
         quality: quality as any,
       });
       
+      // Detener notificación de tracking
+      await sleepTrackingNotification.stopTracking();
+      
       setActiveSleep(null);
       setIsPaused(false);
       setPauseStartTime(null);
@@ -347,12 +359,16 @@ const SleepTrackerScreen = ({ navigation, route }: any) => {
     }
   };
 
-  const handlePauseSleep = () => {
+  const handlePauseSleep = async () => {
     if (!activeSleep || isPaused) return;
     
     const now = new Date();
     setPauseStartTime(now);
     setIsPaused(true);
+    
+    // Actualizar notificación a estado pausado
+    await sleepTrackingNotification.updatePauseState(true);
+    
     Alert.alert('⏸️ Pausado', 'Siesta pausada. El tiempo no se contará hasta que reanudes.');
   };
 
@@ -387,6 +403,10 @@ const SleepTrackerScreen = ({ navigation, route }: any) => {
       
       setIsPaused(false);
       setPauseStartTime(null);
+      
+      // Actualizar notificación a estado activo
+      await sleepTrackingNotification.updatePauseState(false);
+      
       Alert.alert('▶️ Reanudado', 'Siesta reanudada. El contador continúa.');
     } catch (error) {
       console.error('Error reanudando sueño:', error);
