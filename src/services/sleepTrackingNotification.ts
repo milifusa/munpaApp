@@ -216,28 +216,35 @@ class SleepTrackingNotification {
       }
 
       const title = this.currentNapData.isPaused ? '⏸️ Siesta pausada' : '😴 Siesta';
+      const categoryId = this.currentNapData.isPaused ? 'nap-tracking-paused' : 'nap-tracking-running';
 
       console.log('📱 [NAP-NOTIF] Mostrando notificación:', {
         title,
-        body: bodyText
+        body: bodyText,
+        categoryId
       });
 
-      // Primero cancelar notificación anterior si existe
+      // Cancelar notificación anterior programada
+      await Notifications.cancelScheduledNotificationAsync(this.notificationId);
+      // También dismissar si ya está mostrada
       await Notifications.dismissNotificationAsync(this.notificationId);
       console.log('🗑️ [NAP-NOTIF] Notificación anterior cancelada');
       
-      // Programar notificación inmediatamente (trigger: null)
+      // Programar notificación persistente con acciones
       const notificationId = await Notifications.scheduleNotificationAsync({
+        identifier: this.notificationId,
         content: {
           title,
           body: bodyText,
+          categoryIdentifier: categoryId,
           data: {
             type: 'nap-tracking',
             startTime: this.currentNapData.startTime,
+            persistent: true,
           },
           sound: false,
           badge: 0,
-          priority: Notifications.AndroidNotificationPriority.HIGH,
+          priority: Notifications.AndroidNotificationPriority.MAX,
           // iOS: mantener la notificación visible
           autoDismiss: false,
           sticky: true,
