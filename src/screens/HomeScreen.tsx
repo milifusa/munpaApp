@@ -4421,24 +4421,23 @@ const styles = StyleSheet.create({
     color: '#FFF',
     textTransform: 'lowercase',
   },
-  // Barra fija de siesta activa (ARRIBA como Live Activity)
+  // Barra fija de siesta activa en el FOOTER
   fixedSleepBarContainer: {
     position: 'absolute',
-    top: 50, // Justo debajo del status bar
-    left: 12,
-    right: 12,
-    paddingHorizontal: 16,
+    bottom: 0,
+    left: 0,
+    right: 0,
+    paddingHorizontal: 20,
     paddingVertical: 16,
-    backgroundColor: 'rgba(44, 62, 80, 0.95)',
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.15)',
+    backgroundColor: 'rgba(44, 62, 80, 0.98)',
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.2)',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 16,
-    elevation: 20,
-    zIndex: 1000, // Para que esté por encima de todo
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 15,
+    zIndex: 1000,
   },
   fixedSleepBarInner: {
     width: '100%',
