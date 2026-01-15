@@ -120,42 +120,13 @@ class SleepTrackingNotification {
   async startTracking(napData: ActiveNapData): Promise<void> {
     try {
       console.log('🚀 [NAP-NOTIF] Iniciando tracking de siesta...');
+      console.log('ℹ️ [NAP-NOTIF] Las notificaciones están desactivadas, usando solo barra visual en HomeScreen');
       
-      // Verificar y solicitar permisos
-      const hasPermission = await this.requestPermissions();
-      if (!hasPermission) {
-        console.warn('⚠️ [NAP-NOTIF] No hay permisos, no se puede mostrar notificación');
-        return;
-      }
-      
-      // PRIMERO: Detener intervalo anterior si existe
-      if (this.updateInterval) {
-        clearInterval(this.updateInterval);
-        this.updateInterval = null;
-      }
-      
-      // SEGUNDO: Guardar los datos ANTES de actualizar
+      // Guardar datos para referencia (aunque no se usen actualmente)
       this.currentNapData = napData;
-      console.log('💾 [NAP-NOTIF] Datos de siesta guardados:', napData);
-
-      // TERCERO: Configurar handler de comportamiento de notificaciones
-      Notifications.setNotificationHandler({
-        handleNotification: async () => ({
-          shouldShowAlert: true,
-          shouldPlaySound: false,
-          shouldSetBadge: false,
-        }),
-      });
-
-      // CUARTO: Mostrar notificación inicial
-      await this.updateNotification();
-
-      // QUINTO: Actualizar cada minuto
-      this.updateInterval = setInterval(() => {
-        this.updateNotification();
-      }, 60000); // 1 minuto
-
-      console.log('✅ [NAP-NOTIF] Tracking de siesta iniciado');
+      
+      // NO mostrar notificaciones - la barra visual es suficiente
+      console.log('✅ [NAP-NOTIF] Tracking iniciado (sin notificaciones)');
     } catch (error) {
       console.error('❌ [NAP-NOTIF] Error iniciando tracking:', error);
     }
@@ -226,9 +197,9 @@ class SleepTrackingNotification {
       await Notifications.dismissNotificationAsync(this.notificationId);
       console.log('🗑️ [NAP-NOTIF] Notificación anterior cancelada');
       
-      // Presentar notificación inmediatamente
-      try {
-        await Notifications.presentNotificationAsync({
+      // Programar notificación inmediatamente (trigger: null)
+      const notificationId = await Notifications.scheduleNotificationAsync({
+        content: {
           title,
           body: bodyText,
           data: {
@@ -236,26 +207,12 @@ class SleepTrackingNotification {
             startTime: this.currentNapData.startTime,
           },
           sound: false,
-        });
-        console.log('✅ [NAP-NOTIF] Notificación presentada exitosamente');
-      } catch (presentError) {
-        console.error('❌ [NAP-NOTIF] Error al presentar notificación:', presentError);
-        // Intentar con método alternativo
-        console.log('🔄 [NAP-NOTIF] Intentando método alternativo (schedule)...');
-        await Notifications.scheduleNotificationAsync({
-          content: {
-            title,
-            body: bodyText,
-            data: {
-              type: 'nap-tracking',
-              startTime: this.currentNapData.startTime,
-            },
-            sound: false,
-          },
-          trigger: null,
-        });
-        console.log('✅ [NAP-NOTIF] Notificación programada con método alternativo');
-      }
+          badge: 1,
+        },
+        trigger: null, // Mostrar inmediatamente
+      });
+      
+      console.log('✅ [NAP-NOTIF] Notificación programada con ID:', notificationId);
 
     } catch (error) {
       console.error('❌ [NAP-NOTIF] Error actualizando notificación:', error);

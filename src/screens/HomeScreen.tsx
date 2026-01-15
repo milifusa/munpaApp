@@ -1708,7 +1708,7 @@ const HomeScreen: React.FC = () => {
             <View style={styles.fixedSleepRow}>
               {/* Ícono y tiempo */}
               <View style={styles.fixedSleepTimeDisplay}>
-                <Ionicons name="moon" size={20} color="#FFF" />
+                <Ionicons name="moon" size={24} color="#FFF" />
                 <Text style={styles.fixedSleepTime}>
                   {formatDuration(elapsedSleepTime / 60, true)}
                 </Text>
@@ -1765,14 +1765,14 @@ const HomeScreen: React.FC = () => {
                     style={styles.fixedSleepBtn}
                     onPress={handleResumeSleep}
                   >
-                    <Ionicons name="play" size={20} color="#FFF" />
+                    <Ionicons name="play" size={24} color="#FFF" />
                   </TouchableOpacity>
                 ) : (
                   <TouchableOpacity
                     style={styles.fixedSleepBtn}
                     onPress={handlePauseSleep}
                   >
-                    <Ionicons name="pause" size={20} color="#FFF" />
+                    <Ionicons name="pause" size={24} color="#FFF" />
                   </TouchableOpacity>
                 )}
                 
@@ -1780,7 +1780,7 @@ const HomeScreen: React.FC = () => {
                   style={styles.fixedSleepBtn}
                   onPress={handleStopSleep}
                 >
-                  <Ionicons name="stop" size={20} color="#FFF" />
+                  <Ionicons name="stop" size={24} color="#FFF" />
                 </TouchableOpacity>
               </View>
             </View>
@@ -4421,22 +4421,24 @@ const styles = StyleSheet.create({
     color: '#FFF',
     textTransform: 'lowercase',
   },
-  // Barra fija de siesta activa
+  // Barra fija de siesta activa (ARRIBA como Live Activity)
   fixedSleepBarContainer: {
     position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    backgroundColor: 'rgba(44, 62, 80, 0.98)',
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255, 255, 255, 0.2)',
+    top: 50, // Justo debajo del status bar
+    left: 12,
+    right: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    backgroundColor: 'rgba(44, 62, 80, 0.95)',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.15)',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 12,
-    elevation: 15,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 16,
+    elevation: 20,
+    zIndex: 1000, // Para que esté por encima de todo
   },
   fixedSleepBarInner: {
     width: '100%',
@@ -4486,15 +4488,17 @@ const styles = StyleSheet.create({
   },
   fixedSleepButtons: {
     flexDirection: 'row',
-    gap: 8,
+    gap: 10,
   },
   fixedSleepBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
     justifyContent: 'center',
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
   },
 });
 
