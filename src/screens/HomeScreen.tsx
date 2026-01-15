@@ -162,6 +162,9 @@ const HomeScreen: React.FC = () => {
     loadData();
     loadUserProfile();
     
+    // DETENER cualquier notificación que esté corriendo
+    sleepTrackingNotification.stopTracking();
+    
     // Configurar categorías de notificaciones para tracking de siestas
     sleepTrackingNotification.setupNotificationCategories();
     
@@ -180,6 +183,8 @@ const HomeScreen: React.FC = () => {
     
     return () => {
       subscription.remove();
+      // También detener notificaciones al desmontar
+      sleepTrackingNotification.stopTracking();
     };
   }, []);
 
