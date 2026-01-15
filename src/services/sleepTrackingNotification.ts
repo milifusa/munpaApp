@@ -120,13 +120,42 @@ class SleepTrackingNotification {
   async startTracking(napData: ActiveNapData): Promise<void> {
     try {
       console.log('🚀 [NAP-NOTIF] Iniciando tracking de siesta...');
-      console.log('ℹ️ [NAP-NOTIF] Las notificaciones están desactivadas, usando solo barra visual en HomeScreen');
       
-      // Guardar datos para referencia (aunque no se usen actualmente)
+      // Verificar y solicitar permisos
+      const hasPermission = await this.requestPermissions();
+      if (!hasPermission) {
+        console.warn('⚠️ [NAP-NOTIF] No hay permisos, no se puede mostrar notificación');
+        return;
+      }
+      
+      // PRIMERO: Detener intervalo anterior si existe
+      if (this.updateInterval) {
+        clearInterval(this.updateInterval);
+        this.updateInterval = null;
+      }
+      
+      // SEGUNDO: Guardar los datos ANTES de actualizar
       this.currentNapData = napData;
-      
-      // NO mostrar notificaciones - la barra visual es suficiente
-      console.log('✅ [NAP-NOTIF] Tracking iniciado (sin notificaciones)');
+      console.log('💾 [NAP-NOTIF] Datos de siesta guardados:', napData);
+
+      // TERCERO: Configurar handler de comportamiento de notificaciones
+      Notifications.setNotificationHandler({
+        handleNotification: async () => ({
+          shouldShowAlert: true,
+          shouldPlaySound: false,
+          shouldSetBadge: false,
+        }),
+      });
+
+      // CUARTO: Mostrar notificación inicial
+      await this.updateNotification();
+
+      // QUINTO: Actualizar cada 30 segundos
+      this.updateInterval = setInterval(() => {
+        this.updateNotification();
+      }, 30000); // 30 segundos
+
+      console.log('✅ [NAP-NOTIF] Tracking de siesta iniciado (actualización cada 30s)');
     } catch (error) {
       console.error('❌ [NAP-NOTIF] Error iniciando tracking:', error);
     }
@@ -207,7 +236,11 @@ class SleepTrackingNotification {
             startTime: this.currentNapData.startTime,
           },
           sound: false,
-          badge: 1,
+          badge: 0,
+          priority: Notifications.AndroidNotificationPriority.HIGH,
+          // iOS: mantener la notificación visible
+          autoDismiss: false,
+          sticky: true,
         },
         trigger: null, // Mostrar inmediatamente
       });

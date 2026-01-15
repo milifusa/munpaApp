@@ -304,12 +304,12 @@ const SleepTrackerScreen = ({ navigation, route }: any) => {
       if (response.success && response.sleepEvent) {
         setActiveSleep(response.sleepEvent);
         
-        // NO iniciar notificaciones - solo usar la barra visual en HomeScreen
-        // await sleepTrackingNotification.startTracking({
-        //   startTime: response.sleepEvent.startTime,
-        //   expectedDuration: response.sleepEvent.expectedDuration,
-        //   isPaused: false,
-        // });
+        // Iniciar notificación persistente
+        await sleepTrackingNotification.startTracking({
+          startTime: response.sleepEvent.startTime,
+          expectedDuration: response.sleepEvent.expectedDuration,
+          isPaused: false,
+        });
         
         Alert.alert('✓ Iniciado', `Seguimiento de ${selectedSleepType === 'nap' ? 'siesta' : 'noche'} iniciado`);
         loadData(); // Recargar para actualizar la UI
@@ -342,8 +342,8 @@ const SleepTrackerScreen = ({ navigation, route }: any) => {
         quality: quality as any,
       });
       
-      // NO detener notificación - solo usar barra visual
-      // await sleepTrackingNotification.stopTracking();
+      // Detener notificación de tracking
+      await sleepTrackingNotification.stopTracking();
       
       setActiveSleep(null);
       setIsPaused(false);
@@ -367,8 +367,8 @@ const SleepTrackerScreen = ({ navigation, route }: any) => {
     setIsPaused(true);
     
     // Actualizar notificación a estado pausado
-    // NO actualizar notificación - solo usar barra visual
-    // await sleepTrackingNotification.updatePauseState(true);
+    // Actualizar notificación a estado pausado
+    await sleepTrackingNotification.updatePauseState(true);
     
     Alert.alert('⏸️ Pausado', 'Siesta pausada. El tiempo no se contará hasta que reanudes.');
   };
@@ -406,8 +406,8 @@ const SleepTrackerScreen = ({ navigation, route }: any) => {
       setPauseStartTime(null);
       
       // Actualizar notificación a estado activo
-      // NO actualizar notificación - solo usar barra visual
-      // await sleepTrackingNotification.updatePauseState(false);
+      // Actualizar notificación a estado activo
+      await sleepTrackingNotification.updatePauseState(false);
       
       Alert.alert('▶️ Reanudado', 'Siesta reanudada. El contador continúa.');
     } catch (error) {
