@@ -484,14 +484,14 @@ const HomeScreen: React.FC = () => {
         );
         setActiveSleep(activeSleepEntry || null);
         
-        // Si hay siesta activa, iniciar notificación de tracking
-        if (activeSleepEntry && predictionRes.status === 'fulfilled' && predictionRes.value.prediction?.nextNap) {
-          await sleepTrackingNotification.startTracking({
-            startTime: activeSleepEntry.startTime,
-            expectedDuration: predictionRes.value.prediction.nextNap.expectedDuration,
-            isPaused: false,
-          });
-        }
+        // NO iniciar notificaciones - solo usar la barra visual
+        // if (activeSleepEntry && predictionRes.status === 'fulfilled' && predictionRes.value.prediction?.nextNap) {
+        //   await sleepTrackingNotification.startTracking({
+        //     startTime: activeSleepEntry.startTime,
+        //     expectedDuration: predictionRes.value.prediction.nextNap.expectedDuration,
+        //     isPaused: false,
+        //   });
+        // }
       } else {
         setActiveSleep(null);
       }
@@ -531,8 +531,8 @@ const HomeScreen: React.FC = () => {
     setPauseStartTime(now);
     setIsPaused(true);
     
-    // Actualizar notificación a estado pausado
-    await sleepTrackingNotification.updatePauseState(true);
+    // NO actualizar notificación - solo usar barra visual
+    // await sleepTrackingNotification.updatePauseState(true);
     
     Alert.alert('⏸️ Pausado', 'Siesta pausada. El tiempo no se contará hasta que reanudes.');
   };
@@ -569,8 +569,8 @@ const HomeScreen: React.FC = () => {
       setIsPaused(false);
       setPauseStartTime(null);
       
-      // Actualizar notificación a estado activo
-      await sleepTrackingNotification.updatePauseState(false);
+      // NO actualizar notificación - solo usar barra visual
+      // await sleepTrackingNotification.updatePauseState(false);
       
       Alert.alert('▶️ Reanudado', 'Siesta reanudada. El tiempo se sigue contando.');
       
@@ -608,8 +608,8 @@ const HomeScreen: React.FC = () => {
                 duration,
               });
               
-              // Detener notificación de tracking
-              await sleepTrackingNotification.stopTracking();
+              // NO detener notificación - solo usar barra visual
+              // await sleepTrackingNotification.stopTracking();
               
               setActiveSleep(null);
               setIsPaused(false);
