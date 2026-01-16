@@ -1507,6 +1507,39 @@ export const recommendationsService = {
     }
   },
 
+  // Crear nueva recomendación (usuario app)
+  createRecommendation: async (data: {
+    categoryId: string;
+    name: string;
+    description?: string;
+    address?: string;
+    latitude?: number;
+    longitude?: number;
+    phone?: string;
+    email?: string;
+    website?: string;
+    facebook?: string;
+    instagram?: string;
+    twitter?: string;
+    whatsapp?: string;
+    imageUrl?: string;
+  }) => {
+    console.log('✏️ [RECOMMENDATIONS] Creando nueva recomendación:', data.name);
+    
+    try {
+      const response = await api.post('/api/recommendations', data);
+      
+      console.log('✅ [RECOMMENDATIONS] Recomendación creada exitosamente');
+      console.log('📦 [RECOMMENDATIONS] ID:', response.data?.data?.id);
+      
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ [RECOMMENDATIONS] Error creando recomendación');
+      console.error('❌ [RECOMMENDATIONS] Error:', error.response?.data || error.message);
+      throw error;
+    }
+  },
+
   // Agregar a lista de deseos
   addToWishlist: async (recommendationId: string, notes?: string, priority?: string) => {
     console.log('💝 [RECOMMENDATIONS] Agregando a lista de deseos:', recommendationId);

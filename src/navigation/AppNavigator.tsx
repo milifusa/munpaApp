@@ -44,6 +44,7 @@ import ItemCommentsScreen from '../screens/ItemCommentsScreen';
 import RecommendationsScreen from '../screens/RecommendationsScreen';
 import CategoryRecommendationsScreen from '../screens/CategoryRecommendationsScreen';
 import RecommendationDetailScreen from '../screens/RecommendationDetailScreen';
+import AddRecommendationScreen from '../screens/AddRecommendationScreen';
 import FavoritesScreen from '../screens/FavoritesScreen';
 import FavoritesMapScreen from '../screens/FavoritesMapScreen';
 import WishlistScreen from '../screens/WishlistScreen';
@@ -717,6 +718,14 @@ const RecommendationsStackNavigator = () => {
         component={RecommendationDetailScreen}
         options={{
           title: 'Detalle',
+          headerShown: false, // Usamos header personalizado en la pantalla
+        }}
+      />
+      <Stack.Screen
+        name="AddRecommendation"
+        component={AddRecommendationScreen}
+        options={{
+          title: 'Agregar Recomendación',
           headerShown: false, // Usamos header personalizado en la pantalla
         }}
       />

@@ -168,6 +168,15 @@ const RecommendationsScreen = ({ navigation }: any) => {
           <Text style={styles.quickActionText}>Ver Mapa</Text>
         </TouchableOpacity>
         
+        <TouchableOpacity 
+          style={styles.quickAction}
+          onPress={() => navigation.navigate('AddRecommendation')}
+        >
+          <View style={[styles.quickActionIcon, { backgroundColor: '#8B5CF6' }]}>
+            <Ionicons name="add-circle" size={20} color="white" />
+          </View>
+          <Text style={styles.quickActionText}>Agregar</Text>
+        </TouchableOpacity>
         
       </View>
     </View>
