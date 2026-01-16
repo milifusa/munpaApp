@@ -168,16 +168,6 @@ const RecommendationsScreen = ({ navigation }: any) => {
           <Text style={styles.quickActionText}>Ver Mapa</Text>
         </TouchableOpacity>
         
-        <TouchableOpacity 
-          style={styles.quickAction}
-          onPress={() => navigation.navigate('AddRecommendation')}
-        >
-          <View style={[styles.quickActionIcon, { backgroundColor: '#8B5CF6' }]}>
-            <Ionicons name="add-circle" size={20} color="white" />
-          </View>
-          <Text style={styles.quickActionText}>Agregar</Text>
-        </TouchableOpacity>
-        
       </View>
     </View>
   );
@@ -333,6 +323,25 @@ const RecommendationsScreen = ({ navigation }: any) => {
           
           {/* Acciones rápidas */}
           {renderQuickActions()}
+          
+          {/* Botón grande para agregar recomendación */}
+          <TouchableOpacity
+            style={styles.addRecommendationButton}
+            onPress={() => navigation.navigate('AddRecommendation')}
+          >
+            <View style={styles.addRecommendationContent}>
+              <View style={styles.addRecommendationIcon}>
+                <Ionicons name="add-circle" size={28} color="white" />
+              </View>
+              <View style={styles.addRecommendationText}>
+                <Text style={styles.addRecommendationTitle}>Agregar Recomendación</Text>
+                <Text style={styles.addRecommendationSubtitle}>
+                  Comparte un lugar que te guste con la comunidad
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={24} color="#59C6C0" />
+            </View>
+          </TouchableOpacity>
         </View>
 
         {/* Categorías principales */}
@@ -575,6 +584,46 @@ const styles = StyleSheet.create({
     color: '#333',
     textAlign: 'center',
     fontWeight: '500',
+  },
+  
+  // Botón grande para agregar recomendación
+  addRecommendationButton: {
+    backgroundColor: 'white',
+    borderRadius: 16,
+    padding: 16,
+    marginTop: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  addRecommendationContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  addRecommendationIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#59C6C0',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  addRecommendationText: {
+    flex: 1,
+  },
+  addRecommendationTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#2C3E50',
+    marginBottom: 4,
+  },
+  addRecommendationSubtitle: {
+    fontSize: 13,
+    color: '#718096',
+    lineHeight: 18,
   },
   
   // Recomendaciones recientes
