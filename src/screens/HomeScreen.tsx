@@ -1135,7 +1135,7 @@ const HomeScreen: React.FC = () => {
           {/* Título de Sueño */}
           {selectedChild && (
             <View style={styles.sleepTitleContainer}>
-              <Text style={styles.sleepTitle}>Sueño de {selectedChild.name}</Text>
+              <Text style={styles.sleepTitle}>Recomendación de sueño</Text>
             </View>
           )}
           
