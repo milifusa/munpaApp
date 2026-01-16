@@ -147,15 +147,13 @@ class SleepTrackingNotification {
         }),
       });
 
-      // CUARTO: Mostrar notificación inicial
+      // CUARTO: Mostrar notificación UNA SOLA VEZ
       await this.updateNotification();
 
-      // QUINTO: Actualizar cada 30 segundos
-      this.updateInterval = setInterval(() => {
-        this.updateNotification();
-      }, 30000); // 30 segundos
-
-      console.log('✅ [NAP-NOTIF] Tracking de siesta iniciado (actualización cada 30s)');
+      // NO actualizar periódicamente porque en iOS cada actualización crea una nueva notificación
+      // La barra visual en HomeScreen se actualiza en tiempo real
+      
+      console.log('✅ [NAP-NOTIF] Notificación inicial mostrada (sin actualizaciones automáticas)');
     } catch (error) {
       console.error('❌ [NAP-NOTIF] Error iniciando tracking:', error);
     }
