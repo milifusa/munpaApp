@@ -2617,11 +2617,11 @@ const HomeScreen: React.FC = () => {
         transparent={false}
         onRequestClose={() => setShowMedicationModal(false)}
       >
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          style={styles.medModalContainer}
-        >
-          <ScrollView>
+        <SafeAreaView style={{ flex: 1, backgroundColor: '#887CBC' }}>
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            style={styles.medModalContainer}
+          >
             <View style={styles.medModalHeader}>
               <TouchableOpacity onPress={() => setShowMedicationModal(false)}>
                 <Text style={styles.medModalCancelButton}>Cancelar</Text>
@@ -2633,8 +2633,9 @@ const HomeScreen: React.FC = () => {
                 <Text style={styles.medModalSaveButton}>Guardar</Text>
               </TouchableOpacity>
             </View>
-
-            <View style={styles.medModalBody}>
+            
+            <ScrollView style={styles.medModalScrollView}>
+              <View style={styles.medModalBody}>
               {/* Nombre */}
               <View style={styles.medInputGroup}>
                 <Text style={styles.medInputLabel}>Nombre del medicamento</Text>
@@ -2868,6 +2869,7 @@ const HomeScreen: React.FC = () => {
             </View>
           </ScrollView>
         </KeyboardAvoidingView>
+        </SafeAreaView>
       </Modal>
 
       {/* Modal de detalle de medicamento */}
@@ -5567,6 +5569,9 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F5F5F5',
   },
+  medModalScrollView: {
+    flex: 1,
+  },
   medModalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -5580,6 +5585,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '700',
     color: '#FFF',
+    fontFamily: 'Montserrat',
   },
   medModalCancelButton: {
     fontSize: 16,
@@ -5591,7 +5597,8 @@ const styles = StyleSheet.create({
     color: '#FFF',
   },
   medModalBody: {
-    padding: 20,
+    padding: 16,
+    paddingBottom: 40,
   },
   medInputGroup: {
     marginBottom: 20,
