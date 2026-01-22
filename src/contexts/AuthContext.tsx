@@ -182,14 +182,20 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setTimeout(async () => {
         console.log('🔔 [AUTH] Inicializando notificaciones después del login...');
         try {
+          // Inicializar servicio de notificaciones
+          await notificationService.initialize();
+          
           // Verificar si hay un token pendiente
           const pendingToken = await AsyncStorage.getItem('fcm_token_pending');
           if (pendingToken) {
-            console.log('🔄 [AUTH] Registrando token pendiente...');
+            console.log('🔄 [AUTH] Registrando token pendiente:', pendingToken.substring(0, 50) + '...');
             await notificationService.registerToken(pendingToken);
+            // Limpiar token pendiente después de registrarlo
+            await AsyncStorage.removeItem('fcm_token_pending');
           } else {
-            // Si no hay token pendiente, intentar obtener uno nuevo
-            await notificationService.initialize();
+            // Si no hay token pendiente, obtener y registrar uno nuevo
+            console.log('🔄 [AUTH] Obteniendo y registrando nuevo token...');
+            await notificationService.registerToken();
           }
         } catch (error) {
           console.error('❌ [AUTH] Error inicializando notificaciones después del login:', error);
@@ -312,12 +318,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setTimeout(async () => {
         console.log('🔔 [AUTH] Inicializando notificaciones después del login con Google...');
         try {
+          // Inicializar servicio de notificaciones
+          await notificationService.initialize();
+          
           const pendingToken = await AsyncStorage.getItem('fcm_token_pending');
           if (pendingToken) {
-            console.log('🔄 [AUTH] Registrando token pendiente...');
+            console.log('🔄 [AUTH] Registrando token pendiente:', pendingToken.substring(0, 50) + '...');
             await notificationService.registerToken(pendingToken);
+            await AsyncStorage.removeItem('fcm_token_pending');
           } else {
-            await notificationService.initialize();
+            console.log('🔄 [AUTH] Obteniendo y registrando nuevo token...');
+            await notificationService.registerToken();
           }
         } catch (error) {
           console.error('❌ [AUTH] Error inicializando notificaciones después del login con Google:', error);
@@ -473,12 +484,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setTimeout(async () => {
         console.log('🔔 [AUTH] Inicializando notificaciones después del login con Apple...');
         try {
+          // Inicializar servicio de notificaciones
+          await notificationService.initialize();
+          
           const pendingToken = await AsyncStorage.getItem('fcm_token_pending');
           if (pendingToken) {
-            console.log('🔄 [AUTH] Registrando token pendiente...');
+            console.log('🔄 [AUTH] Registrando token pendiente:', pendingToken.substring(0, 50) + '...');
             await notificationService.registerToken(pendingToken);
+            await AsyncStorage.removeItem('fcm_token_pending');
           } else {
-            await notificationService.initialize();
+            console.log('🔄 [AUTH] Obteniendo y registrando nuevo token...');
+            await notificationService.registerToken();
           }
         } catch (error) {
           console.error('❌ [AUTH] Error inicializando notificaciones después del login con Apple:', error);
@@ -566,12 +582,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setTimeout(async () => {
         console.log('🔔 [AUTH] Inicializando notificaciones después del registro...');
         try {
+          // Inicializar servicio de notificaciones
+          await notificationService.initialize();
+          
           const pendingToken = await AsyncStorage.getItem('fcm_token_pending');
           if (pendingToken) {
-            console.log('🔄 [AUTH] Registrando token pendiente...');
+            console.log('🔄 [AUTH] Registrando token pendiente:', pendingToken.substring(0, 50) + '...');
             await notificationService.registerToken(pendingToken);
+            await AsyncStorage.removeItem('fcm_token_pending');
           } else {
-            await notificationService.initialize();
+            console.log('🔄 [AUTH] Obteniendo y registrando nuevo token...');
+            await notificationService.registerToken();
           }
         } catch (error) {
           console.error('❌ [AUTH] Error inicializando notificaciones después del registro:', error);

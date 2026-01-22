@@ -10,6 +10,8 @@ Notifications.setNotificationHandler({
     shouldShowAlert: true,
     shouldPlaySound: true,
     shouldSetBadge: true,
+    shouldShowBanner: true,
+    shouldShowList: true,
   }),
 });
 
@@ -118,18 +120,25 @@ const notificationService = {
    */
   async registerToken(existingToken?: string): Promise<string | null> {
     try {
+      console.log('🔔 [NOTIF] Iniciando registro de token...');
+      console.log('🔔 [NOTIF] Token existente:', existingToken ? existingToken.substring(0, 50) + '...' : 'ninguno');
+      
       let token = existingToken;
-
       let tokenType: 'fcm' | 'apns' | 'expo' | undefined;
 
       if (!token) {
+        console.log('🔔 [NOTIF] No hay token existente, solicitando permisos...');
+        
         // Solicitar permisos
         const { status: existingStatus } = await Notifications.getPermissionsAsync();
         let finalStatus = existingStatus;
+        console.log('🔔 [NOTIF] Estado de permisos actual:', existingStatus);
 
         if (existingStatus !== 'granted') {
+          console.log('🔔 [NOTIF] Solicitando permisos...');
           const { status } = await Notifications.requestPermissionsAsync();
           finalStatus = status;
+          console.log('🔔 [NOTIF] Permisos otorgados:', finalStatus);
         }
 
         if (finalStatus !== 'granted') {
@@ -139,17 +148,20 @@ const notificationService = {
 
         // Obtener token del dispositivo (FCM/APNs)
         if (Device.isDevice) {
+          console.log('🔔 [NOTIF] Dispositivo real detectado, obteniendo token...');
+          
           try {
             const deviceToken = await Notifications.getDevicePushTokenAsync();
             token = deviceToken.data;
             tokenType = Platform.OS === 'android' ? 'fcm' : 'apns';
-            console.log(`✅ [NOTIF] Token ${tokenType.toUpperCase()} obtenido:`, token);
+            console.log(`✅ [NOTIF] Token ${tokenType.toUpperCase()} obtenido:`, token?.substring(0, 50) + '...');
           } catch (deviceTokenError) {
             console.error('❌ [NOTIF] Error obteniendo token del dispositivo:', deviceTokenError);
           }
 
           // Fallback a token de Expo si no hay token del dispositivo
           if (!token) {
+            console.log('🔔 [NOTIF] No se pudo obtener token del dispositivo, usando Expo...');
             const projectId = Constants.expoConfig?.extra?.eas?.projectId;
             if (!projectId) {
               console.error('❌ [NOTIF] No se encontró el projectId en la configuración');
@@ -158,28 +170,43 @@ const notificationService = {
             const tokenData = await Notifications.getExpoPushTokenAsync({ projectId });
             token = tokenData.data;
             tokenType = 'expo';
-            console.log('✅ [NOTIF] Token Expo obtenido:', token);
+            console.log('✅ [NOTIF] Token Expo obtenido:', token?.substring(0, 50) + '...');
           }
         } else {
-          console.log('⚠️ [NOTIF] No se puede obtener token en simulador');
+          console.log('⚠️ [NOTIF] Simulador detectado, no se puede obtener token');
           return null;
         }
+      } else {
+        // Si hay token existente, determinar el tipo
+        tokenType = Platform.OS === 'android' ? 'fcm' : 'apns';
+        console.log(`🔔 [NOTIF] Usando token existente tipo ${tokenType.toUpperCase()}`);
       }
 
       // Registrar token con el backend
       if (token) {
-        await api.post('/api/notifications/register-token', {
+        console.log('📤 [NOTIF] Enviando token al backend...');
+        console.log('📤 [NOTIF] Token:', token.substring(0, 50) + '...');
+        console.log('📤 [NOTIF] Token Type:', tokenType);
+        console.log('📤 [NOTIF] Platform:', Platform.OS);
+        console.log('📤 [NOTIF] Device ID:', Constants.deviceId || 'unknown');
+        
+        const response = await api.post('/api/notifications/register-token', {
           token,
           tokenType,
           platform: Platform.OS,
           deviceId: Constants.deviceId || 'unknown',
         });
-        console.log('✅ [NOTIF] Token registrado con el backend');
+        
+        console.log('✅ [NOTIF] Token registrado con el backend exitosamente');
+        console.log('✅ [NOTIF] Respuesta del backend:', response.data);
+      } else {
+        console.log('⚠️ [NOTIF] No hay token para registrar');
       }
 
       return token;
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ [NOTIF] Error registrando token:', error);
+      console.error('❌ [NOTIF] Error details:', error.response?.data || error.message);
       return null;
     }
   },
