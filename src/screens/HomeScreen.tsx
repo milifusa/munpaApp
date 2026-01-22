@@ -1953,43 +1953,139 @@ const HomeScreen: React.FC = () => {
                     setShowMedicationDetailModal(true);
                   }}
                 >
+                  {/* Header: Nombre y Estado */}
                   <View style={styles.medicationCardHeader}>
                     <Text style={styles.medicationName}>{medication.name}</Text>
                     <View style={[
                       styles.medicationStatus,
-                      { backgroundColor: medication.active ? '#4CAF50' : '#999' }
+                      { backgroundColor: medication.active ? 'rgba(86, 204, 242, 0.2)' : '#999' }
                     ]}>
-                      <Text style={styles.medicationStatusText}>
+                      <Text style={[
+                        styles.medicationStatusText,
+                        { color: medication.active ? '#56CCF2' : '#FFF' }
+                      ]}>
                         {medication.active ? 'Activo' : 'Finalizado'}
                       </Text>
                     </View>
                   </View>
                   
-                  <View style={styles.medicationCardBody}>
-                    <View style={styles.medicationInfoRow}>
-                      <Ionicons name="water" size={16} color="#666" />
-                      <Text style={styles.medicationInfoText}>
-                        {medication.dose} {medication.doseUnit}
+                  {/* Dosis e información principal */}
+                  <View style={styles.medicationDoseRow}>
+                    <Text style={styles.medicationDoseText}>
+                      {medication.dose} {medication.doseUnit}
+                    </Text>
+                    <Text style={styles.medicationDoseSeparator}>·</Text>
+                    <Text style={styles.medicationFrequencyText}>
+                      {(() => {
+                        const times = getMedicationTimes(medication);
+                        if (times.length === 1) return '1 toma';
+                        return `${times.length} tomas`;
+                      })()}
+                    </Text>
+                  </View>
+                  
+                  {/* Grid de información: Próxima toma y Frecuencia */}
+                  <View style={styles.medicationInfoGrid}>
+                    {/* Próxima toma */}
+                    <View style={styles.medicationInfoGridItem}>
+                      <Text style={styles.medicationInfoLabel}>Próxima toma</Text>
+                      <Text style={styles.medicationInfoValue}>
+                        {(() => {
+                          const times = getMedicationTimes(medication);
+                          if (times.length === 0) return '—';
+                          
+                          const now = new Date();
+                          const currentHour = now.getHours();
+                          const currentMinute = now.getMinutes();
+                          const currentTotalMinutes = currentHour * 60 + currentMinute;
+                          
+                          // Encontrar la próxima toma
+                          const nextTime = times.find((time: string) => {
+                            const [h, m] = time.split(':').map(Number);
+                            const timeTotalMinutes = h * 60 + m;
+                            return timeTotalMinutes > currentTotalMinutes;
+                          });
+                          
+                          return nextTime || times[0];
+                        })()}
                       </Text>
                     </View>
                     
-                    {getMedicationTimes(medication).length > 0 && (
-                      <View style={styles.medicationInfoRow}>
-                        <Ionicons name="time" size={16} color="#666" />
-                        <Text style={styles.medicationInfoText}>
-                          {getScheduleSummary(getMedicationTimes(medication))}
-                        </Text>
-                      </View>
-                    )}
+                    {/* Frecuencia */}
+                    <View style={styles.medicationInfoGridItem}>
+                      <Text style={styles.medicationInfoLabel}>Frecuencia</Text>
+                      <Text style={styles.medicationInfoValue}>
+                        {(() => {
+                          const times = getMedicationTimes(medication);
+                          if (times.length === 1) return '1 toma al día';
+                          return `${times.length} tomas al día`;
+                        })()}
+                      </Text>
+                    </View>
+                  </View>
+                  
+                  {/* Lista de horarios de toma */}
+                  {getMedicationTimes(medication).length > 0 && (
+                    <View style={styles.medicationTimesContainer}>
+                      {getMedicationTimes(medication).map((time: string, idx: number) => {
+                        const now = new Date();
+                        const [h, m] = time.split(':').map(Number);
+                        const timeDate = new Date();
+                        timeDate.setHours(h, m, 0, 0);
+                        const isPast = timeDate.getTime() < now.getTime();
+                        
+                        return (
+                          <View 
+                            key={`${medication.id}-time-${idx}`} 
+                            style={[
+                              styles.medicationTimeChip,
+                              isPast && styles.medicationTimeChipPast
+                            ]}
+                          >
+                            <Ionicons 
+                              name={isPast ? "checkmark-circle" : "time-outline"} 
+                              size={14} 
+                              color={isPast ? "#4CAF50" : "#56CCF2"} 
+                            />
+                            <Text style={[
+                              styles.medicationTimeText,
+                              isPast && styles.medicationTimeTextPast
+                            ]}>
+                              {time}
+                            </Text>
+                          </View>
+                        );
+                      })}
+                    </View>
+                  )}
+                  
+                  {/* Fechas de inicio y fin */}
+                  <View style={styles.medicationDatesRow}>
+                    <View style={styles.medicationDateItem}>
+                      <Text style={styles.medicationDateLabel}>Inicio</Text>
+                      <Text style={styles.medicationDateValue}>
+                        {medication.startDate ? 
+                          new Date(medication.startDate).toLocaleDateString('es-ES', {
+                            day: '2-digit',
+                            month: '2-digit',
+                            year: 'numeric'
+                          }) : '—'
+                        }
+                      </Text>
+                    </View>
                     
-                    {medication.notes && (
-                      <View style={styles.medicationInfoRow}>
-                        <Ionicons name="document-text" size={16} color="#666" />
-                        <Text style={styles.medicationInfoText} numberOfLines={1}>
-                          {medication.notes}
-                        </Text>
-                      </View>
-                    )}
+                    <View style={styles.medicationDateItem}>
+                      <Text style={styles.medicationDateLabel}>Fin</Text>
+                      <Text style={styles.medicationDateValue}>
+                        {medication.endDate ? 
+                          new Date(medication.endDate).toLocaleDateString('es-ES', {
+                            day: '2-digit',
+                            month: '2-digit',
+                            year: 'numeric'
+                          }) : '—'
+                        }
+                      </Text>
+                    </View>
                   </View>
                 </TouchableOpacity>
               ))
@@ -5323,7 +5419,7 @@ const styles = StyleSheet.create({
   },
   medicationCard: {
     backgroundColor: '#FFF',
-    borderRadius: 12,
+    borderRadius: 16,
     padding: 16,
     marginBottom: 12,
     shadowColor: '#000',
@@ -5336,23 +5432,121 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 8,
   },
   medicationName: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '700',
-    color: '#333',
+    color: '#1A202C',
     flex: 1,
+    fontFamily: 'Montserrat',
   },
   medicationStatus: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
     borderRadius: 12,
   },
   medicationStatusText: {
     fontSize: 11,
     fontWeight: '700',
-    color: '#FFF',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    fontFamily: 'Montserrat',
+  },
+  medicationDoseRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+    gap: 6,
+  },
+  medicationDoseText: {
+    fontSize: 14,
+    color: '#4A5568',
+    fontWeight: '500',
+  },
+  medicationDoseSeparator: {
+    fontSize: 14,
+    color: '#CBD5E0',
+    fontWeight: '700',
+  },
+  medicationFrequencyText: {
+    fontSize: 14,
+    color: '#4A5568',
+    fontWeight: '500',
+  },
+  medicationInfoGrid: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 12,
+  },
+  medicationInfoGridItem: {
+    flex: 1,
+    backgroundColor: '#F7FAFC',
+    borderRadius: 12,
+    padding: 12,
+  },
+  medicationInfoLabel: {
+    fontSize: 12,
+    color: '#718096',
+    marginBottom: 4,
+    fontWeight: '500',
+  },
+  medicationInfoValue: {
+    fontSize: 16,
+    color: '#1A202C',
+    fontWeight: '700',
+    fontFamily: 'Montserrat',
+  },
+  medicationTimesContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 12,
+  },
+  medicationTimeChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(86, 204, 242, 0.1)',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(86, 204, 242, 0.3)',
+  },
+  medicationTimeChipPast: {
+    backgroundColor: 'rgba(76, 175, 80, 0.1)',
+    borderColor: 'rgba(76, 175, 80, 0.3)',
+  },
+  medicationTimeText: {
+    fontSize: 13,
+    color: '#56CCF2',
+    fontWeight: '600',
+    fontFamily: 'Montserrat',
+  },
+  medicationTimeTextPast: {
+    color: '#4CAF50',
+  },
+  medicationDatesRow: {
+    flexDirection: 'row',
+    gap: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#E2E8F0',
+  },
+  medicationDateItem: {
+    flex: 1,
+  },
+  medicationDateLabel: {
+    fontSize: 12,
+    color: '#718096',
+    marginBottom: 2,
+    fontWeight: '500',
+  },
+  medicationDateValue: {
+    fontSize: 13,
+    color: '#4A5568',
+    fontWeight: '600',
   },
   medicationCardBody: {
     gap: 8,
