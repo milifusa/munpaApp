@@ -1300,13 +1300,51 @@ const HomeScreen: React.FC = () => {
             <Text style={styles.greetingHello}>¡Hola </Text>
             <Text style={styles.greetingName}>{user?.displayName}!</Text>
           </View>
-          
+        </View>
+
+        {/* Pestañas de Sueño / Medicamentos */}
+        {selectedChild && (
+          <View style={styles.tabsContainer}>
+            <TouchableOpacity
+              style={[styles.tab, homeTab === 'sleep' && styles.activeTab]}
+              onPress={() => setHomeTab('sleep')}
+            >
+              <Ionicons 
+                name="moon" 
+                size={18} 
+                color={homeTab === 'sleep' ? '#4A5568' : '#FFF'} 
+              />
+              <Text style={[styles.tabText, homeTab === 'sleep' && styles.activeTabText]}>
+                Sueño
+              </Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity
+              style={[styles.tab, homeTab === 'medications' && styles.activeTab]}
+              onPress={() => setHomeTab('medications')}
+            >
+              <Ionicons 
+                name="medkit" 
+                size={18} 
+                color={homeTab === 'medications' ? '#4A5568' : '#FFF'} 
+              />
+              <Text style={[styles.tabText, homeTab === 'medications' && styles.activeTabText]}>
+                Medicamentos
+                {medications.filter(m => m.active).length > 0 && (
+                  <Text style={styles.tabBadge}> ({medications.filter(m => m.active).length})</Text>
+                )}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* Contenido de la pestaña SUEÑO */}
+        {homeTab === 'sleep' && selectedChild && (
+          <>
           {/* Título de Sueño */}
-          {selectedChild && (
-            <View style={styles.sleepTitleContainer}>
-              <Text style={styles.sleepTitle}>Recomendación de sueño</Text>
-            </View>
-          )}
+          <View style={styles.sleepTitleContainer}>
+            <Text style={styles.sleepTitle}>Recomendación de sueño</Text>
+          </View>
           
           {/* Carita animada de presión de sueño */}
           <View style={styles.sleepPlanetContainer}>
@@ -1786,65 +1824,11 @@ const HomeScreen: React.FC = () => {
             )}
           </View>
         )}
-
-        {/* Carrusel de Banners */}
-        <BannerCarousel section="home" />
-
-        {/* Pestañas de Sueño / Medicamentos */}
-        {selectedChild && (
-          <View style={styles.tabsContainer}>
-            <TouchableOpacity
-              style={[styles.tab, homeTab === 'sleep' && styles.activeTab]}
-              onPress={() => setHomeTab('sleep')}
-            >
-              <Ionicons 
-                name="moon" 
-                size={18} 
-                color={homeTab === 'sleep' ? '#4A5568' : '#FFF'} 
-              />
-              <Text style={[styles.tabText, homeTab === 'sleep' && styles.activeTabText]}>
-                Sueño
-              </Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity
-              style={[styles.tab, homeTab === 'medications' && styles.activeTab]}
-              onPress={() => setHomeTab('medications')}
-            >
-              <Ionicons 
-                name="medkit" 
-                size={18} 
-                color={homeTab === 'medications' ? '#4A5568' : '#FFF'} 
-              />
-              <Text style={[styles.tabText, homeTab === 'medications' && styles.activeTabText]}>
-                Medicamentos
-                {medications.filter(m => m.active).length > 0 && (
-                  <Text style={styles.tabBadge}> ({medications.filter(m => m.active).length})</Text>
-                )}
-              </Text>
-            </TouchableOpacity>
-          </View>
-        )}
-
-        {/* Contenido según pestaña activa */}
-        {homeTab === 'sleep' && selectedChild && (
-          <>
-        {/* Card de Seguimiento de Sueño */}
-        <View style={styles.sleepSection}>
-            {loadingSleep ? (
-              <View style={styles.sleepLoadingCard}>
-                <ActivityIndicator size="small" color="#887CBC" />
-                <Text style={styles.sleepLoadingText}>Cargando...</Text>
-              </View>
-            ) : (
-              <>
-                {/* Resto del contenido cuando no está cargando */}
-
-              </>
-            )}
-          </View>
           </>
         )}
+
+        {/* Carrusel de Banners - Solo en pestaña de sueño */}
+        {homeTab === 'sleep' && <BannerCarousel section="home" />}
 
         {/* Sección de Medicamentos */}
         {homeTab === 'medications' && selectedChild && (
