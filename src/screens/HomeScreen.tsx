@@ -1394,14 +1394,22 @@ const HomeScreen: React.FC = () => {
           <View style={styles.scheduleAgenda}>
             <Text style={styles.scheduleAgendaTitle}>Horario de hoy</Text>
             
+            {/* Debug log */}
+            {console.log('📅 [AGENDA] wakeTimeToday disponible:', !!wakeTimeToday, wakeTimeToday)}
+            {console.log('📅 [AGENDA] Siestas disponibles:', sleepPrediction.prediction.dailySchedule?.allNaps?.length || 0)}
+            {console.log('📅 [AGENDA] Bedtime disponible:', !!sleepPrediction.prediction.bedtime?.time)}
+            
             {/* Lista de eventos del día */}
             <View style={styles.scheduleTimeline}>
               {/* Hora de despertar */}
               {wakeTimeToday && (() => {
+                console.log('⏰ [AGENDA] wakeTimeToday:', wakeTimeToday);
                 const wakeDate = new Date(wakeTimeToday);
+                console.log('⏰ [AGENDA] wakeDate:', wakeDate);
                 const hours = wakeDate.getHours();
                 const minutes = wakeDate.getMinutes();
                 const timeStr = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+                console.log('⏰ [AGENDA] Mostrando hora de despertar:', timeStr);
                 
                 return (
                   <View style={styles.scheduleItem}>
