@@ -1551,7 +1551,6 @@ const HomeScreen: React.FC = () => {
                   </View>
                 </>
               ) : null}
-                </View>
             </View>
             
           {/* Mensaje de presión de sueño - SOLO cuando NO hay siesta activa */}
@@ -1572,7 +1571,7 @@ const HomeScreen: React.FC = () => {
         </View>
           
         {/* Recuadros de información de siestas + Estado del bebé */}
-        {selectedChild && sleepPrediction?.prediction && (
+        {sleepPrediction?.prediction && (
           <View style={styles.sleepInfoCardsContainer}>
             {/* Tiempo hasta la próxima siesta */}
             {sleepPrediction.prediction.nextNap && (() => {
@@ -1824,11 +1823,11 @@ const HomeScreen: React.FC = () => {
             )}
           </View>
         )}
-          </>
-        )}
 
         {/* Carrusel de Banners - Solo en pestaña de sueño */}
-        {homeTab === 'sleep' && <BannerCarousel section="home" />}
+        <BannerCarousel section="home" />
+        </>
+        )}
 
         {/* Sección de Medicamentos */}
         {homeTab === 'medications' && selectedChild && (
