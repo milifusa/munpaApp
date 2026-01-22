@@ -180,6 +180,13 @@ const notificationService = {
             console.log(`✅ [NOTIF] Token FCM obtenido (${token.length} caracteres):`, token.substring(0, 50) + '...');
             console.log(`🔍 [NOTIF] Token completo para debug:`, token);
             
+            // Mostrar alerta con el token FCM COMPLETO
+            Alert.alert(
+              '✅ Token FCM Obtenido',
+              `TIPO: FCM\nLongitud: ${token.length} chars\n\nTOKEN COMPLETO:\n${token}`,
+              [{ text: 'OK' }]
+            );
+            
           } catch (fcmError: any) {
             console.error('❌ [NOTIF] Error obteniendo token FCM:', fcmError);
             console.error('❌ [NOTIF] Error details:', fcmError.message);
@@ -199,6 +206,13 @@ const notificationService = {
               console.log('⚠️ [NOTIF] Token Expo obtenido (DESARROLLO):', token.substring(0, 50) + '...');
               console.log('⚠️ [NOTIF] ADVERTENCIA: Token Expo no funcionará con FCM en producción');
               console.log('⚠️ [NOTIF] Necesitas hacer build nativo: npx expo run:ios');
+              
+              // Mostrar alerta con el token Expo COMPLETO
+              Alert.alert(
+                '⚠️ Token Expo (Desarrollo)',
+                `TIPO: EXPO (Fallback)\nLongitud: ${token.length} chars\n\nTOKEN COMPLETO:\n${token}\n\n⚠️ Este token NO funcionará con FCM.\nHaz build nativo: npx expo run:ios`,
+                [{ text: 'Entendido' }]
+              );
               
             } catch (expoError: any) {
               console.error('❌ [NOTIF] Error obteniendo token de Expo:', expoError);
@@ -247,6 +261,13 @@ const notificationService = {
         
         console.log('✅ [NOTIF] Token registrado con el backend exitosamente');
         console.log('✅ [NOTIF] Respuesta del backend:', response.data);
+        
+        // Mostrar alerta de confirmación
+        Alert.alert(
+          '✅ Token Registrado',
+          `Token tipo ${tokenType.toUpperCase()} registrado con el backend correctamente.\n\nPlatform: ${Platform.OS}\nToken length: ${token.length} chars`,
+          [{ text: 'OK' }]
+        );
       } else {
         console.log('⚠️ [NOTIF] No hay token para registrar');
       }
