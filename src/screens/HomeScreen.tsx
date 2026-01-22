@@ -226,8 +226,15 @@ const HomeScreen: React.FC = () => {
   // Refrescar datos cuando se regrese a esta pantalla
   useEffect(() => {
     const unsubscribe = navigation.addListener("focus", () => {
+      console.log('🏠 [HOME] Pantalla enfocada, recargando datos...');
       loadData();
       // loadSleepData se maneja en otro useEffect cuando selectedChild cambia
+      
+      // Registrar token de notificaciones cada vez que se regrese al home
+      console.log('🔔 [HOME] Registrando token de notificaciones...');
+      notificationService.registerToken().catch((error) => {
+        console.error('❌ [HOME] Error registrando token:', error);
+      });
     });
 
     return unsubscribe;
