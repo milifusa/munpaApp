@@ -489,18 +489,6 @@ const HomeScreen: React.FC = () => {
           console.log('\n⚠️ [ÓRBITA] NO hay predicciones para dibujar (allNaps vacío o undefined)');
         }
         
-        // Log de recomendaciones para debug
-        if (predictionRes.value.prediction?.recommendations) {
-          console.log('📋 [RECOMENDACIONES] Total:', predictionRes.value.prediction.recommendations.length);
-          predictionRes.value.prediction.recommendations.forEach((rec: any, index: number) => {
-            console.log(`\n🔹 Recomendación ${index + 1}:`);
-            console.log(`   Tipo: ${rec.type}`);
-            console.log(`   Categoría: ${rec.category}`);
-            console.log(`   Título: ${rec.title}`);
-            console.log(`   Mensaje: ${rec.message}`);
-            console.log(`   Acción: ${rec.action}`);
-          });
-        }
       } else {
         setSleepPrediction(null);
         setWakeTimeToday(null);
@@ -567,11 +555,7 @@ const HomeScreen: React.FC = () => {
       const response = await medicationsService.getMedications(childId);
       if (response.success) {
         setMedications(response.data || []);
-        // Auto-switch a pestaña de medicamentos si hay medicamentos activos
-        const activeMeds = (response.data || []).filter((m: any) => m.active);
-        if (activeMeds.length > 0 && homeTab === 'sleep') {
-          setHomeTab('medications');
-        }
+        // NO hacer auto-switch, dejar que el usuario elija la pestaña
       }
     } catch (error) {
       console.error('❌ Error cargando medicamentos:', error);
@@ -1833,7 +1817,10 @@ const HomeScreen: React.FC = () => {
                 color={homeTab === 'medications' ? '#887CBC' : '#999'} 
               />
               <Text style={[styles.tabText, homeTab === 'medications' && styles.activeTabText]}>
-                Medicamentos {medications.filter(m => m.active).length > 0 && `/ ${medications.filter(m => m.active).length} activos`}
+                Medicamentos
+                {medications.filter(m => m.active).length > 0 && (
+                  <Text style={styles.tabBadge}> ({medications.filter(m => m.active).length})</Text>
+                )}
               </Text>
             </TouchableOpacity>
           </View>
@@ -5228,6 +5215,10 @@ const styles = StyleSheet.create({
   },
   activeTabText: {
     color: '#887CBC',
+    fontWeight: '700',
+  },
+  tabBadge: {
+    fontSize: 12,
     fontWeight: '700',
   },
 
