@@ -33,8 +33,6 @@ import {
 import { medicationsService } from "../services/childProfileService";
 import { imageUploadService } from "../services/imageUploadService";
 import notificationService from "../services/notificationService";
-import sleepNotificationScheduler from "../services/sleepNotificationScheduler";
-import sleepTrackingNotification from "../services/sleepTrackingNotification";
 import {
   colors,
   typography,
@@ -197,12 +195,6 @@ const HomeScreen: React.FC = () => {
     loadData();
     loadUserProfile();
     
-    // DETENER cualquier notificación que esté corriendo
-    sleepTrackingNotification.stopTracking();
-    
-    // Configurar categorías de notificaciones para tracking de siestas
-    sleepTrackingNotification.setupNotificationCategories();
-    
     // Configurar handler de respuestas a notificaciones
     const subscription = Notifications.addNotificationResponseReceivedListener(async (response) => {
       const action = response.actionIdentifier;
@@ -218,8 +210,6 @@ const HomeScreen: React.FC = () => {
     
     return () => {
       subscription.remove();
-      // También detener notificaciones al desmontar
-      sleepTrackingNotification.stopTracking();
     };
   }, []);
 
@@ -268,13 +258,8 @@ const HomeScreen: React.FC = () => {
   // 🔔 Iniciar verificaciones periódicas de notificaciones cuando hay hijo seleccionado
   useEffect(() => {
     if (selectedChild?.id) {
-      console.log('🔄 [HOME] Iniciando verificaciones periódicas de notificaciones para:', selectedChild.name);
-      sleepNotificationScheduler.startPeriodicChecks(selectedChild.id);
-      
-      return () => {
-        console.log('🛑 [HOME] Deteniendo verificaciones periódicas');
-        sleepNotificationScheduler.stopPeriodicChecks();
-      };
+      console.log('🔄 [HOME] Hijo seleccionado:', selectedChild.name);
+      // Ya no se programan notificaciones de sueño
     }
   }, [selectedChild?.id]);
 
@@ -449,14 +434,7 @@ const HomeScreen: React.FC = () => {
             const isValid = hasValidTime && isNotCompleted;
           });
           
-          // Solo programar si hay al menos 1 siesta válida
-          if (upcomingNaps.length > 0) {
-            console.log(`✅ [HOME] Programando notificaciones para ${upcomingNaps.length} siesta(s) válida(s)...`);
-            sleepNotificationScheduler.scheduleAllNotifications(childId, true).catch(error => {
-              console.error('❌ [HOME] Error reprogramando notificaciones:', error);
-              // No mostrar error al usuario, es un proceso secundario
-            });
-          }
+          // Ya no se programan notificaciones de sueño
         } 
         
         // Log de bedtime RAW (sin conversiones)
@@ -520,14 +498,7 @@ const HomeScreen: React.FC = () => {
         );
         setActiveSleep(activeSleepEntry || null);
         
-        // Iniciar notificación persistente si hay siesta activa
-        if (activeSleepEntry && predictionRes.status === 'fulfilled' && predictionRes.value.prediction?.nextNap) {
-          await sleepTrackingNotification.startTracking({
-            startTime: activeSleepEntry.startTime,
-            expectedDuration: predictionRes.value.prediction.nextNap.expectedDuration,
-            isPaused: false,
-          });
-        }
+        // Ya no se envían notificaciones de tracking de sueño
       } else {
         setActiveSleep(null);
       }
@@ -716,8 +687,7 @@ const HomeScreen: React.FC = () => {
     setPauseStartTime(now);
     setIsPaused(true);
     
-    // Actualizar notificación a estado pausado
-    await sleepTrackingNotification.updatePauseState(true);
+    // Ya no se actualizan notificaciones de tracking
     
     Alert.alert('⏸️ Pausado', 'Siesta pausada. El tiempo no se contará hasta que reanudes.');
   };
@@ -754,8 +724,7 @@ const HomeScreen: React.FC = () => {
       setIsPaused(false);
       setPauseStartTime(null);
       
-      // Actualizar notificación a estado activo
-      await sleepTrackingNotification.updatePauseState(false);
+      // Ya no se actualizan notificaciones de tracking
       
       Alert.alert('▶️ Reanudado', 'Siesta reanudada. El tiempo se sigue contando.');
       
@@ -793,8 +762,7 @@ const HomeScreen: React.FC = () => {
                 duration,
               });
               
-              // Detener notificación de tracking
-              await sleepTrackingNotification.stopTracking();
+              // Ya no se detienen notificaciones de tracking
               
               setActiveSleep(null);
               setIsPaused(false);
