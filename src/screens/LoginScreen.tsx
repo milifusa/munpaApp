@@ -262,31 +262,32 @@ const styles = StyleSheet.create({
   scrollContainer: {
     flexGrow: 1,
     justifyContent: 'center',
-    padding: spacing.xl,
-    paddingTop: spacing['3xl'],
+    padding: spacing.lg,
+    paddingTop: spacing.xl,
+    paddingBottom: spacing.xl,
   },
   header: {
     alignItems: 'center',
-    marginBottom: spacing['2xl'],
+    marginBottom: spacing.lg,
   },
   welcomeText: {
-    fontSize: 28,
+    fontSize: 24,
     fontWeight: '700',
     color: colors.white,
-    marginTop: spacing.lg,
+    marginTop: spacing.md,
     textAlign: 'center',
   },
   subtitleText: {
-    fontSize: typography.sizes.base,
+    fontSize: typography.sizes.sm,
     color: 'rgba(255, 255, 255, 0.9)',
     marginTop: spacing.xs,
     textAlign: 'center',
   },
   form: {
-    marginBottom: spacing.xl,
+    marginBottom: spacing.md,
   },
   inputContainer: {
-    marginBottom: spacing.md,
+    marginBottom: spacing.sm,
   },
   inputWrapper: {
     flexDirection: 'row',
@@ -294,7 +295,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(169, 157, 217, 0.8)',
     borderRadius: borderRadius.lg,
     paddingHorizontal: spacing.md,
-    minHeight: 56,
+    minHeight: 52,
     ...shadows.base,
   },
   inputIcon: {
@@ -320,8 +321,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 56,
-    marginTop: spacing.lg,
+    minHeight: 52,
+    marginTop: spacing.md,
     ...shadows.lg,
   },
   buttonDisabled: {
@@ -335,17 +336,18 @@ const styles = StyleSheet.create({
   },
   loginButtonText: {
     color: colors.white,
-    fontSize: typography.sizes.lg,
+    fontSize: typography.sizes.base,
     fontWeight: '700',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
   linksContainer: {
     alignItems: 'center',
-    marginBottom: spacing.xl,
+    marginBottom: spacing.md,
+    marginTop: spacing.xs,
   },
   linkButton: {
-    padding: spacing.sm,
+    padding: spacing.xs,
   },
   linkText: {
     color: colors.white,
@@ -356,7 +358,7 @@ const styles = StyleSheet.create({
   dividerContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginVertical: spacing.xl,
+    marginVertical: spacing.md,
   },
   divider: {
     flex: 1,
@@ -371,18 +373,18 @@ const styles = StyleSheet.create({
   },
   socialContainer: {
     width: '100%',
-    marginBottom: spacing.xl,
+    marginBottom: spacing.md,
   },
   socialLoginButton: {
     width: '100%',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 14,
+    paddingVertical: 12,
     paddingHorizontal: 20,
     borderRadius: borderRadius.lg,
-    marginBottom: 12,
-    minHeight: 56,
+    marginBottom: 10,
+    minHeight: 50,
     gap: spacing.sm,
     ...shadows.base,
   },
@@ -392,7 +394,7 @@ const styles = StyleSheet.create({
   },
   appleButtonText: {
     color: '#FFFFFF',
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
   },
   googleButton: {
@@ -402,23 +404,23 @@ const styles = StyleSheet.create({
   },
   googleButtonText: {
     color: '#000000',
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
   },
   signupContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: spacing.lg,
-    paddingBottom: spacing.xl,
+    marginTop: spacing.sm,
+    paddingBottom: spacing.md,
   },
   signupText: {
     color: 'rgba(255, 255, 255, 0.9)',
-    fontSize: typography.sizes.base,
+    fontSize: typography.sizes.sm,
   },
   signupLink: {
     color: colors.white,
-    fontSize: typography.sizes.base,
+    fontSize: typography.sizes.sm,
     fontWeight: '700',
     textDecorationLine: 'underline',
   },
