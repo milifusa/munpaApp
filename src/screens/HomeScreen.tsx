@@ -1394,7 +1394,18 @@ const HomeScreen: React.FC = () => {
         {/* Vista de Agenda/Horarios del día */}
         {sleepPrediction?.prediction && (
           <View style={styles.scheduleAgenda}>
-            <Text style={styles.scheduleAgendaTitle}>Horario de hoy</Text>
+            {/* Header con título y botón Ver más */}
+            <View style={styles.scheduleAgendaHeader}>
+              <Text style={styles.scheduleAgendaTitle}>Horario de hoy</Text>
+              <TouchableOpacity
+                onPress={() => navigation.navigate('SleepTracker' as never)}
+                style={styles.scheduleViewMoreButton}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.scheduleViewMoreText}>Ver más</Text>
+                <Ionicons name="chevron-forward" size={16} color="#FFF" />
+              </TouchableOpacity>
+            </View>
             
             {/* Lista de eventos del día */}
             <View style={styles.scheduleTimeline}>
@@ -4379,11 +4390,31 @@ const styles = StyleSheet.create({
     marginTop: 20,
     marginBottom: 16,
   },
+  scheduleAgendaHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
   scheduleAgendaTitle: {
     fontSize: 18,
     fontWeight: '700',
     color: '#FFF',
-    marginBottom: 16,
+    fontFamily: 'Montserrat',
+  },
+  scheduleViewMoreButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 20,
+    gap: 4,
+  },
+  scheduleViewMoreText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#FFF',
     fontFamily: 'Montserrat',
   },
   scheduleTimeline: {
