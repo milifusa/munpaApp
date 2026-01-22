@@ -1516,7 +1516,15 @@ const HomeScreen: React.FC = () => {
             <View style={styles.scheduleAgendaHeader}>
               <Text style={styles.scheduleAgendaTitle}>Horario de hoy</Text>
               <TouchableOpacity
-                onPress={() => navigation.navigate('SleepTracker' as never)}
+                onPress={() => {
+                  if (selectedChild) {
+                    // @ts-ignore
+                    navigation.navigate('SleepTracker', { 
+                      childId: selectedChild.id,
+                      childName: selectedChild.name 
+                    });
+                  }
+                }}
                 style={styles.scheduleViewMoreButton}
                 activeOpacity={0.7}
               >
