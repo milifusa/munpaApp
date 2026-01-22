@@ -1388,6 +1388,112 @@ const HomeScreen: React.FC = () => {
             </View>
           )}
         </View>
+
+        {/* Vista de Agenda/Horarios del día */}
+        {sleepPrediction?.prediction && (
+          <View style={styles.scheduleAgenda}>
+            <Text style={styles.scheduleAgendaTitle}>Horario de hoy</Text>
+            
+            {/* Lista de eventos del día */}
+            <View style={styles.scheduleTimeline}>
+              {/* Hora de despertar */}
+              {wakeTimeToday && (() => {
+                const wakeDate = new Date(wakeTimeToday);
+                const hours = wakeDate.getHours();
+                const minutes = wakeDate.getMinutes();
+                const timeStr = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+                
+                return (
+                  <View style={styles.scheduleItem}>
+                    <View style={styles.scheduleTimeContainer}>
+                      <Text style={styles.scheduleTime}>{timeStr}</Text>
+                    </View>
+                    <View style={[styles.scheduleDot, { backgroundColor: '#FFA500' }]} />
+                    <View style={styles.scheduleContent}>
+                      <View style={[styles.scheduleCard, { borderLeftColor: '#FFA500' }]}>
+                        <View style={styles.scheduleCardHeader}>
+                          <Ionicons name="sunny" size={20} color="#FFA500" />
+                          <Text style={styles.scheduleCardTitle}>Despertar</Text>
+                        </View>
+                      </View>
+                    </View>
+                  </View>
+                );
+              })()}
+
+              {/* Siestas del día */}
+              {sleepPrediction.prediction.dailySchedule?.allNaps?.map((nap: any, index: number) => {
+                const napTime = nap.time || nap.startTime;
+                if (!napTime) return null;
+                
+                const napDate = new Date(napTime);
+                const hours = napDate.getHours();
+                const minutes = napDate.getMinutes();
+                const timeStr = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+                
+                const isInProgress = nap.status === 'in_progress' || nap.isInProgress === true;
+                const isCompleted = nap.completed || nap.status === 'completed';
+                const duration = nap.actualDuration || nap.expectedDuration || nap.duration || 0;
+                
+                const dotColor = isInProgress ? '#8B5CF6' : (isCompleted ? '#4CAF50' : '#56CCF2');
+                const iconName = isCompleted ? "checkmark-circle" : (isInProgress ? "moon" : "moon-outline");
+                const statusText = isCompleted ? "Completada" : (isInProgress ? "En progreso" : "Programada");
+                
+                return (
+                  <View key={`nap-${index}`} style={styles.scheduleItem}>
+                    <View style={styles.scheduleTimeContainer}>
+                      <Text style={styles.scheduleTime}>{timeStr}</Text>
+                    </View>
+                    <View style={[styles.scheduleDot, { backgroundColor: dotColor }]} />
+                    <View style={styles.scheduleContent}>
+                      <TouchableOpacity 
+                        style={[styles.scheduleCard, { borderLeftColor: dotColor }]}
+                        onPress={() => showNapDetail(nap, index)}
+                        activeOpacity={0.7}
+                      >
+                        <View style={styles.scheduleCardHeader}>
+                          <Ionicons name={iconName} size={20} color={dotColor} />
+                          <Text style={styles.scheduleCardTitle}>Siesta {index + 1}</Text>
+                        </View>
+                        <Text style={styles.scheduleCardDuration}>{duration} min · {statusText}</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                );
+              })}
+
+              {/* Hora de dormir (Bedtime) */}
+              {sleepPrediction.prediction.bedtime?.time && (() => {
+                const bedtimeStr = sleepPrediction.prediction.bedtime.time;
+                const bedtimeDate = new Date(bedtimeStr);
+                const hours = bedtimeDate.getHours();
+                const minutes = bedtimeDate.getMinutes();
+                const timeStr = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+                
+                return (
+                  <View style={styles.scheduleItem}>
+                    <View style={styles.scheduleTimeContainer}>
+                      <Text style={styles.scheduleTime}>{timeStr}</Text>
+                    </View>
+                    <View style={[styles.scheduleDot, { backgroundColor: '#7F7FD5' }]} />
+                    <View style={styles.scheduleContent}>
+                      <TouchableOpacity 
+                        style={[styles.scheduleCard, { borderLeftColor: '#7F7FD5' }]}
+                        onPress={() => showBedtimeDetail(sleepPrediction.prediction.bedtime)}
+                        activeOpacity={0.7}
+                      >
+                        <View style={styles.scheduleCardHeader}>
+                          <Ionicons name="moon" size={20} color="#7F7FD5" />
+                          <Text style={styles.scheduleCardTitle}>Hora de dormir</Text>
+                        </View>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                );
+              })()}
+            </View>
+          </View>
+        )}
           
         {/* Recuadros de información de siestas + Estado del bebé */}
         {sleepPrediction?.prediction && (
@@ -4222,6 +4328,74 @@ const styles = StyleSheet.create({
   activeSleepSubtitle: {
     fontSize: 14,
     color: 'rgba(255, 255, 255, 0.8)',
+  },
+
+  // Estilos para la vista de agenda/horarios
+  scheduleAgenda: {
+    marginHorizontal: 20,
+    marginTop: 20,
+    marginBottom: 16,
+  },
+  scheduleAgendaTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#FFF',
+    marginBottom: 16,
+    fontFamily: 'Montserrat',
+  },
+  scheduleTimeline: {
+    gap: 12,
+  },
+  scheduleItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    position: 'relative',
+  },
+  scheduleTimeContainer: {
+    width: 60,
+    paddingTop: 4,
+  },
+  scheduleTime: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#FFF',
+    fontFamily: 'Montserrat',
+  },
+  scheduleDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    marginTop: 6,
+    marginHorizontal: 12,
+    borderWidth: 2,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+  },
+  scheduleContent: {
+    flex: 1,
+  },
+  scheduleCard: {
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    borderRadius: 12,
+    padding: 12,
+    borderLeftWidth: 4,
+  },
+  scheduleCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  scheduleCardTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#FFF',
+    fontFamily: 'Montserrat',
+  },
+  scheduleCardDuration: {
+    fontSize: 13,
+    color: 'rgba(255, 255, 255, 0.8)',
+    marginTop: 4,
+    marginLeft: 28,
+    fontFamily: 'Montserrat',
   },
   
   // Estilos para modal de detalles de órbita
