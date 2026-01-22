@@ -408,14 +408,18 @@ const HomeScreen: React.FC = () => {
       if (predictionRes.status === 'fulfilled' && predictionRes.value.success) {
         console.log('🔍 [DEBUG] allNaps recibidos:', predictionRes.value.prediction?.dailySchedule?.allNaps?.length || 0);
         console.log('🔍 [DEBUG] Primer nap:', predictionRes.value.prediction?.dailySchedule?.allNaps?.[0]);
+        console.log('🔍 [SLEEP PRESSURE] nivel recibido del backend:', predictionRes.value.prediction?.sleepPressure?.level);
+        console.log('🔍 [SLEEP PRESSURE] objeto completo:', predictionRes.value.prediction?.sleepPressure);
         
         setSleepPrediction(predictionRes.value);
         
         // Si el nivel de presión es BAJO (energía alta), cargar sugerencias de actividades
         if (predictionRes.value.prediction?.sleepPressure?.level === 'low') {
+          console.log('✅ [ACTIVITIES] Cargando sugerencias (energía alta)');
           loadActivitySuggestions(childId);
         } else {
           // Si no hay energía alta, limpiar sugerencias
+          console.log('❌ [ACTIVITIES] NO cargar sugerencias, nivel:', predictionRes.value.prediction?.sleepPressure?.level);
           setActivitySuggestions(null);
         }
         
@@ -1502,6 +1506,7 @@ const HomeScreen: React.FC = () => {
                     <Text style={styles.activityReminderLabelCompact}>
                       {(() => {
                         const level = sleepPrediction?.prediction?.sleepPressure?.level;
+                        console.log('🔍 [ENERGY CARD] nivel recibido:', level);
                         if (level === 'low') return 'Energía alta';
                         if (level === 'medium') return 'Energía media';
                         if (level === 'high') return 'Energía baja';
