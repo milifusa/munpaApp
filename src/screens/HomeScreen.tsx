@@ -1346,212 +1346,31 @@ const HomeScreen: React.FC = () => {
             <Text style={styles.sleepTitle}>Recomendación de sueño</Text>
           </View>
           
-          {/* Carita animada de presión de sueño */}
+          {/* Carita de presión de sueño */}
           <View style={styles.sleepPlanetContainer}>
-            {/* Planeta/Carita */}
-            <View style={styles.sleepPlanet}>
-              {/* Imagen del planeta según estado */}
-              <Image 
-                source={getSleepPressureImage()} 
-                style={styles.planetImage}
-                resizeMode="contain"
-              />
+            {/* Imagen del planeta/carita según estado */}
+            <Image 
+              source={getSleepPressureImage()} 
+              style={styles.planetImageSimple}
+              resizeMode="contain"
+            />
               
-              {/* Órbita animada */}
-              <View style={styles.orbitContainer}>
-                <View style={[styles.orbit, styles.orbitOuter]} />
-                <View style={[styles.orbit, styles.orbitInner]} />
-                
-                {/* Hora actual - Punto blanco */}
-                {(() => {
-                  const now = new Date();
-                  // Usar el ISO string completo de la fecha actual
-                  const { x, y } = parseTimeToPosition(now.toISOString(), 140, true); // true = usar hora local
-                  
-                  
-                  return (
-                    <View
-                      key="current-time"
-                      style={[
-                        styles.currentTimeIndicator,
-                        {
-                          left: x + 180 - 8, // Centrar el punto (radio 8px)
-                          top: y + 180 - 8,
-                        }
-                      ]}
-                    >
-                      <View style={styles.currentTimeGlow} />
-                      <View style={styles.currentTimeDot} />
-                    </View>
-                  );
-                })()}
-                
-                {/* Hora de despertar (Wake Time) */}
-                {wakeTimeToday && (() => {
-                  
-                  const { x, y, hour, minute } = parseTimeToPosition(wakeTimeToday, 140); // Radio en la órbita
-                  
-                  
-                  return (
-                    <TouchableOpacity
-                      key="wake-time"
-                      style={[
-                        styles.orbitCapsule,
-                        {
-                          left: x + 180 - 32, // Centrar la cápsula
-                          top: y + 180 - 20,
-                        }
-                      ]}
-                      onPress={showWakeTimeDetail}
-                      activeOpacity={0.7}
-                    >
-                      <View style={[styles.capsuleGlow, { backgroundColor: '#FFD700' }]} />
-                      <View style={[styles.capsuleInner, { backgroundColor: '#FFA500' }]}>
-                        <Ionicons name="sunny" size={20} color="#FFF" />
-                      </View>
-                    </TouchableOpacity>
-                  );
-                })()}
-                
-                {/* Hora de dormir predicha (Bedtime) */}
-                {sleepPrediction?.prediction?.bedtime?.time && (() => {
-                  const { x, y, hour, minute } = parseTimeToPosition(sleepPrediction.prediction.bedtime.time, 140, false); // false = NO convertir timezone
-                  const bedtime = sleepPrediction.prediction.bedtime;
-                  
-                  return (
-                    <TouchableOpacity
-                      key="bedtime"
-                      style={[
-                        styles.orbitCapsule,
-                        {
-                          left: x + 180 - 32,
-                          top: y + 180 - 20,
-                        }
-                      ]}
-                      onPress={() => showBedtimeDetail(bedtime)}
-                      activeOpacity={0.7}
-                    >
-                      <View style={[styles.capsuleGlow, { backgroundColor: '#9D9FFF' }]} />
-                      <View style={[styles.capsuleInner, { backgroundColor: '#7F7FD5' }]}>
-                        <Ionicons name="moon" size={20} color="#FFF" />
-                      </View>
-                    </TouchableOpacity>
-                  );
-                })()}
-                
-                {/* Siestas predichas/completadas */}
-                {sleepPrediction?.prediction?.dailySchedule?.allNaps?.map((nap: any, index: number) => {
-                  const napStartTime = nap.time || nap.startTime;
-                  const { x: xStart, y: yStart, hour: startHour, minute: startMinute } = parseTimeToPosition(napStartTime, 140); // Radio en la órbita
-                  
-                  // Color según estado
-                  const isInProgress = nap.status === 'in_progress' || nap.isInProgress === true;
-                  const isCompleted = nap.completed || nap.status === 'completed';
-                  const dotColor = isInProgress ? '#8B5CF6' : (isCompleted ? '#4CAF50' : '#56CCF2');
-                  
-                  // Calcular duración
-                  const duration = nap.actualDuration || nap.expectedDuration || nap.duration || 0;
-                  
-                  // Dibujar múltiples segmentos para crear un arco visual
-                  const segments = [];
-                  if (duration > 0) {
-                    const segmentCount = Math.min(Math.floor(duration / 5), 30); // Un segmento cada 5 minutos, máximo 30
-                    for (let i = 0; i < segmentCount; i++) {
-                      const segmentTime = (startHour * 60 + startMinute + (duration * i / segmentCount));
-                      const segmentMinutes = segmentTime % (24 * 60);
-                      const segmentAngle = (segmentMinutes / (24 * 60)) * 360 - 90;
-                      const segmentRadian = (segmentAngle * Math.PI) / 180;
-                      const xSeg = Math.cos(segmentRadian) * 140;
-                      const ySeg = Math.sin(segmentRadian) * 140;
-                      
-                      // Tamaño del segmento basado en la duración
-                      const segmentSize = Math.min(Math.max(8, duration / 15), 16);
-                      
-                      segments.push(
-                    <View
-                          key={`segment-${index}-${i}`}
-                      style={[
-                            styles.napArcSegment,
-                            {
-                              left: xSeg + 180 - segmentSize / 2,
-                              top: ySeg + 180 - segmentSize / 2,
-                              width: segmentSize,
-                              height: segmentSize,
-                          backgroundColor: dotColor,
-                              opacity: isCompleted ? 0.5 : 0.3,
-                              borderRadius: segmentSize / 2,
-                            }
-                          ]}
-                        />
-                      );
-                    }
-                  }
-                  
-                  return (
-                    <React.Fragment key={`nap-${index}`}>
-                      {/* Segmentos de arco para mostrar duración */}
-                      {segments}
-                      
-                      {/* Cápsula marcador en el inicio */}
-                      <TouchableOpacity
-                        style={[
-                          styles.orbitCapsule,
-                          {
-                            left: xStart + 180 - 32,
-                            top: yStart + 180 - 20,
-                          }
-                        ]}
-                        onPress={() => showNapDetail(nap, index)}
-                        activeOpacity={0.8}
-                      >
-                        <View style={[
-                          styles.capsuleGlow,
-                          { 
-                            backgroundColor: isInProgress ? '#A78BFA' : (isCompleted ? '#66BB6A' : '#56CCF2'),
-                            opacity: 0.4,
-                          }
-                        ]} />
-                        <View style={[
-                          styles.capsuleInner,
-                          { backgroundColor: dotColor }
-                        ]}>
-                          <Ionicons 
-                            name={isCompleted ? "checkmark" : (isInProgress ? "hourglass" : "moon")} 
-                            size={20} 
-                            color="#FFF" 
-                          />
-                    </View>
-                      </TouchableOpacity>
-                    </React.Fragment>
-                  );
-                })}
+            {/* Información de siesta activa sobre la carita */}
+            {activeSleep && (
+              <View style={styles.activeSleepInfo}>
+                <Text style={styles.activeSleepTitle}>
+                  {isPaused ? '⏸ Pausada' : '😴 Durmiendo'}
+                </Text>
+                <Text style={styles.activeSleepTime}>
+                  {formatDuration(elapsedSleepTime / 60, false)}
+                </Text>
+                {sleepPrediction?.prediction?.nextNap?.expectedDuration && (
+                  <Text style={styles.activeSleepSubtitle}>
+                    de {formatDuration(sleepPrediction.prediction.nextNap.expectedDuration)} min
+                  </Text>
+                )}
               </View>
-              
-              {/* Cara del planeta O información de siesta activa */}
-              {activeSleep ? (
-                // Mostrar info de siesta activa DENTRO del planeta
-                <>
-                  {/* Texto "Durmiendo" arriba */}
-                  <View style={styles.planetTopText}>
-                    <Text style={styles.planetCenterTitle}>
-                      {isPaused ? 'Pausada' : 'Durmiendo'}
-                    </Text>
-                  </View>
-                  
-                  {/* Tiempo abajo */}
-                  <View style={styles.planetBottomText}>
-                    <Text style={styles.planetCenterTime}>
-                      {formatDuration(elapsedSleepTime / 60, false)}
-                    </Text>
-                    {sleepPrediction?.prediction?.nextNap?.expectedDuration && (
-                      <Text style={styles.planetCenterSubtitle}>
-                        de {formatDuration(sleepPrediction.prediction.nextNap.expectedDuration)} min
-                      </Text>
-                    )}
-                  </View>
-                </>
-              ) : null}
-            </View>
+            )}
             
           {/* Mensaje de presión de sueño - SOLO cuando NO hay siesta activa */}
           {!activeSleep && !activitySuggestions && (
@@ -3621,21 +3440,6 @@ const styles = StyleSheet.create({
   activeSleepEmoji: {
     fontSize: 32,
   },
-  activeSleepInfo: {
-    flex: 1,
-  },
-  activeSleepTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#FFF',
-    marginBottom: 4,
-    fontFamily: 'Montserrat',
-  },
-  activeSleepTime: {
-    fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.9)',
-    fontFamily: 'Montserrat',
-  },
   activeSleepProgress: {
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
     borderRadius: 16,
@@ -4388,267 +4192,36 @@ const styles = StyleSheet.create({
   sleepPlanetContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    width: 360, // Contenedor más grande
-    height: 360,
+    paddingVertical: 20,
     alignSelf: 'center',
   },
-  sleepPlanet: {
-    width: 200,
-    height: 200,
-    borderRadius: 100,
+  planetImageSimple: {
+    width: 180,
+    height: 180,
+  },
+  activeSleepInfo: {
+    marginTop: 15,
     alignItems: 'center',
-    justifyContent: 'center',
-    position: 'relative',
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 12,
   },
-  planetImage: {
-    width: 200,
-    height: 200,
-    zIndex: 1,
-  },
-  orbitContainer: {
-    position: 'absolute',
-    width: 360, // Mismo tamaño que sleepPlanetContainer
-    height: 360,
-    alignItems: 'center',
-    justifyContent: 'center',
-    left: -80, // Centrar: (360-200)/2 = 80px a la izquierda
-    top: -80,  // Centrar: (360-200)/2 = 80px arriba
-  },
-  orbit: {
-    position: 'absolute',
-    borderWidth: 3,
-    borderColor: 'rgba(255, 255, 255, 0.5)',
-    borderRadius: 200,
-  },
-  orbitOuter: {
-    width: 280,
-    height: 280,
-  },
-  orbitInner: {
-    width: 240,
-    height: 240,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
-  },
-  orbitDot: {
-    position: 'absolute',
-    top: -5,
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: '#FFD54F',
-    shadowColor: '#FFD54F',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.8,
-    shadowRadius: 4,
-  },
-  napMarker: {
-    position: 'absolute',
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    borderWidth: 2,
-    borderColor: '#FFF',
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 3,
-    elevation: 5,
-  },
-  napMarkerTime: {
-    position: 'absolute',
-    left: 18,
-    top: -2,
-    fontSize: 10,
-    fontWeight: 'bold',
-    color: '#FFF',
-    backgroundColor: 'rgba(0, 0, 0, 0.85)',
-    paddingHorizontal: 5,
-    paddingVertical: 2,
-    borderRadius: 5,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
-  },
-  orbitMarker: {
-    position: 'absolute',
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 3,
-    elevation: 5,
-  },
-  markerLabel: {
-    position: 'absolute',
-    top: 26,
-    left: -10,
-    fontSize: 10,
-    fontWeight: 'bold',
-    color: '#FFF',
-    backgroundColor: 'rgba(0, 0, 0, 0.8)',
-    paddingHorizontal: 5,
-    paddingVertical: 2,
-    borderRadius: 5,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
-  },
-  napDurationLine: {
-    position: 'absolute',
-    height: 3,
-    borderRadius: 1.5,
-  },
-  napDurationArc: {
-    position: 'absolute',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.2,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  napEndMarker: {
-    position: 'absolute',
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    borderWidth: 2,
-    borderColor: '#FFF',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.2,
-    shadowRadius: 2,
-    elevation: 3,
-  },
-  napEndTime: {
-    position: 'absolute',
-    left: 14,
-    top: -2,
-    fontSize: 9,
-    fontWeight: 'bold',
-    color: '#FFF',
-    backgroundColor: 'rgba(0, 0, 0, 0.75)',
-    paddingHorizontal: 4,
-    paddingVertical: 2,
-    borderRadius: 4,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
-  },
-  hourMark: {
-    position: 'absolute',
-    fontSize: 10,
+  activeSleepTitle: {
+    fontSize: 16,
     fontWeight: '700',
     color: '#FFF',
-    textAlign: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    paddingHorizontal: 4,
-    paddingVertical: 2,
-    borderRadius: 4,
-    overflow: 'hidden',
+    marginBottom: 8,
   },
-  // Estilos para cápsulas de órbita (estilo imagen)
-  orbitCapsule: {
-    position: 'absolute',
-    width: 64,
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  capsuleGlow: {
-    position: 'absolute',
-    width: '100%',
-    height: '100%',
-    borderRadius: 20,
-    opacity: 0.3,
-  },
-  capsuleInner: {
-    width: 48,
-    height: 32,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: 'rgba(255, 255, 255, 0.5)',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 5,
-  },
-  // Estilos para el indicador de hora actual
-  currentTimeIndicator: {
-    position: 'absolute',
-    width: 16,
-    height: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  currentTimeGlow: {
-    position: 'absolute',
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: '#FFFFFF',
-    opacity: 0.3,
-  },
-  currentTimeDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 2,
-    borderColor: 'rgba(255, 255, 255, 0.8)',
-    shadowColor: '#FFF',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.8,
-    shadowRadius: 4,
-    elevation: 8,
-  },
-  // Segmentos de arco para mostrar duración de siestas
-  napArcSegment: {
-    position: 'absolute',
-  },
-  orbitLegend: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: 8,
-    marginBottom: 12,
-    gap: 16,
-    flexWrap: 'wrap',
-  },
-  legendItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  legendDot: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    borderWidth: 2,
-    borderColor: '#FFF',
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.3,
-    shadowRadius: 2,
-    elevation: 3,
-  },
-  legendText: {
-    fontSize: 12,
+  activeSleepTime: {
+    fontSize: 32,
+    fontWeight: '800',
     color: '#FFF',
-    fontWeight: '700',
-    textShadowColor: 'rgba(0, 0, 0, 0.5)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
+    marginBottom: 4,
+  },
+  activeSleepSubtitle: {
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.8)',
   },
   
   // Estilos para modal de detalles de órbita
@@ -4800,39 +4373,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     zIndex: 10,
     top: 110,
-  },
-  // Texto "Durmiendo" arriba sobre la cara
-  planetTopText: {
-    position: 'absolute',
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 10,
-    top: 10, // Mucho más arriba
-  },
-  // Tiempo abajo debajo de la cara
-  planetBottomText: {
-    position: 'absolute',
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 10,
-    top: 135, // Mucho más abajo
-  },
-  planetCenterTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#FFF',
-    marginBottom: 8,
-  },
-  planetCenterTime: {
-    fontSize: 48,
-    fontWeight: '700',
-    color: '#FFF',
-    marginBottom: 4,
-  },
-  planetCenterSubtitle: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: 'rgba(255, 255, 255, 0.8)',
   },
   // Estilos para controles de siesta activa (debajo del planeta)
   activeSleepControls: {
