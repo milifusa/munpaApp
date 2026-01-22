@@ -6,7 +6,6 @@ import {
   ScrollView,
   TouchableOpacity,
   Image,
-  SafeAreaView,
   RefreshControl,
   ActivityIndicator,
   Linking,
@@ -19,7 +18,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import api from '../services/api';
 import recommendationAnalyticsService from '../services/recommendationAnalyticsService';
 import { useAuth } from '../contexts/AuthContext';
@@ -648,11 +647,11 @@ const RecommendationDetailScreen = ({ route, navigation }: any) => {
 
   if (isLoading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={styles.container} edges={['top']}>
         <StatusBar barStyle="light-content" backgroundColor="#96d2d3" />
         <LinearGradient
           colors={['#59C6C0', '#4DB8B3']}
-          style={[styles.header, { paddingTop: insets.top + 10 }]}
+          style={styles.header}
         >
           <TouchableOpacity onPress={() => navigation.goBack()}>
             <Ionicons name="arrow-back" size={24} color="white" />
@@ -668,11 +667,11 @@ const RecommendationDetailScreen = ({ route, navigation }: any) => {
 
   if (error || !recommendation) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={styles.container} edges={['top']}>
         <StatusBar barStyle="light-content" backgroundColor="#96d2d3" />
         <LinearGradient
           colors={['#59C6C0', '#4DB8B3']}
-          style={[styles.header, { paddingTop: insets.top + 10 }]}
+          style={styles.header}
         >
           <TouchableOpacity onPress={() => navigation.goBack()}>
             <Ionicons name="arrow-back" size={24} color="white" />
@@ -690,13 +689,13 @@ const RecommendationDetailScreen = ({ route, navigation }: any) => {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <StatusBar barStyle="light-content" backgroundColor="#96d2d3" />
       <View style={styles.contentWrapper}>
         {/* Header */}
         <LinearGradient
           colors={['#59C6C0', '#4DB8B3']}
-          style={[styles.header, { paddingTop: insets.top + 10 }]}
+          style={styles.header}
         >
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color="white" />
@@ -1169,6 +1168,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 20,
+    paddingTop: 6,
     paddingBottom: 15,
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255, 255, 255, 0.3)',

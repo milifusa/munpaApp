@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { View, Text, Image, TouchableOpacity, StyleSheet, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import LikeButton from './LikeButton';
 import { Post } from '../types/posts';
 import AttachedLists from './AttachedLists';
+import { useAuth } from '../contexts/AuthContext';
 
 interface PostCardProps {
   post: Post;
@@ -28,6 +29,8 @@ const PostCard: React.FC<PostCardProps> = ({
   onViewFull,
 }) => {
   const navigation = useNavigation<any>();
+  const { user } = useAuth();
+  const isOwn = post.authorId && user?.id ? post.authorId === user.id : false;
   const MAX_LENGTH = 200;
   const shouldTruncate = post.content.length > MAX_LENGTH;
   const displayContent = shouldTruncate 
@@ -36,78 +39,10 @@ const PostCard: React.FC<PostCardProps> = ({
   const imagePosition = post.imagePosition || 'start';
 
   return (
-    <View style={[styles.postCard, post.isPinned && styles.pinnedPostCard]}>
-      {/* Badge de pinned */}
-      {post.isPinned && (
-        <View style={styles.pinnedBadge}>
-          <Ionicons name="pin" size={14} color="#59C6C0" />
-          <Text style={styles.pinnedText}>Fijado</Text>
-        </View>
-      )}
-      
-      {/* Título del post si existe */}
-      {post.title && (
-        <Text style={styles.postTitle}>{post.title}</Text>
-      )}
-      
-      {/* Contenido del post */}
-      <View style={styles.postContent}>
-        {/* Imagen al inicio si imagePosition es 'start' */}
-        {post.imageUrl && imagePosition === 'start' && (
-          <Image source={{ uri: post.imageUrl }} style={styles.postImage} />
-        )}
-        
-        {/* Texto del post */}
-        <Text style={styles.postText}>{displayContent}</Text>
-        
-        {/* Botón ver más */}
-        {shouldTruncate && onViewFull && (
-          <TouchableOpacity 
-            onPress={() => onViewFull(post)}
-            style={styles.expandButton}
-          >
-            <Text style={styles.expandButtonText}>Ver más</Text>
-            <Ionicons name="arrow-forward" size={14} color="#59C6C0" />
-          </TouchableOpacity>
-        )}
-        
-        {/* Imagen al final si imagePosition es 'end' */}
-        {post.imageUrl && imagePosition === 'end' && (
-          <Image source={{ uri: post.imageUrl }} style={styles.postImage} />
-        )}
-        
-        {/* Listas adjuntas */}
-        {(() => {
-          // Debug: verificar si hay listas adjuntas
-          if (post.attachedLists) {
-            console.log('📋 [POST CARD] Post tiene attachedLists:', {
-              postId: post.id,
-              listsCount: post.attachedLists.length,
-              lists: post.attachedLists
-            });
-          }
-          
-          return post.attachedLists && post.attachedLists.length > 0 ? (
-            <AttachedLists 
-              lists={post.attachedLists}
-              onListPress={(listId) => {
-                // Navegar a la lista cuando se presione
-                // ListDetail está en RecommendationsStackNavigator dentro del tab Recommendations
-                console.log('📋 [POST CARD] Navegando a lista:', listId);
-                // Navegar al tab de Recommendations y luego a ListDetail
-                navigation.getParent()?.navigate('Recommendations', {
-                  screen: 'ListDetail',
-                  params: { listId }
-                });
-              }}
-            />
-          ) : null;
-        })()}
-      </View>
-      
-      {/* Información del autor abajo */}
-      <View style={styles.postAuthorInfo}>
-        <View style={styles.authorInfo}>
+    <View style={[styles.postCard, isOwn ? styles.postCardOwn : styles.postCardOther]}>
+      {/* Meta */}
+      <View style={[styles.metaRow, isOwn && styles.metaRowOwn]}>
+        {!isOwn && (
           <View style={styles.authorAvatar}>
             {post.authorPhoto ? (
               <Image source={{ uri: post.authorPhoto }} style={styles.authorAvatarImage} />
@@ -115,65 +50,63 @@ const PostCard: React.FC<PostCardProps> = ({
               <Ionicons name="person" size={16} color="#666" />
             )}
           </View>
-          <View style={styles.authorDetails}>
-            <Text style={styles.authorName}>{post.authorName}</Text>
-            <Text style={styles.postDate}>
-              {formatDate(post.createdAt)}
-            </Text>
-          </View>
+        )}
+        <View style={styles.metaText}>
+          <Text style={styles.authorName}>{post.authorName}</Text>
+          <Text style={styles.postDate}>{formatDate(post.createdAt)}</Text>
         </View>
       </View>
 
-      {/* Footer del post con estadísticas */}
-      <View style={styles.postFooter}>
-        <View style={styles.postStats}>
-          <View style={styles.statItem}>
-            <Ionicons name="heart" size={16} color="#FF6B6B" />
-            <Text style={styles.statText}>{post.likeCount || 0}</Text>
-          </View>
-          <View style={styles.statItem}>
-            <Ionicons name="chatbubble" size={16} color="#59C6C0" />
-            <Text style={styles.statText}>{post.commentCount || 0}</Text>
-            {post.commentCount > 0 && (
-              <View style={styles.commentIndicator}>
-                <Text style={styles.commentIndicatorText}>
-                  {post.commentCount > 99 ? '99+' : post.commentCount}
-                </Text>
-              </View>
-            )}
-          </View>
-        </View>
-        
-        {/* Botones de acción */}
-        <View style={styles.postActions}>
-          <LikeButton
-            isLiked={post.isLiked || false}
-            likeCount={post.likeCount || 0}
-            onPress={() => onLike(post)}
-            isLoading={likingPostId === post.id}
-            size="medium"
-            showCount={false}
+      {/* Burbuja de mensaje */}
+      <View style={[styles.bubble, isOwn ? styles.bubbleOwn : styles.bubbleOther]}>
+        {post.title && <Text style={styles.postTitle}>{post.title}</Text>}
+
+        {post.imageUrl && imagePosition === 'start' && (
+          <Image source={{ uri: post.imageUrl }} style={styles.postImage} />
+        )}
+
+        <Text style={[styles.postText, isOwn && styles.postTextOwn]}>{displayContent}</Text>
+
+        {shouldTruncate && onViewFull && (
+          <TouchableOpacity onPress={() => onViewFull(post)} style={styles.expandButton}>
+            <Text style={styles.expandButtonText}>Ver más</Text>
+            <Ionicons name="arrow-forward" size={14} color="#59C6C0" />
+          </TouchableOpacity>
+        )}
+
+        {post.imageUrl && imagePosition === 'end' && (
+          <Image source={{ uri: post.imageUrl }} style={styles.postImage} />
+        )}
+
+        {post.attachedLists && post.attachedLists.length > 0 && (
+          <AttachedLists 
+            lists={post.attachedLists}
+            onListPress={(listId) => {
+              navigation.getParent()?.navigate('Recommendations', {
+                screen: 'ListDetail',
+                params: { listId }
+              });
+            }}
           />
-          <TouchableOpacity 
-            style={[
-              styles.actionButton,
-              post.commentCount > 0 && styles.actionButtonWithComments
-            ]}
-            onPress={() => onComment(post)}
-          >
-            <Ionicons 
-              name={post.commentCount > 0 ? "chatbubble" : "chatbubble-outline"} 
-              size={20} 
-              color={post.commentCount > 0 ? "#59C6C0" : "#666"} 
-            />
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={styles.actionButton}
-            onPress={() => onShare(post.id)}
-          >
-            <Ionicons name="share-outline" size={20} color="#666" />
-          </TouchableOpacity>
-        </View>
+        )}
+      </View>
+
+      {/* Acciones */}
+      <View style={[styles.postActions, isOwn && styles.postActionsOwn]}>
+        <LikeButton
+          isLiked={post.isLiked || false}
+          likeCount={post.likeCount || 0}
+          onPress={() => onLike(post)}
+          isLoading={likingPostId === post.id}
+          size="small"
+          showCount={false}
+        />
+        <TouchableOpacity style={styles.actionButton} onPress={() => onComment(post)}>
+          <Ionicons name="chatbubble-outline" size={18} color="#666" />
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.actionButton} onPress={() => onShare(post.id)}>
+          <Ionicons name="share-outline" size={18} color="#666" />
+        </TouchableOpacity>
       </View>
     </View>
   );
@@ -181,65 +114,88 @@ const PostCard: React.FC<PostCardProps> = ({
 
 const styles = StyleSheet.create({
   postCard: {
-    backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 15,
-    marginBottom: 15,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-      },
-      android: {
-        elevation: 2,
-      },
-    }),
+    marginBottom: 16,
+    maxWidth: '88%',
   },
-  pinnedPostCard: {
-    borderLeftWidth: 4,
-    borderLeftColor: '#59C6C0',
+  postCardOwn: {
+    alignSelf: 'flex-end',
   },
-  pinnedBadge: {
+  postCardOther: {
+    alignSelf: 'flex-start',
+  },
+  metaRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    alignSelf: 'flex-start',
-    backgroundColor: '#E3F2FD',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    marginBottom: 8,
-    gap: 4,
+    marginBottom: 6,
+    gap: 8,
   },
-  pinnedText: {
-    fontSize: 11,
+  metaRowOwn: {
+    justifyContent: 'flex-end',
+  },
+  metaText: {
+    flexDirection: 'column',
+  },
+  authorAvatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#F0F0F0',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  authorAvatarImage: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+  },
+  authorName: {
+    fontSize: 12,
     fontWeight: '600',
-    color: '#59C6C0',
+    color: '#6B7280',
     fontFamily: 'Montserrat',
+  },
+  postDate: {
+    fontSize: 12,
+    color: '#9CA3AF',
+    fontFamily: 'Montserrat',
+  },
+  bubble: {
+    borderRadius: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+  },
+  bubbleOwn: {
+    backgroundColor: '#59C6C0',
+    borderTopRightRadius: 6,
+  },
+  bubbleOther: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 6,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
   },
   postTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#1F2937',
     fontFamily: 'Montserrat',
-    marginBottom: 10,
-  },
-  postContent: {
-    marginBottom: 12,
+    marginBottom: 6,
   },
   postText: {
     fontSize: 14,
-    color: '#666',
+    color: '#1F2937',
     lineHeight: 20,
     fontFamily: 'Montserrat',
   },
+  postTextOwn: {
+    color: '#FFFFFF',
+  },
   postImage: {
     width: '100%',
-    height: 200,
-    borderRadius: 8,
-    marginBottom: 12,
-    marginTop: 12,
+    height: 180,
+    borderRadius: 12,
+    marginBottom: 10,
+    marginTop: 10,
   },
   expandButton: {
     marginTop: 8,
@@ -254,90 +210,17 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     fontFamily: 'Montserrat',
   },
-  postAuthorInfo: {
-    marginTop: 15,
-    paddingTop: 15,
-    borderTopWidth: 1,
-    borderTopColor: '#F0F0F0',
-  },
-  authorInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  authorAvatar: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#F0F0F0',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 10,
-  },
-  authorAvatarImage: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-  },
-  authorDetails: {
-    flex: 1,
-  },
-  authorName: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#666',
-    marginBottom: 2,
-    fontFamily: 'Montserrat',
-  },
-  postDate: {
-    fontSize: 12,
-    color: '#999',
-    fontFamily: 'Montserrat',
-  },
-  postFooter: {
-    marginTop: 15,
-    paddingTop: 15,
-    borderTopWidth: 1,
-    borderTopColor: '#F0F0F0',
-  },
-  postStats: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-    gap: 20,
-  },
-  statItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  statText: {
-    fontSize: 14,
-    color: '#666',
-    fontFamily: 'Montserrat',
-  },
-  commentIndicator: {
-    backgroundColor: '#59C6C0',
-    borderRadius: 10,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    marginLeft: 4,
-  },
-  commentIndicatorText: {
-    color: 'white',
-    fontSize: 10,
-    fontWeight: 'bold',
-    fontFamily: 'Montserrat',
-  },
   postActions: {
+    marginTop: 6,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 15,
+    gap: 10,
+  },
+  postActionsOwn: {
+    justifyContent: 'flex-end',
   },
   actionButton: {
-    padding: 8,
-  },
-  actionButtonWithComments: {
-    // Estilo adicional si hay comentarios
+    padding: 6,
   },
 });
 

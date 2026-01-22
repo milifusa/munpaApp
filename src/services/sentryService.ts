@@ -11,19 +11,13 @@ export const sentryService = {
    * Debes obtener tu DSN desde https://sentry.io
    */
   initialize: async (dsn?: string) => {
-    if (isInitialized) {
-      console.log('⚠️ [SENTRY] Ya está inicializado');
-      return;
-    }
+    if (isInitialized) return;
 
     try {
       const sentryDsn = dsn || SENTRY_DSN;
       
       // Solo inicializar si el DSN es válido
-      if (!sentryDsn || sentryDsn.includes('YOUR_DSN_HERE')) {
-        console.warn('⚠️ [SENTRY] DSN no configurado. Configura tu DSN en src/services/sentryService.ts');
-        return;
-      }
+      if (!sentryDsn || sentryDsn.includes('YOUR_DSN_HERE')) return;
 
       Sentry.init({
         dsn: sentryDsn,
@@ -32,11 +26,7 @@ export const sentryService = {
         enableAutoSessionTracking: true,
         sessionTrackingIntervalMillis: 30000, // 30 segundos
         // Configuración adicional
-        beforeSend(event, hint) {
-          // Filtrar errores en desarrollo si es necesario
-          if (__DEV__) {
-            console.log('📊 [SENTRY] Evento capturado:', event);
-          }
+        beforeSend(event) {
           return event;
         },
         // Ignorar ciertos errores si es necesario
@@ -57,17 +47,13 @@ export const sentryService = {
    * Capturar una excepción manualmente
    */
   captureException: (error: Error, context?: Record<string, any>) => {
-    if (!isInitialized) {
-      console.warn('⚠️ [SENTRY] No está inicializado, no se puede capturar error');
-      return;
-    }
+    if (!isInitialized) return;
 
     try {
       if (context) {
         Sentry.setContext('error_context', context);
       }
       Sentry.captureException(error);
-      console.log('📊 [SENTRY] Excepción capturada:', error.message);
     } catch (err) {
       console.error('❌ [SENTRY] Error capturando excepción:', err);
     }
@@ -77,14 +63,10 @@ export const sentryService = {
    * Capturar un mensaje
    */
   captureMessage: (message: string, level: 'info' | 'warning' | 'error' = 'info') => {
-    if (!isInitialized) {
-      console.warn('⚠️ [SENTRY] No está inicializado, no se puede capturar mensaje');
-      return;
-    }
+    if (!isInitialized) return;
 
     try {
       Sentry.captureMessage(message, level);
-      console.log(`📊 [SENTRY] Mensaje capturado (${level}):`, message);
     } catch (error) {
       console.error('❌ [SENTRY] Error capturando mensaje:', error);
     }
@@ -98,7 +80,6 @@ export const sentryService = {
 
     try {
       Sentry.setUser(user);
-      console.log('👤 [SENTRY] Usuario configurado:', user.id);
     } catch (error) {
       console.error('❌ [SENTRY] Error configurando usuario:', error);
     }
@@ -112,7 +93,6 @@ export const sentryService = {
 
     try {
       Sentry.setUser(null);
-      console.log('👤 [SENTRY] Usuario limpiado');
     } catch (error) {
       console.error('❌ [SENTRY] Error limpiando usuario:', error);
     }

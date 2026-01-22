@@ -15,8 +15,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRoute, useNavigation } from '@react-navigation/native';
-import { SafeAreaView } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { TextInput } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { communitiesService, listsService } from '../services/api';
@@ -422,10 +421,10 @@ const CreatePostScreen: React.FC = () => {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={styles.safeArea} edges={['top']}>
       <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
       {/* Header */}
-      <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
+      <View style={styles.header}>
         <TouchableOpacity 
           style={styles.cancelButton}
           onPress={handleCancel}
@@ -732,6 +731,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
+    paddingTop: 6,
     paddingBottom: 15,
     borderBottomWidth: 1,
     borderBottomColor: '#E5E5E5',

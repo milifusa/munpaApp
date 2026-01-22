@@ -265,7 +265,7 @@ PODS:
   - EXUpdatesInterface (2.0.0):
     - ExpoModulesCore
   - FBLazyVector (0.81.5)
-  - GoogleSignIn (9.0.0):
+  - GoogleSignIn (9.1.0):
     - AppAuth (~> 2.0)
     - AppCheckCore (~> 11.0)
     - GTMAppAuth (~> 5.0)
@@ -2591,7 +2591,7 @@ SPEC CHECKSUMS:
   ExpoModulesCore: 87979cd52381b29e81e9cb7fa0fd5c4ae494d83e
   EXUpdatesInterface: 5adf50cb41e079c861da6d9b4b954c3db9a50734
   FBLazyVector: e95a291ad2dadb88e42b06e0c5fb8262de53ec12
-  GoogleSignIn: c7f09cfbc85a1abf69187be091997c317cc33b77
+  GoogleSignIn: fcee2257188d5eda57a5e2b6a715550ffff9206d
   GoogleUtilities: 00c88b9a86066ef77f0da2fab05f65d7768ed8e1
   GTMAppAuth: 217a876b249c3c585a54fd6f73e6b58c4f5c4238
   GTMSessionFetcher: 5aea5ba6bd522a239e236100971f10cb71b96ab6
@@ -2676,6 +2676,6 @@ SPEC CHECKSUMS:
   Sentry: 83a3814c3ca042874b39c5c5bdffb6570d4d760e
   Yoga: 5934998fbeaef7845dbf698f698518695ab4cd1a
 
-PODFILE CHECKSUM: 7533069c280b04cffc338c98e2b0d22c7c003c92
+PODFILE CHECKSUM: a165aa1b5c6021d93f63c546569e6ab7a54a5741
 
 COCOAPODS: 1.16.2

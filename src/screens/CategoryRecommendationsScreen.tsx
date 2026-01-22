@@ -7,7 +7,6 @@ import {
   FlatList,
   TouchableOpacity,
   Image,
-  SafeAreaView,
   RefreshControl,
   ActivityIndicator,
   Linking,
@@ -17,7 +16,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import api from '../services/api';
 import { useLocation } from '../hooks/useLocation';
 import recommendationAnalyticsService from '../services/recommendationAnalyticsService';
@@ -689,10 +688,8 @@ const CategoryRecommendationsScreen = ({ route, navigation }: any) => {
     </TouchableOpacity>
   );
 
-  const insets = useSafeAreaInsets();
-
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <StatusBar barStyle="light-content" backgroundColor="#96d2d3" />
       <View style={styles.content}>
         {/* Header */}
@@ -712,6 +709,14 @@ const CategoryRecommendationsScreen = ({ route, navigation }: any) => {
             {!isLoading && `${recommendations.length} recomendaciones`}
           </Text>
         </View>
+        <TouchableOpacity
+          style={styles.headerAddButton}
+          onPress={() => {
+            navigation.navigate('AddRecommendation', { categoryId });
+          }}
+        >
+          <Ionicons name="add" size={24} color="white" />
+        </TouchableOpacity>
       </LinearGradient>
 
       {/* Filtros de ordenamiento */}
@@ -813,7 +818,7 @@ const CategoryRecommendationsScreen = ({ route, navigation }: any) => {
         />
       )}
       </View>
-    </View>
+    </SafeAreaView>
   );
 };
 
@@ -846,6 +851,14 @@ const styles = StyleSheet.create({
   },
   headerTitleContainer: {
     flex: 1,
+  },
+  headerAddButton: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   headerTitle: {
     fontSize: 20,

@@ -1133,7 +1133,6 @@ export const categoriesService = {
       
       console.log('✅ [CATEGORIES] Categorías obtenidas exitosamente');
       console.log('📦 [CATEGORIES] Total de categorías:', response.data?.data?.length || 0);
-      console.log('📦 [CATEGORIES] Datos:', JSON.stringify(response.data, null, 2));
       
       return response.data;
     } catch (error: any) {
@@ -1467,7 +1466,6 @@ export const recommendationsService = {
       
       console.log('✅ [RECOMMENDATIONS] Recomendaciones recientes obtenidas exitosamente');
       console.log('📦 [RECOMMENDATIONS] Total recientes:', response.data?.data?.length || 0);
-      console.log('📦 [RECOMMENDATIONS] Datos:', JSON.stringify(response.data, null, 2));
       
       return response.data;
     } catch (error: any) {
@@ -1871,7 +1869,7 @@ export const sleepService = {
             console.log(`  - Fin real: ${nap.endTime}`);
           }
         });
-      } 
+      }
       
       return response.data;
     } catch (error: any) {
@@ -1977,6 +1975,23 @@ export const activitiesService = {
   },
 };
 
+// ============= EMBARAZO 🤰 =============
+export const pregnancyService = {
+  getWeekInfo: async (gestationWeeks: number, name?: string, includeImage: boolean = true) => {
+    try {
+      const response = await api.post('/api/pregnancy/week-info', {
+        gestationWeeks,
+        name,
+        includeImage,
+      });
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ [PREGNANCY] Error obteniendo info de semana:', error.response?.data || error.message);
+      throw error;
+    }
+  },
+};
+
 // Export de la instancia de axios para uso en otros servicios
 export { api as axiosInstance };
 
@@ -1992,4 +2007,5 @@ export default {
   ...adminService,
   ...sleepService,
   ...activitiesService,
+  ...pregnancyService,
 };

@@ -15,8 +15,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRoute, useNavigation } from '@react-navigation/native';
-import { SafeAreaView } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../contexts/AuthContext';
 import { communitiesService } from '../services/api';
 import LikeButton from '../components/LikeButton';
@@ -65,7 +64,6 @@ const CommunityPostsScreen: React.FC = () => {
   const { communityId, communityName } = route.params;
   const navigation = useNavigation();
   const { isAuthenticated } = useAuth();
-  const insets = useSafeAreaInsets();
   
   const [posts, setPosts] = useState<Post[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -81,7 +79,6 @@ const CommunityPostsScreen: React.FC = () => {
   // Listener para cuando se regrese de la pantalla de comentarios
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
-      console.log('🔄 [POSTS] Pantalla enfocada, recargando posts...');
       loadPosts();
     });
 
@@ -102,7 +99,6 @@ const CommunityPostsScreen: React.FC = () => {
   const loadPosts = async () => {
     // Verificar que el usuario esté autenticado antes de cargar datos
     if (!isAuthenticated) {
-      console.log('🚫 [POSTS] Usuario no autenticado, no cargando posts');
       setIsLoading(false);
       return;
     }
@@ -110,30 +106,14 @@ const CommunityPostsScreen: React.FC = () => {
     try {
       setIsLoading(true);
       const result = await communitiesService.getCommunityPosts(communityId);
-      
-      console.log('📋 [POSTS] Respuesta completa del backend:', JSON.stringify(result, null, 2));
-      
+
       if (result.success) {
         const postsData = result.data || [];
         
         const finalPosts = Array.isArray(postsData) ? postsData : [];
-        
-        // Debug: verificar attachedLists en cada post
-        finalPosts.forEach((post: any, index: number) => {
-          console.log(`📋 [POSTS] Post ${index}:`, {
-            id: post.id,
-            hasAttachedLists: !!post.attachedLists,
-            attachedListsType: typeof post.attachedLists,
-            attachedListsIsArray: Array.isArray(post.attachedLists),
-            attachedListsLength: post.attachedLists?.length || 0,
-            attachedLists: post.attachedLists
-          });
-        });
-        
-        console.log('✅ [POSTS] Posts finales a mostrar:', finalPosts.length);
+
         setPosts(finalPosts);
       } else {
-        console.log('❌ [POSTS] Backend no devolvió success: true');
         setPosts([]);
       }
     } catch (error: any) {
@@ -169,27 +149,21 @@ const CommunityPostsScreen: React.FC = () => {
 
   // Función para convertir timestamp de Firestore a fecha válida
   const parseFirestoreTimestamp = (timestamp: any): Date => {
-    console.log('🕐 [POSTS] Parseando timestamp:', timestamp);
-    
     if (timestamp && typeof timestamp === 'object' && timestamp._seconds) {
       // Es un timestamp de Firestore
       const seconds = timestamp._seconds;
       const nanoseconds = timestamp._nanoseconds || 0;
       const date = new Date(seconds * 1000 + nanoseconds / 1000000);
-      console.log('✅ [POSTS] Timestamp convertido a fecha:', date);
       return date;
     } else if (typeof timestamp === 'string') {
       // Es un string de fecha normal
       const date = new Date(timestamp);
-      console.log('✅ [POSTS] String convertido a fecha:', date);
       return date;
     } else if (timestamp instanceof Date) {
       // Ya es una fecha
-      console.log('✅ [POSTS] Ya es una fecha válida:', timestamp);
       return timestamp;
     } else {
       // Fallback a fecha actual
-      console.warn('⚠️ [POSTS] Timestamp no reconocido:', timestamp);
       return new Date();
     }
   };
@@ -213,7 +187,6 @@ const CommunityPostsScreen: React.FC = () => {
 
   // Función para crear un nuevo post
   const handleCreatePost = () => {
-    console.log('📝 [POSTS] Navegando a crear post');
     (navigation as any).navigate('CreatePost', {
       communityId: communityId,
       communityName: communityName
@@ -235,7 +208,6 @@ const CommunityPostsScreen: React.FC = () => {
           style: 'destructive',
           onPress: async () => {
             try {
-              console.log('🚪 [POSTS] Saliendo de la comunidad:', communityId);
               setIsLoading(true);
               
               const response = await communitiesService.leaveCommunity(communityId);
@@ -281,8 +253,6 @@ const CommunityPostsScreen: React.FC = () => {
 
     try {
       setLikingPostId(post.id);
-      console.log('❤️ [POSTS] Procesando like para post:', post.id);
-      
       const result = await communitiesService.likePost(post.id);
       
       if (result.success) {
@@ -299,7 +269,6 @@ const CommunityPostsScreen: React.FC = () => {
           )
         );
         
-        console.log('✅ [POSTS] Like procesado exitosamente para post:', post.id);
       } else {
         throw new Error(result.message || 'No se pudo procesar el like');
       }
@@ -318,9 +287,9 @@ const CommunityPostsScreen: React.FC = () => {
   // Si el usuario no está autenticado, mostrar mensaje
   if (!isAuthenticated) {
     return (
-      <SafeAreaView style={styles.safeArea}>
+      <SafeAreaView style={styles.safeArea} edges={['top']}>
         <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
-        <View style={[styles.header, { paddingTop: Platform.OS === 'ios' ? 10 : 10 }]}>
+        <View style={styles.header}>
         <TouchableOpacity 
           style={styles.backButton}
           onPress={() => navigation.goBack()}
@@ -342,13 +311,13 @@ const CommunityPostsScreen: React.FC = () => {
   }
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={styles.safeArea} edges={['top']}>
       <StatusBar barStyle="light-content" backgroundColor="#96d2d3" />
       <View style={styles.contentWrapper}>
         {/* Header */}
         <LinearGradient
           colors={['#59C6C0', '#4DB8B3']}
-          style={[styles.header, { paddingTop: Platform.OS === 'ios' ? 10 : 10 }]}
+          style={styles.header}
         >
         <TouchableOpacity 
           style={styles.backButton}
@@ -397,13 +366,14 @@ const CommunityPostsScreen: React.FC = () => {
 
       {/* Información de la comunidad */}
       <View style={styles.communityInfo}>
-        <Ionicons name="people" size={24} color="#59C6C0" />
+        <Ionicons name="people" size={18} color="#59C6C0" />
         <Text style={styles.communityName}>{communityName}</Text>
       </View>
 
       {/* Contenido principal */}
       <ScrollView 
         style={styles.content}
+        contentContainerStyle={styles.contentContainer}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
@@ -430,17 +400,12 @@ const CommunityPostsScreen: React.FC = () => {
           </View>
         ) : (
           <View style={styles.postsContainer}>
-            <Text style={styles.sectionTitle}>
-              {posts.length} post{posts.length !== 1 ? 's' : ''} en la comunidad
-            </Text>
-            
             {posts.map((post) => (
               <PostCard
                 key={post.id}
                 post={post}
                 onLike={handleLikePost}
                 onComment={(post) => {
-                  console.log('💬 [POSTS] Navegando a comentarios del post:', post.id);
                   (navigation as any).navigate('Comments', {
                     postId: post.id,
                     postContent: post.content,
@@ -449,7 +414,6 @@ const CommunityPostsScreen: React.FC = () => {
                   });
                 }}
                 onShare={(postId) => {
-                  console.log('📤 [POSTS] Compartiendo post:', postId);
                   shareContentHelper.sharePost(postId).catch((error) => {
                     console.error('❌ [POSTS] Error compartiendo post:', error);
                   });
@@ -494,6 +458,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
+    paddingTop: 6,
     paddingBottom: 15,
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255, 255, 255, 0.3)',
@@ -571,7 +536,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 20,
     paddingVertical: 15,
-    backgroundColor: '#F7FAFC',
+    backgroundColor: '#EEF2F7',
   },
   communityName: {
     fontSize: 16,
@@ -581,6 +546,10 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
+    backgroundColor: '#EEF2F7',
+  },
+  contentContainer: {
+    paddingVertical: 16,
   },
   loadingContainer: {
     alignItems: 'center',
@@ -626,13 +595,8 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   postsContainer: {
-    padding: 20,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 20,
+    paddingHorizontal: 16,
+    gap: 12,
   },
   postCard: {
     backgroundColor: 'white',

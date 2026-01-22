@@ -4,7 +4,6 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  SafeAreaView,
   ActivityIndicator,
   Alert,
   Dimensions,
@@ -13,7 +12,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { AppleMaps, GoogleMaps } from 'expo-maps';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import api from '../services/api';
 import { shareContentHelper } from '../utils/shareContentHelper';
 
@@ -38,7 +37,6 @@ interface Recommendation {
 }
 
 const FavoritesMapScreen = ({ navigation }: any) => {
-  const insets = useSafeAreaInsets();
   const [favorites, setFavorites] = useState<Recommendation[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -49,7 +47,6 @@ const FavoritesMapScreen = ({ navigation }: any) => {
   // Resetear mapLoaded cuando cambian los favoritos o el centro
   useEffect(() => {
     if (mapCenter && favorites.length > 0) {
-      console.log('🔄 [MAP] Reseteando mapLoaded a false para nuevo mapa');
       setMapLoaded(false);
     }
   }, [mapCenter?.latitude, mapCenter?.longitude, favorites.length]);
@@ -117,10 +114,10 @@ const FavoritesMapScreen = ({ navigation }: any) => {
 
   if (isLoading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={styles.container} edges={['top']}>
         <LinearGradient
           colors={['#59C6C0', '#4DB8B3']}
-          style={[styles.header, { paddingTop: insets.top + 10 }]}
+          style={styles.header}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 0 }}
         >
@@ -145,10 +142,10 @@ const FavoritesMapScreen = ({ navigation }: any) => {
 
   if (error) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={styles.container} edges={['top']}>
         <LinearGradient
           colors={['#59C6C0', '#4DB8B3']}
-          style={[styles.header, { paddingTop: insets.top + 10 }]}
+          style={styles.header}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 0 }}
         >
@@ -176,10 +173,10 @@ const FavoritesMapScreen = ({ navigation }: any) => {
 
   if (favorites.length === 0) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={styles.container} edges={['top']}>
         <LinearGradient
           colors={['#59C6C0', '#4DB8B3']}
-          style={[styles.header, { paddingTop: insets.top + 10 }]}
+          style={styles.header}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 0 }}
         >
@@ -212,10 +209,10 @@ const FavoritesMapScreen = ({ navigation }: any) => {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <LinearGradient
         colors={['#59C6C0', '#4DB8B3']}
-        style={[styles.header, { paddingTop: insets.top + 10 }]}
+        style={styles.header}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 0 }}
       >

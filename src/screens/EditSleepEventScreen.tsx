@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { sleepService } from '../services/api';
 import { SleepEntry, SleepPause } from '../types/sleep';
@@ -21,7 +21,6 @@ import { SleepEntry, SleepPause } from '../types/sleep';
 const EditSleepEventScreen: React.FC = () => {
   const navigation = useNavigation();
   const route = useRoute();
-  const insets = useSafeAreaInsets();
   const { eventId, sleepEvent } = route.params as { eventId: string; sleepEvent: SleepEntry };
 
   // Estados para el formulario
@@ -260,9 +259,9 @@ const EditSleepEventScreen: React.FC = () => {
   ];
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       {/* Header */}
-      <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
+      <View style={styles.header}>
         <TouchableOpacity
           style={styles.backButton}
           onPress={() => navigation.goBack()}
@@ -632,7 +631,7 @@ const EditSleepEventScreen: React.FC = () => {
           </View>
         </View>
       </Modal>
-    </View>
+    </SafeAreaView>
   );
 };
 

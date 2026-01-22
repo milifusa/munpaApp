@@ -147,7 +147,7 @@ export const appointmentsService = {
 export const medicationsService = {
   getMedications: async (childId: string) => {
     try {
-      const response = await api.get(`/api/children/${childId}/medications`);
+      const response = await api.get(`/api/medications/${childId}`);
       return response.data;
     } catch (error) {
       console.error('Error obteniendo medicamentos:', error);
@@ -157,17 +157,23 @@ export const medicationsService = {
 
   addMedication: async (childId: string, medicationData: {
     name: string;
-    dosage: string;
-    frequency: string;
+    dose: number | string;
+    doseUnit: string;
+    times?: string[];
+    repeatEveryMinutes?: number;
+    startTime?: string;
+    endTime?: string;
     startDate: string;
     endDate?: string;
-    reason?: string;
-    prescribedBy?: string;
     notes?: string;
-    status?: 'active' | 'completed' | 'discontinued';
+    timezone?: string;
+    scheduleDays?: number;
   }) => {
     try {
-      const response = await api.post(`/api/children/${childId}/medications`, medicationData);
+      const response = await api.post(`/api/medications`, {
+        childId,
+        ...medicationData,
+      });
       return response.data;
     } catch (error) {
       console.error('Error agregando medicamento:', error);
@@ -175,19 +181,22 @@ export const medicationsService = {
     }
   },
 
-  updateMedication: async (childId: string, medicationId: string, medicationData: {
+  updateMedication: async (medicationId: string, medicationData: {
     name?: string;
-    dosage?: string;
-    frequency?: string;
+    dose?: number | string;
+    doseUnit?: string;
+    times?: string[];
+    repeatEveryMinutes?: number;
+    startTime?: string;
+    endTime?: string;
     startDate?: string;
     endDate?: string;
-    reason?: string;
-    prescribedBy?: string;
     notes?: string;
-    status?: 'active' | 'completed' | 'discontinued';
+    scheduleDays?: number;
+    active?: boolean;
   }) => {
     try {
-      const response = await api.put(`/api/children/${childId}/medications/${medicationId}`, medicationData);
+      const response = await api.put(`/api/medications/${medicationId}`, medicationData);
       return response.data;
     } catch (error) {
       console.error('Error actualizando medicamento:', error);
@@ -195,9 +204,9 @@ export const medicationsService = {
     }
   },
 
-  deleteMedication: async (childId: string, medicationId: string) => {
+  deleteMedication: async (medicationId: string) => {
     try {
-      const response = await api.delete(`/api/children/${childId}/medications/${medicationId}`);
+      const response = await api.delete(`/api/medications/${medicationId}`);
       return response.data;
     } catch (error) {
       console.error('Error eliminando medicamento:', error);

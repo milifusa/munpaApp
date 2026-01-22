@@ -46,6 +46,16 @@ const GlobalMenu: React.FC<GlobalMenuProps> = ({ visible, onClose }) => {
       },
     },
     {
+      id: 'market',
+      title: 'Munpa Market',
+      icon: 'cart',
+      onPress: () => {
+        onClose();
+        // @ts-ignore
+        navigation.navigate('MainTabs', { screen: 'MunpaMarket' });
+      },
+    },
+    {
       id: 'children',
       title: 'Mis Hijos',
       icon: 'people',

@@ -6,8 +6,7 @@ import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import appleAuth from '@invertase/react-native-apple-authentication';
 import notificationService from '../services/notificationService';
 import sentryService from '../services/sentryService';
-import { initializeApp, getApps } from 'firebase/app';
-import { getAuth, signInWithCredential, GoogleAuthProvider } from 'firebase/auth';
+import { authenticateWithGoogle, initializeFirebaseAuth } from '../services/firebaseAuth';
 
 interface AuthContextType {
   user: User | null;
@@ -28,6 +27,7 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (!context) {
@@ -46,30 +46,24 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const isAuthenticated = !!user;
 
-  // Configurar Google Sign-In y Firebase al iniciar la app
   useEffect(() => {
+    console.log('⚙️ [AUTH] Inicializando servicios de autenticación...');
+    
+    // Inicializar Firebase Auth
+    try {
+      initializeFirebaseAuth();
+    } catch (error) {
+      console.error('❌ [AUTH] Error inicializando Firebase:', error);
+    }
+    
+    // Configurar Google Sign-In
     console.log('⚙️ [GOOGLE SIGN-IN] Configurando Google Sign-In...');
     GoogleSignin.configure({
-      webClientId: '975014449237-9crsati0bs65e787cb5no3ntu2utmqe1.apps.googleusercontent.com', // Para servidor backend
-      iosClientId: '975014449237-1d0vk75uqm3oqd3psjmcjvc1la9232kb.apps.googleusercontent.com', // CLIENT_ID específico de iOS
+      webClientId: '975014449237-9crsati0bs65e787cb5no3ntu2utmqe1.apps.googleusercontent.com',
+      iosClientId: '975014449237-1d0vk75uqm3oqd3psjmcjvc1la9232kb.apps.googleusercontent.com',
       offlineAccess: true,
     });
     console.log('✅ [GOOGLE SIGN-IN] Configuración completada');
-    
-    // Inicializar Firebase si no está ya inicializado
-    if (getApps().length === 0) {
-      console.log('🔥 [FIREBASE] Inicializando Firebase...');
-      const firebaseConfig = {
-        apiKey: Platform.OS === 'ios' ? 'AIzaSyDOR0D2ZvAjwYvAjwgYZ5HGGyxo8zLZzF0' : 'AIzaSyDDX0_GPvfxwnmC4H0Rs1cUEyz44IAY1S4',
-        authDomain: 'mumpabackend.firebaseapp.com',
-        projectId: 'mumpabackend',
-        storageBucket: 'mumpabackend.firebasestorage.app',
-        messagingSenderId: '975014449237',
-        appId: Platform.OS === 'ios' ? '1:975014449237:ios:2d54adfc178e18629dc4dc' : '1:975014449237:android:46c06caf478b53489dc4dc',
-      };
-      initializeApp(firebaseConfig);
-      console.log('✅ [FIREBASE] Firebase inicializado para', Platform.OS);
-    }
     
     checkAuthStatus();
   }, []);
@@ -125,14 +119,31 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
+  const getAuthResponseRoot = (response: any) => response?.data ?? response;
+  const getAuthResponseSuccess = (response: any) => {
+    const root = getAuthResponseRoot(response);
+    return root?.success ?? true;
+  };
+  const getAuthPayload = (response: any) => {
+    const root = getAuthResponseRoot(response);
+    return root?.data ?? root ?? {};
+  };
+
   const login = async (email: string, password: string) => {
     console.log('🔑 Iniciando proceso de login...');
     try {
       const response = await authService.login({ email, password });
       console.log('📋 Respuesta completa del login:', response);
       
-      // Extraer datos directamente de response.data
-      const { customToken, displayName: userName, email: userEmail, uid } = response.data;
+      const data = getAuthPayload(response);
+      const {
+        customToken,
+        displayName: userName,
+        email: userEmail,
+        uid,
+        isPregnant: isPregnantFromServer,
+        gestationWeeks: gestationWeeksFromServer,
+      } = data;
       
       console.log('🔑 Token extraído:', customToken ? 'Sí' : 'No');
       console.log('👤 Datos del usuario extraídos:', { displayName: userName, email: userEmail, uid });
@@ -146,6 +157,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         id: uid,
         email: userEmail,
         name: userName,
+        isPregnant: isPregnantFromServer ?? false,
+        gestationWeeks: gestationWeeksFromServer ?? undefined,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
@@ -213,15 +226,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       const userInfo = await GoogleSignin.signIn();
       console.log('📋 Información completa del usuario de Google:', JSON.stringify(userInfo, null, 2));
       
-      // Obtener idToken de la respuesta (esto resuelve el DEVELOPER_ERROR)
-      const idToken = userInfo.data?.idToken || (userInfo as any).idToken;
+      // Obtener idToken de Google OAuth
+      const googleOAuthToken = userInfo.data?.idToken || (userInfo as any).idToken;
       
-      if (!idToken) {
+      if (!googleOAuthToken) {
         console.error('❌ No se pudo obtener idToken de Google');
         throw new Error('No se pudo obtener idToken de Google. Por favor, intenta de nuevo.');
       }
       
-      console.log('🔑 [GOOGLE SIGN-IN] idToken obtenido:', idToken.substring(0, 50) + '...');
+      console.log('🔑 [GOOGLE SIGN-IN] Google OAuth Token obtenido:', googleOAuthToken.substring(0, 50) + '...');
       
       // Extraer datos del usuario de Google para logs
       const googleUser = userInfo.data?.user || (userInfo as any).user;
@@ -234,38 +247,38 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         });
       }
       
-      // Usar Firebase Auth para obtener un token de Firebase ID
-      console.log('🔥 [FIREBASE AUTH] Autenticando con Firebase usando token de Google...');
+      // ========== CONVERTIR GOOGLE OAUTH TOKEN A FIREBASE ID TOKEN ==========
+      console.log('🔥 [FIREBASE AUTH] Convirtiendo token de Google a Firebase ID Token...');
       let firebaseIdToken: string;
+      
       try {
-        const auth = getAuth();
-        const credential = GoogleAuthProvider.credential(idToken);
-        const firebaseUserCredential = await signInWithCredential(auth, credential);
-        firebaseIdToken = await firebaseUserCredential.user.getIdToken();
-        console.log('✅ [FIREBASE AUTH] Token de Firebase ID obtenido:', firebaseIdToken.substring(0, 50) + '...');
+        firebaseIdToken = await authenticateWithGoogle(googleOAuthToken);
+        console.log('✅ [FIREBASE AUTH] Firebase ID Token obtenido correctamente');
+        console.log('🔑 [FIREBASE ID TOKEN] Token (primeros 50 chars):', firebaseIdToken.substring(0, 50) + '...');
       } catch (firebaseError: any) {
-        console.error('❌ [FIREBASE AUTH] Error autenticando con Firebase:', firebaseError);
-        // Si Firebase Auth falla, intentar usar el token de Google directamente
-        console.log('⚠️ [FIREBASE AUTH] Intentando usar token de Google directamente...');
-        firebaseIdToken = idToken;
+        console.error('❌ [FIREBASE AUTH] Error obteniendo Firebase ID Token:', firebaseError);
+        console.error('❌ [FIREBASE AUTH] Error code:', firebaseError.code);
+        console.error('❌ [FIREBASE AUTH] Error message:', firebaseError.message);
+        throw new Error(`Error autenticando con Firebase: ${firebaseError.message}`);
       }
       
-      console.log('📤 Enviando token al backend...');
+      console.log('📤 Enviando Firebase ID Token al backend...');
       
-      // Enviar token al backend (Firebase ID token o Google OAuth token como fallback)
+      // Enviar Firebase ID Token al backend (NO el token de Google OAuth)
       const response = await authService.googleLogin(firebaseIdToken);
       console.log('📋 Respuesta completa del login con Google:', response);
       
       // El backend retorna: { success, message, data: { uid, email, displayName, photoUrl, customToken }, isNewUser }
-      if (!response.success) {
-        throw new Error(response.message || 'Error en login con Google');
+      if (!getAuthResponseSuccess(response)) {
+        throw new Error(getAuthResponseRoot(response)?.message || 'Error en login con Google');
       }
       
-      const { customToken, displayName: userName, email: userEmail, uid, photoUrl } = response.data;
+      const data = getAuthPayload(response);
+      const { customToken, displayName: userName, email: userEmail, uid, photoUrl } = data;
       
       console.log('🔑 Token extraído:', customToken ? 'Sí' : 'No');
       console.log('👤 Datos del usuario extraídos:', { displayName: userName, email: userEmail, uid });
-      console.log('🆕 Usuario nuevo:', response.isNewUser ? 'Sí' : 'No');
+      console.log('🆕 Usuario nuevo:', (response as any)?.isNewUser ? 'Sí' : 'No');
       
       if (!customToken) {
         throw new Error('No se recibió token del servidor');
@@ -417,15 +430,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       
       console.log('📋 Respuesta completa del login con Apple:', response);
       
-      if (!response.success) {
-        throw new Error(response.message || 'Error en login con Apple');
+      if (!getAuthResponseSuccess(response)) {
+        throw new Error(getAuthResponseRoot(response)?.message || 'Error en login con Apple');
       }
       
-      const { customToken, displayName: userName, email: userEmail, uid, photoURL } = response.data;
+      const data = getAuthPayload(response);
+      const { customToken, displayName: userName, email: userEmail, uid, photoURL } = data;
       
       console.log('🔑 Token extraído:', customToken ? 'Sí' : 'No');
       console.log('👤 Datos del usuario extraídos:', { displayName: userName, email: userEmail, uid });
-      console.log('🆕 Usuario nuevo:', response.isNewUser ? 'Sí' : 'No');
+      console.log('🆕 Usuario nuevo:', (response as any)?.isNewUser ? 'Sí' : 'No');
       
       if (!customToken) {
         throw new Error('No se recibió token del servidor');
@@ -492,22 +506,31 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
-  const signup = async (email: string, password: string, displayName?: string, gender?: 'M' | 'F', childrenCount?: number, isPregnant?: boolean) => {
+  const signup = async (
+    email: string,
+    password: string,
+    displayName?: string,
+    gender?: 'M' | 'F',
+    childrenCount?: number,
+    isPregnant?: boolean,
+    gestationWeeks?: number
+  ) => {
     console.log('📝 Iniciando proceso de registro...');
-    console.log('📊 Datos de registro:', { email, displayName, gender, childrenCount, isPregnant });
+    console.log('📊 Datos de registro:', { email, displayName, gender, childrenCount, isPregnant, gestationWeeks });
     try {
       const signupData: any = { email, password };
       if (displayName) signupData.displayName = displayName;
       if (gender) signupData.gender = gender;
       if (childrenCount !== undefined) signupData.childrenCount = childrenCount;
       if (isPregnant !== undefined) signupData.isPregnant = isPregnant;
+      if (gestationWeeks !== undefined) signupData.gestationWeeks = gestationWeeks;
       
       console.log('📤 Datos finales a enviar al backend:', signupData);
       const response = await authService.signup(signupData);
       console.log('📋 Respuesta completa del registro:', response);
       
-      // Extraer datos directamente de response.data
-      const { customToken, displayName: userName, email: userEmail, uid } = response.data;
+      const data = getAuthPayload(response);
+      const { customToken, displayName: userName, email: userEmail, uid } = data;
       
       console.log('🔑 Token extraído:', customToken ? 'Sí' : 'No');
       console.log('👤 Datos del usuario extraídos:', { displayName: userName, email: userEmail, uid });

@@ -1,6 +1,6 @@
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
-import { Platform } from 'react-native';
+import { Alert, Platform } from 'react-native';
 import Constants from 'expo-constants';
 import { axiosInstance as api } from './api';
 
@@ -16,6 +16,37 @@ Notifications.setNotificationHandler({
 let isInitialized = false;
 
 const notificationService = {
+  async configureNotificationCategories() {
+    try {
+      await Notifications.setNotificationCategoryAsync('medication_reminder', [
+        {
+          identifier: 'MED_TAKEN',
+          buttonTitle: 'La tomé',
+          options: { opensAppToForeground: false },
+        },
+        {
+          identifier: 'MED_SKIPPED',
+          buttonTitle: 'No la tomé',
+          options: { opensAppToForeground: false },
+        },
+      ]);
+      console.log('✅ [NOTIF] Categorías de notificación configuradas.');
+    } catch (error) {
+      console.error('❌ [NOTIF] Error configurando categorías:', error);
+    }
+  },
+
+  isMedicationNotification(notification: Notifications.Notification) {
+    const data: any = notification.request.content.data || {};
+    const title = notification.request.content.title || '';
+    return (
+      data?.type === 'medication_reminder' ||
+      data?.kind === 'medication' ||
+      data?.medicationId ||
+      data?.reminderId ||
+      /medicamento/i.test(title)
+    );
+  },
   /**
    * Inicializa el servicio de notificaciones (solo para recibir push notifications del backend)
    */
@@ -39,6 +70,7 @@ const notificationService = {
       }
 
       // Registrar listeners de notificaciones
+      await this.configureNotificationCategories();
       this.configureNotificationListeners();
       
       isInitialized = true;
@@ -56,11 +88,27 @@ const notificationService = {
     // Listener para notificaciones recibidas mientras la app está abierta
     Notifications.addNotificationReceivedListener((notification) => {
       console.log('📨 [NOTIF] Notificación recibida:', notification.request.content.title);
+      if (this.isMedicationNotification(notification)) {
+        Alert.alert(
+          '¿Tomó el medicamento?',
+          notification.request.content.body || 'Confirma si ya lo tomó.',
+          [
+            { text: 'No la tomé', style: 'destructive', onPress: () => console.log('🟡 [MED] No tomado') },
+            { text: 'La tomé', onPress: () => console.log('✅ [MED] Tomado') },
+          ]
+        );
+      }
     });
 
     // Listener para cuando el usuario interactúa con una notificación
     Notifications.addNotificationResponseReceivedListener((response) => {
       console.log('👆 [NOTIF] Usuario interactuó con notificación:', response.notification.request.content.title);
+      if (response.actionIdentifier === 'MED_TAKEN') {
+        console.log('✅ [MED] Confirmado: tomado');
+      }
+      if (response.actionIdentifier === 'MED_SKIPPED') {
+        console.log('🟡 [MED] Confirmado: no tomado');
+      }
       // Aquí puedes manejar la navegación basada en la notificación
     });
   },
@@ -71,6 +119,8 @@ const notificationService = {
   async registerToken(existingToken?: string): Promise<string | null> {
     try {
       let token = existingToken;
+
+      let tokenType: 'fcm' | 'apns' | 'expo' | undefined;
 
       if (!token) {
         // Solicitar permisos
@@ -87,18 +137,29 @@ const notificationService = {
           return null;
         }
 
-        // Obtener token de Expo
+        // Obtener token del dispositivo (FCM/APNs)
         if (Device.isDevice) {
-          const projectId = Constants.expoConfig?.extra?.eas?.projectId;
-          
-          if (!projectId) {
-            console.error('❌ [NOTIF] No se encontró el projectId en la configuración');
-            return null;
+          try {
+            const deviceToken = await Notifications.getDevicePushTokenAsync();
+            token = deviceToken.data;
+            tokenType = Platform.OS === 'android' ? 'fcm' : 'apns';
+            console.log(`✅ [NOTIF] Token ${tokenType.toUpperCase()} obtenido:`, token);
+          } catch (deviceTokenError) {
+            console.error('❌ [NOTIF] Error obteniendo token del dispositivo:', deviceTokenError);
           }
 
-          const tokenData = await Notifications.getExpoPushTokenAsync({ projectId });
-          token = tokenData.data;
-          console.log('✅ [NOTIF] Token obtenido:', token);
+          // Fallback a token de Expo si no hay token del dispositivo
+          if (!token) {
+            const projectId = Constants.expoConfig?.extra?.eas?.projectId;
+            if (!projectId) {
+              console.error('❌ [NOTIF] No se encontró el projectId en la configuración');
+              return null;
+            }
+            const tokenData = await Notifications.getExpoPushTokenAsync({ projectId });
+            token = tokenData.data;
+            tokenType = 'expo';
+            console.log('✅ [NOTIF] Token Expo obtenido:', token);
+          }
         } else {
           console.log('⚠️ [NOTIF] No se puede obtener token en simulador');
           return null;
@@ -109,6 +170,7 @@ const notificationService = {
       if (token) {
         await api.post('/api/notifications/register-token', {
           token,
+          tokenType,
           platform: Platform.OS,
           deviceId: Constants.deviceId || 'unknown',
         });

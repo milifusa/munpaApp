@@ -3,7 +3,7 @@ import {
   View,
   Text,
   StyleSheet,
-  ScrollView,
+  FlatList,
   TouchableOpacity,
   Alert,
   ActivityIndicator,
@@ -16,8 +16,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRoute, useNavigation } from '@react-navigation/native';
-import { SafeAreaView } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../contexts/AuthContext';
 import { communitiesService } from '../services/api';
 import { Comment } from '../types/comments';
@@ -62,16 +61,9 @@ const CommentsScreen: React.FC = () => {
     }
   }, [isAuthenticated]);
 
-  // Debug: Log cuando cambia el estado de comentarios
-  useEffect(() => {
-    console.log('💬 [COMMENTS] Estado de comentarios cambiado:', comments);
-    console.log('💬 [COMMENTS] Longitud de comentarios:', comments.length);
-  }, [comments]);
-
   // Función para cargar los comentarios
   const loadComments = async () => {
     if (!isAuthenticated) {
-      console.log('🚫 [COMMENTS] Usuario no autenticado, no cargando comentarios');
       setIsLoading(false);
       return;
     }
@@ -79,18 +71,12 @@ const CommentsScreen: React.FC = () => {
     try {
       setIsLoading(true);
       const result = await communitiesService.getPostComments(postId);
-      
-      console.log('📋 [COMMENTS] Respuesta completa del backend:', JSON.stringify(result, null, 2));
-      
+
       if (result.success) {
         const commentsData = result.data || [];
-        console.log('💬 [COMMENTS] Datos de comentarios extraídos:', commentsData);
-        
         const finalComments = Array.isArray(commentsData) ? commentsData : [];
-        console.log('✅ [COMMENTS] Comentarios finales a mostrar:', finalComments);
         setComments(finalComments);
       } else {
-        console.log('❌ [COMMENTS] Backend no devolvió success: true');
         setComments([]);
       }
     } catch (error: any) {
@@ -127,8 +113,6 @@ const CommentsScreen: React.FC = () => {
 
     try {
       setIsCreatingComment(true);
-      console.log('💬 [COMMENTS] Creando comentario:', newComment.trim());
-      
       const result = await communitiesService.createComment(postId, newComment.trim());
       
       if (result.success) {
@@ -139,7 +123,6 @@ const CommentsScreen: React.FC = () => {
         // Limpiar el input
         setNewComment('');
         
-        console.log('✅ [COMMENTS] Comentario creado exitosamente');
       } else {
         throw new Error(result.message || 'No se pudo crear el comentario');
       }
@@ -164,8 +147,6 @@ const CommentsScreen: React.FC = () => {
 
     try {
       setLikingCommentId(comment.id);
-      console.log('❤️ [COMMENTS] Procesando like para comentario:', comment.id);
-      
       const result = await communitiesService.likeComment(comment.id);
       
       if (result.success) {
@@ -182,7 +163,6 @@ const CommentsScreen: React.FC = () => {
           )
         );
         
-        console.log('✅ [COMMENTS] Like procesado exitosamente para comentario:', comment.id);
       } else {
         throw new Error(result.message || 'No se pudo procesar el like');
       }
@@ -233,9 +213,9 @@ const CommentsScreen: React.FC = () => {
   // Si el usuario no está autenticado, mostrar mensaje
   if (!isAuthenticated) {
     return (
-      <SafeAreaView style={styles.safeArea}>
+      <SafeAreaView style={styles.safeArea} edges={['top']}>
         <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
-        <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
+        <View style={styles.header}>
           <TouchableOpacity 
             style={styles.backButton}
             onPress={() => navigation.goBack()}
@@ -257,116 +237,123 @@ const CommentsScreen: React.FC = () => {
   }
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={styles.safeArea} edges={['top']}>
       <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
-      {/* Header */}
-      <View style={[styles.header, { paddingTop: Platform.OS === 'ios' ? 10 : 10 }]}>
-        <TouchableOpacity 
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-        >
-          <Ionicons name="arrow-back" size={24} color="#333" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Comentarios</Text>
-        <View style={styles.placeholder} />
-      </View>
-
-      {/* Información del post */}
-      <View style={styles.postInfo}>
-        <View style={styles.postHeader}>
-          <Ionicons name="person" size={16} color="#59C6C0" />
-          <Text style={styles.postAuthor}>{postAuthorName}</Text>
-        </View>
-        <Text style={styles.postContent}>{postContent}</Text>
-        <Text style={styles.communityName}>{communityName}</Text>
-      </View>
-
       <KeyboardAvoidingView 
         style={styles.container}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top + 100 : 0}
       >
-        {/* Lista de comentarios */}
-        <ScrollView 
-          style={styles.commentsContainer}
+        {/* Header */}
+        <View style={styles.header}>
+          <TouchableOpacity 
+            style={styles.backButton}
+            onPress={() => navigation.goBack()}
+          >
+            <Ionicons name="arrow-back" size={24} color="#333" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Comentarios</Text>
+          <View style={styles.placeholder} />
+        </View>
+
+        {/* Lista de comentarios con header del post */}
+        <FlatList
+          data={comments}
+          keyExtractor={(item) => item.id}
+          renderItem={({ item: comment }) => (
+            <View style={styles.commentCard}>
+              {/* Header del comentario */}
+              <View style={styles.commentHeader}>
+                <View style={styles.authorInfo}>
+                  <View style={styles.authorAvatar}>
+                    {comment.authorPhoto ? (
+                      <Image source={{ uri: comment.authorPhoto }} style={styles.authorAvatarImage} />
+                    ) : (
+                      <Ionicons name="person" size={20} color="#666" />
+                    )}
+                  </View>
+                  <View style={styles.authorDetails}>
+                    <Text style={styles.authorName}>{comment.authorName}</Text>
+                    <Text style={styles.commentDate}>
+                      {formatDate(comment.createdAt)}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+
+              {/* Contenido del comentario */}
+              <View style={styles.commentContent}>
+                <Text style={styles.commentText}>{comment.content}</Text>
+              </View>
+
+              {/* Footer del comentario con estadísticas */}
+              <View style={styles.commentFooter}>
+                <View style={styles.commentStats}>
+                  <View style={styles.statItem}>
+                    <Ionicons name="heart" size={14} color="#FF6B6B" />
+                    <Text style={styles.statText}>{comment.likeCount || 0}</Text>
+                  </View>
+                </View>
+                
+                {/* Botones de acción */}
+                <View style={styles.commentActions}>
+                  <LikeButton
+                    isLiked={comment.isLiked || false}
+                    likeCount={comment.likeCount || 0}
+                    onPress={() => handleLikeComment(comment)}
+                    isLoading={likingCommentId === comment.id}
+                    size="small"
+                    showCount={false}
+                  />
+                </View>
+              </View>
+            </View>
+          )}
+          ListHeaderComponent={
+            <View style={styles.listHeader}>
+              <View style={styles.postInfo}>
+                <View style={styles.postHeader}>
+                  <Ionicons name="person" size={16} color="#59C6C0" />
+                  <Text style={styles.postAuthor}>{postAuthorName}</Text>
+                </View>
+                <Text style={styles.postContent}>{postContent}</Text>
+                <Text style={styles.communityName}>{communityName}</Text>
+              </View>
+              {isLoading ? (
+                <View style={styles.loadingContainer}>
+                  <ActivityIndicator size="large" color="#59C6C0" />
+                  <Text style={styles.loadingText}>Cargando comentarios...</Text>
+                </View>
+              ) : comments.length > 0 ? (
+                <Text style={styles.sectionTitle}>
+                  {comments.length} comentario{comments.length !== 1 ? 's' : ''}
+                </Text>
+              ) : null}
+            </View>
+          }
+          ListEmptyComponent={
+            !isLoading ? (
+              <View style={styles.emptyState}>
+                <Ionicons name="chatbubble-outline" size={64} color="#CCC" />
+                <Text style={styles.emptyStateTitle}>No hay comentarios aún</Text>
+                <Text style={styles.emptyStateText}>
+                  Sé el primero en comentar en esta publicación
+                </Text>
+              </View>
+            ) : null
+          }
+          contentContainerStyle={styles.commentsContent}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="interactive"
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
           }
           showsVerticalScrollIndicator={false}
-        >
-          {isLoading ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color="#59C6C0" />
-              <Text style={styles.loadingText}>Cargando comentarios...</Text>
-            </View>
-          ) : comments.length === 0 ? (
-            <View style={styles.emptyState}>
-              <Ionicons name="chatbubble-outline" size={64} color="#CCC" />
-              <Text style={styles.emptyStateTitle}>No hay comentarios aún</Text>
-              <Text style={styles.emptyStateText}>
-                Sé el primero en comentar en esta publicación
-              </Text>
-            </View>
-          ) : (
-            <View style={styles.commentsList}>
-              <Text style={styles.sectionTitle}>
-                {comments.length} comentario{comments.length !== 1 ? 's' : ''}
-              </Text>
-              
-              {comments.map((comment) => (
-                <View key={comment.id} style={styles.commentCard}>
-                  {/* Header del comentario */}
-                  <View style={styles.commentHeader}>
-                    <View style={styles.authorInfo}>
-                      <View style={styles.authorAvatar}>
-                        {comment.authorPhoto ? (
-                          <Image source={{ uri: comment.authorPhoto }} style={styles.authorAvatarImage} />
-                        ) : (
-                          <Ionicons name="person" size={20} color="#666" />
-                        )}
-                      </View>
-                      <View style={styles.authorDetails}>
-                        <Text style={styles.authorName}>{comment.authorName}</Text>
-                        <Text style={styles.commentDate}>
-                          {formatDate(comment.createdAt)}
-                        </Text>
-                      </View>
-                    </View>
-                  </View>
-
-                  {/* Contenido del comentario */}
-                  <View style={styles.commentContent}>
-                    <Text style={styles.commentText}>{comment.content}</Text>
-                  </View>
-
-                  {/* Footer del comentario con estadísticas */}
-                  <View style={styles.commentFooter}>
-                    <View style={styles.commentStats}>
-                      <View style={styles.statItem}>
-                        <Ionicons name="heart" size={14} color="#FF6B6B" />
-                        <Text style={styles.statText}>{comment.likeCount || 0}</Text>
-                      </View>
-                    </View>
-                    
-                    {/* Botones de acción */}
-                    <View style={styles.commentActions}>
-                      <LikeButton
-                        isLiked={comment.isLiked || false}
-                        likeCount={comment.likeCount || 0}
-                        onPress={() => handleLikeComment(comment)}
-                        isLoading={likingCommentId === comment.id}
-                        size="small"
-                        showCount={false}
-                      />
-                    </View>
-                  </View>
-                </View>
-              ))}
-            </View>
-          )}
-        </ScrollView>
+          style={styles.commentsContainer}
+        />
 
         {/* Input para crear comentario */}
-        <View style={styles.createCommentSection}>
+        <View style={[styles.createCommentSection, { paddingBottom: insets.bottom || 12 }]}>
           <View style={styles.inputContainer}>
             <TextInput
               style={styles.commentInput}
@@ -410,6 +397,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
+    paddingTop: 6,
     paddingBottom: 15,
     borderBottomWidth: 1,
     borderBottomColor: '#E5E5E5',
@@ -462,6 +450,10 @@ const styles = StyleSheet.create({
   commentsContainer: {
     flex: 1,
   },
+  commentsContent: {
+    paddingBottom: 80,
+  },
+  listHeader: {},
   loadingContainer: {
     alignItems: 'center',
     paddingVertical: 60,
@@ -498,12 +490,14 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#333',
     marginBottom: 20,
+    marginHorizontal: 20,
   },
   commentCard: {
     backgroundColor: 'white',
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
+    marginHorizontal: 20,
     shadowColor: '#000',
     shadowOffset: {
       width: 0,

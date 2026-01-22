@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'react-native';
 import marketplaceService, { MarketplaceProduct, CATEGORIES, CONDITIONS } from '../services/marketplaceService';
 import { useAuth } from '../contexts/AuthContext';
@@ -213,10 +213,10 @@ const ProductDetailScreen = () => {
   const isOwner = user?.id === product.userId;
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <StatusBar barStyle="light-content" backgroundColor="rgba(0,0,0,0.3)" translucent />
       {/* Header */}
-      <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
+      <View style={[styles.header, { paddingTop: Math.max(insets.top, 6) }]}>
         <TouchableOpacity style={styles.headerButton} onPress={() => navigation.goBack()}>
           <Ionicons name="arrow-back" size={24} color="white" />
         </TouchableOpacity>
@@ -525,7 +525,7 @@ const ProductDetailScreen = () => {
           </TouchableOpacity>
         )}
       </View>
-    </View>
+    </SafeAreaView>
   );
 };
 

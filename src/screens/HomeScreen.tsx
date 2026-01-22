@@ -30,7 +30,9 @@ import {
   sleepService,
   activitiesService,
 } from "../services/api";
+import { medicationsService } from "../services/childProfileService";
 import { imageUploadService } from "../services/imageUploadService";
+import notificationService from "../services/notificationService";
 import sleepNotificationScheduler from "../services/sleepNotificationScheduler";
 import sleepTrackingNotification from "../services/sleepTrackingNotification";
 import {
@@ -158,6 +160,35 @@ const HomeScreen: React.FC = () => {
   const [showOrbitDetailModal, setShowOrbitDetailModal] = useState(false);
   const [orbitDetailData, setOrbitDetailData] = useState<any>(null);
 
+  // ============= ESTADOS PARA MEDICAMENTOS =============
+  const [homeTab, setHomeTab] = useState<'sleep' | 'medications'>('sleep');
+  const [medications, setMedications] = useState<any[]>([]);
+  const [loadingMedications, setLoadingMedications] = useState(false);
+  
+  // Modal para agregar/editar medicamento
+  const [showMedicationModal, setShowMedicationModal] = useState(false);
+  const [editingMedication, setEditingMedication] = useState<any | null>(null);
+  const [medName, setMedName] = useState('');
+  const [medDose, setMedDose] = useState('');
+  const [medDoseUnit, setMedDoseUnit] = useState('ml');
+  const [medScheduleMode, setMedScheduleMode] = useState<'times' | 'interval'>('interval');
+  const [medTimes, setMedTimes] = useState<string[]>(['08:00']);
+  const [medEveryHours, setMedEveryHours] = useState('');
+  const [medFirstDose, setMedFirstDose] = useState(new Date());
+  const [medStartDate, setMedStartDate] = useState(new Date());
+  const [medEndDate, setMedEndDate] = useState<Date | null>(null);
+  const [medNotes, setMedNotes] = useState('');
+  const [medScheduleDays, setMedScheduleDays] = useState('14');
+  const [showMedStartDatePicker, setShowMedStartDatePicker] = useState(false);
+  const [showMedEndDatePicker, setShowMedEndDatePicker] = useState(false);
+  const [showMedFirstDosePicker, setShowMedFirstDosePicker] = useState(false);
+  const [showMedTimePicker, setShowMedTimePicker] = useState(false);
+  const [editingTimeIndex, setEditingTimeIndex] = useState<number | null>(null);
+  
+  // Modal de detalle de medicamento
+  const [showMedicationDetailModal, setShowMedicationDetailModal] = useState(false);
+  const [selectedMedication, setSelectedMedication] = useState<any | null>(null);
+
   useEffect(() => {
     loadData();
     loadUserProfile();
@@ -219,6 +250,7 @@ const HomeScreen: React.FC = () => {
   useEffect(() => {
     if (selectedChild) {
       loadSleepData(selectedChild.id);
+      loadMedications(selectedChild.id);
     }
   }, [selectedChild]);
 
@@ -526,6 +558,159 @@ const HomeScreen: React.FC = () => {
     } finally {
       setLoadingActivities(false);
     }
+  };
+
+  // ============= FUNCIONES DE MEDICAMENTOS =============
+  const loadMedications = async (childId: string) => {
+    try {
+      setLoadingMedications(true);
+      const response = await medicationsService.getMedications(childId);
+      if (response.success) {
+        setMedications(response.data || []);
+        // Auto-switch a pestaña de medicamentos si hay medicamentos activos
+        const activeMeds = (response.data || []).filter((m: any) => m.active);
+        if (activeMeds.length > 0 && homeTab === 'sleep') {
+          setHomeTab('medications');
+        }
+      }
+    } catch (error) {
+      console.error('❌ Error cargando medicamentos:', error);
+      setMedications([]);
+    } finally {
+      setLoadingMedications(false);
+    }
+  };
+
+  const openAddMedicationModal = () => {
+    setEditingMedication(null);
+    setMedName('');
+    setMedDose('');
+    setMedDoseUnit('ml');
+    setMedScheduleMode('interval');
+    setMedTimes(['08:00']);
+    setMedEveryHours('');
+    setMedFirstDose(new Date());
+    setMedStartDate(new Date());
+    setMedEndDate(null);
+    setMedNotes('');
+    setMedScheduleDays('14');
+    setShowMedicationModal(true);
+  };
+
+  const openEditMedicationModal = (medication: any) => {
+    setEditingMedication(medication);
+    setMedName(medication.name);
+    setMedDose(medication.dose.toString());
+    setMedDoseUnit(medication.doseUnit);
+    
+    if (medication.times && medication.times.length > 0) {
+      setMedScheduleMode('times');
+      setMedTimes(medication.times);
+    } else if (medication.repeatEveryMinutes) {
+      setMedScheduleMode('interval');
+      setMedEveryHours((medication.repeatEveryMinutes / 60).toString());
+      if (medication.startTime) {
+        const [hours, minutes] = medication.startTime.split(':');
+        const firstDose = new Date();
+        firstDose.setHours(parseInt(hours), parseInt(minutes));
+        setMedFirstDose(firstDose);
+      }
+    }
+    
+    if (medication.startDate) {
+      setMedStartDate(new Date(medication.startDate));
+    }
+    if (medication.endDate) {
+      setMedEndDate(new Date(medication.endDate));
+    }
+    setMedNotes(medication.notes || '');
+    setMedScheduleDays(medication.scheduleDays?.toString() || '14');
+    setShowMedicationModal(true);
+  };
+
+  const handleSaveMedication = async () => {
+    if (!selectedChild) return;
+    
+    if (!medName.trim()) {
+      Alert.alert('Error', 'El nombre del medicamento es requerido');
+      return;
+    }
+    
+    try {
+      let times: string[] | undefined;
+      let repeatEveryMinutes: number | undefined;
+      let startTime: string | undefined;
+      let endTime: string | undefined;
+      
+      if (medScheduleMode === 'times') {
+        times = medTimes;
+      } else {
+        const hours = parseFloat(medEveryHours);
+        if (isNaN(hours) || hours <= 0) {
+          Alert.alert('Error', 'Ingresa un intervalo válido en horas (ej: 0.1 para 6 minutos, 1 para 1 hora)');
+          return;
+        }
+        repeatEveryMinutes = hours * 60;
+        startTime = `${medFirstDose.getHours().toString().padStart(2, '0')}:${medFirstDose.getMinutes().toString().padStart(2, '0')}`;
+      }
+      
+      const scheduleDays = parseInt(medScheduleDays);
+      if (isNaN(scheduleDays) || scheduleDays < 1 || scheduleDays > 60) {
+        Alert.alert('Error', 'Los días de programación deben estar entre 1 y 60');
+        return;
+      }
+      
+      if (editingMedication) {
+        await medicationsService.updateMedication(editingMedication.id, {
+          name: medName.trim(),
+          dose: medDose.trim(),
+          doseUnit: medDoseUnit.trim() || "ml",
+          times: medScheduleMode === "times" ? times : undefined,
+          repeatEveryMinutes,
+          startTime,
+          endTime,
+          startDate: medStartDate.toISOString().split('T')[0],
+          endDate: medEndDate ? medEndDate.toISOString().split('T')[0] : undefined,
+          notes: medNotes.trim(),
+          scheduleDays,
+        });
+      } else {
+        await medicationsService.addMedication(selectedChild.id, {
+          name: medName.trim(),
+          dose: medDose.trim(),
+          doseUnit: medDoseUnit.trim() || "ml",
+          times: medScheduleMode === "times" ? times : undefined,
+          repeatEveryMinutes,
+          startTime,
+          endTime,
+          startDate: medStartDate.toISOString().split('T')[0],
+          endDate: medEndDate ? medEndDate.toISOString().split('T')[0] : undefined,
+          notes: medNotes.trim(),
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+          scheduleDays,
+        });
+      }
+      
+      setShowMedicationModal(false);
+      await loadMedications(selectedChild.id);
+      Alert.alert('Éxito', editingMedication ? 'Medicamento actualizado' : 'Medicamento agregado');
+    } catch (error: any) {
+      console.error('Error guardando medicamento:', error);
+      Alert.alert('Error', error.response?.data?.message || 'No se pudo guardar el medicamento');
+    }
+  };
+
+  const getMedicationTimes = (medication: any): string[] => {
+    if (medication.times && medication.times.length > 0) {
+      return medication.times;
+    }
+    return [];
+  };
+
+  const getScheduleSummary = (times: string[]): string => {
+    if (times.length === 0) return 'Sin horario definido';
+    if (times.length === 1) return `1 toma (${times[0]})`;
+    return `${times.length} tomas (${times[0]}, ${times[times.length - 1]})`;
   };
 
   // Funciones para manejar pausas y detención de siesta
@@ -1621,9 +1806,44 @@ const HomeScreen: React.FC = () => {
         {/* Carrusel de Banners */}
         <BannerCarousel section="home" />
 
-        {/* Card de Seguimiento de Sueño */}
+        {/* Pestañas de Sueño / Medicamentos */}
         {selectedChild && (
-          <View style={styles.sleepSection}>
+          <View style={styles.tabsContainer}>
+            <TouchableOpacity
+              style={[styles.tab, homeTab === 'sleep' && styles.activeTab]}
+              onPress={() => setHomeTab('sleep')}
+            >
+              <Ionicons 
+                name="moon" 
+                size={20} 
+                color={homeTab === 'sleep' ? '#887CBC' : '#999'} 
+              />
+              <Text style={[styles.tabText, homeTab === 'sleep' && styles.activeTabText]}>
+                Sueño
+              </Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity
+              style={[styles.tab, homeTab === 'medications' && styles.activeTab]}
+              onPress={() => setHomeTab('medications')}
+            >
+              <Ionicons 
+                name="medkit" 
+                size={20} 
+                color={homeTab === 'medications' ? '#887CBC' : '#999'} 
+              />
+              <Text style={[styles.tabText, homeTab === 'medications' && styles.activeTabText]}>
+                Medicamentos {medications.filter(m => m.active).length > 0 && `/ ${medications.filter(m => m.active).length} activos`}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* Contenido según pestaña activa */}
+        {homeTab === 'sleep' && selectedChild && (
+          <>
+        {/* Card de Seguimiento de Sueño */}
+        <View style={styles.sleepSection}>
             {loadingSleep ? (
               <View style={styles.sleepLoadingCard}>
                 <ActivityIndicator size="small" color="#887CBC" />
@@ -1636,6 +1856,95 @@ const HomeScreen: React.FC = () => {
               </>
             )}
           </View>
+          </>
+        )}
+
+        {/* Sección de Medicamentos */}
+        {homeTab === 'medications' && selectedChild && (
+          <View style={styles.medicationsSection}>
+            {/* Header */}
+            <View style={styles.medicationsHeader}>
+              <View>
+                <Text style={styles.medicationsTitle}>Medicamentos</Text>
+                <Text style={styles.medicationsSubtitle}>
+                  {medications.filter(m => m.active).length} activos
+                </Text>
+              </View>
+              <TouchableOpacity
+                style={styles.addMedicationButton}
+                onPress={openAddMedicationModal}
+              >
+                <Ionicons name="add-circle" size={20} color="#887CBC" />
+                <Text style={styles.addMedicationButtonText}>Agregar</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Lista de medicamentos */}
+            {loadingMedications ? (
+              <View style={styles.medicationsLoadingCard}>
+                <ActivityIndicator size="small" color="#887CBC" />
+                <Text style={styles.medicationsLoadingText}>Cargando medicamentos...</Text>
+              </View>
+            ) : medications.length === 0 ? (
+              <View style={styles.emptyMedicationsCard}>
+                <Ionicons name="medkit-outline" size={48} color="#CCC" />
+                <Text style={styles.emptyMedicationsText}>No hay medicamentos registrados</Text>
+                <Text style={styles.emptyMedicationsSubtext}>
+                  Presiona "Agregar" para registrar un medicamento
+                </Text>
+              </View>
+            ) : (
+              medications.map((medication) => (
+                <TouchableOpacity
+                  key={medication.id}
+                  style={styles.medicationCard}
+                  onPress={() => {
+                    setSelectedMedication(medication);
+                    setShowMedicationDetailModal(true);
+                  }}
+                >
+                  <View style={styles.medicationCardHeader}>
+                    <Text style={styles.medicationName}>{medication.name}</Text>
+                    <View style={[
+                      styles.medicationStatus,
+                      { backgroundColor: medication.active ? '#4CAF50' : '#999' }
+                    ]}>
+                      <Text style={styles.medicationStatusText}>
+                        {medication.active ? 'Activo' : 'Finalizado'}
+                      </Text>
+                    </View>
+                  </View>
+                  
+                  <View style={styles.medicationCardBody}>
+                    <View style={styles.medicationInfoRow}>
+                      <Ionicons name="water" size={16} color="#666" />
+                      <Text style={styles.medicationInfoText}>
+                        {medication.dose} {medication.doseUnit}
+                      </Text>
+                    </View>
+                    
+                    {getMedicationTimes(medication).length > 0 && (
+                      <View style={styles.medicationInfoRow}>
+                        <Ionicons name="time" size={16} color="#666" />
+                        <Text style={styles.medicationInfoText}>
+                          {getScheduleSummary(getMedicationTimes(medication))}
+                        </Text>
+                      </View>
+                    )}
+                    
+                    {medication.notes && (
+                      <View style={styles.medicationInfoRow}>
+                        <Ionicons name="document-text" size={16} color="#666" />
+                        <Text style={styles.medicationInfoText} numberOfLines={1}>
+                          {medication.notes}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                </TouchableOpacity>
+              ))
+            )}
+          </View>
         )}
 
 
@@ -1644,8 +1953,8 @@ const HomeScreen: React.FC = () => {
         <View style={[styles.finalSpacing, { height: 100 }]} />
       </ScrollView>
 
-      {/* Botón añadir siesta FIJO - solo cuando NO hay siesta activa */}
-      {selectedChild && !activeSleep && (() => {
+      {/* Botón añadir siesta FIJO - solo cuando NO hay siesta activa Y en pestaña de sueño */}
+      {selectedChild && !activeSleep && homeTab === 'sleep' && (() => {
         // Verificar si faltan 30 min o menos para bedtime
         let isBedtimeSoon = false;
         let minutesUntilBedtime = 0;
@@ -1704,6 +2013,19 @@ const HomeScreen: React.FC = () => {
           </View>
         );
       })()}
+
+      {/* Botón agregar medicamento - solo en pestaña de medicamentos */}
+      {selectedChild && homeTab === 'medications' && (
+        <View style={styles.fixedButtonContainer}>
+          <TouchableOpacity
+            style={styles.fixedAddButton}
+            onPress={openAddMedicationModal}
+          >
+            <Ionicons name="add-circle" size={28} color="#FFF" />
+            <Text style={styles.fixedAddButtonText}>agregar medicamento</Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       {/* Barra FIJA de "Durmiendo siesta" - solo cuando HAY siesta activa */}
       {selectedChild && activeSleep && (
@@ -2064,7 +2386,7 @@ const HomeScreen: React.FC = () => {
                 style={[styles.modalButton, styles.modalCancelButton]}
                 onPress={() => setShowWakeTimeModal(false)}
               >
-                <Text style={styles.modalCancelText}>Cancelar</Text>
+                <Text style={{ fontSize: 16, color: '#FFF' }}>Cancelar</Text>
               </TouchableOpacity>
               
               <TouchableOpacity
@@ -2140,6 +2462,373 @@ const HomeScreen: React.FC = () => {
             </TouchableOpacity>
           </TouchableOpacity>
         </TouchableOpacity>
+      </Modal>
+
+      {/* Modal para agregar/editar medicamento */}
+      <Modal
+        visible={showMedicationModal}
+        animationType="slide"
+        transparent={false}
+        onRequestClose={() => setShowMedicationModal(false)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={styles.medModalContainer}
+        >
+          <ScrollView>
+            <View style={styles.medModalHeader}>
+              <TouchableOpacity onPress={() => setShowMedicationModal(false)}>
+                <Text style={styles.medModalCancelButton}>Cancelar</Text>
+              </TouchableOpacity>
+              <Text style={styles.medModalTitle}>
+                {editingMedication ? 'Editar Medicamento' : 'Nuevo Medicamento'}
+              </Text>
+              <TouchableOpacity onPress={handleSaveMedication}>
+                <Text style={styles.medModalSaveButton}>Guardar</Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.medModalBody}>
+              {/* Nombre */}
+              <View style={styles.medInputGroup}>
+                <Text style={styles.medInputLabel}>Nombre del medicamento</Text>
+                <TextInput
+                  style={styles.medInput}
+                  value={medName}
+                  onChangeText={setMedName}
+                  placeholder="Ej: Paracetamol"
+                />
+              </View>
+
+              {/* Dosis */}
+              <View style={styles.medInputGroup}>
+                <Text style={styles.medInputLabel}>Dosis</Text>
+                <View style={styles.medInputRow}>
+                  <TextInput
+                    style={[styles.medInput, { flex: 2 }]}
+                    value={medDose}
+                    onChangeText={setMedDose}
+                    placeholder="5"
+                    keyboardType="numeric"
+                  />
+                  <TextInput
+                    style={[styles.medInput, { flex: 1, marginLeft: 10 }]}
+                    value={medDoseUnit}
+                    onChangeText={setMedDoseUnit}
+                    placeholder="ml"
+                  />
+                </View>
+              </View>
+
+              {/* Modo de programación */}
+              <View style={styles.medInputGroup}>
+                <Text style={styles.medInputLabel}>¿Cómo programar?</Text>
+                <View style={styles.medSegmentedControl}>
+                  <TouchableOpacity
+                    style={[styles.medSegment, medScheduleMode === 'interval' && styles.medActiveSegment]}
+                    onPress={() => setMedScheduleMode('interval')}
+                  >
+                    <Text style={[styles.medSegmentText, medScheduleMode === 'interval' && styles.medActiveSegmentText]}>
+                      Cada X horas
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.medSegment, medScheduleMode === 'times' && styles.medActiveSegment]}
+                    onPress={() => setMedScheduleMode('times')}
+                  >
+                    <Text style={[styles.medSegmentText, medScheduleMode === 'times' && styles.medActiveSegmentText]}>
+                      Horas exactas
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              {/* Intervalo (Cada X horas) */}
+              {medScheduleMode === 'interval' && (
+                <>
+                  <View style={styles.medInputGroup}>
+                    <Text style={styles.medInputLabel}>Cada cuántas horas</Text>
+                    <TextInput
+                      style={styles.medInput}
+                      value={medEveryHours}
+                      onChangeText={setMedEveryHours}
+                      placeholder="Ej: 8"
+                      keyboardType="decimal-pad"
+                    />
+                    <Text style={styles.medInputHelper}>
+                      Puedes usar decimales (ej: 0.1 = 6 min, 0.5 = 30 min, 1 = 1 hora)
+                    </Text>
+                  </View>
+
+                  <View style={styles.medInputGroup}>
+                    <Text style={styles.medInputLabel}>Primera toma</Text>
+                    <TouchableOpacity
+                      style={styles.medDateButton}
+                      onPress={() => setShowMedFirstDosePicker(true)}
+                    >
+                      <Text style={styles.medDateButtonText}>
+                        {medFirstDose.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
+                      </Text>
+                    </TouchableOpacity>
+                    {showMedFirstDosePicker && (
+                      <DateTimePicker
+                        value={medFirstDose}
+                        mode="time"
+                        display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                        onChange={(event, date) => {
+                          setShowMedFirstDosePicker(Platform.OS === 'ios');
+                          if (date) setMedFirstDose(date);
+                        }}
+                      />
+                    )}
+                  </View>
+                </>
+              )}
+
+              {/* Horas exactas */}
+              {medScheduleMode === 'times' && (
+                <View style={styles.medInputGroup}>
+                  <Text style={styles.medInputLabel}>Horarios</Text>
+                  {medTimes.map((time, index) => (
+                    <View key={index} style={styles.medTimeRow}>
+                      <TouchableOpacity
+                        style={styles.medTimeButton}
+                        onPress={() => {
+                          setEditingTimeIndex(index);
+                          setShowMedTimePicker(true);
+                        }}
+                      >
+                        <Text style={styles.medTimeButtonText}>{time}</Text>
+                      </TouchableOpacity>
+                      {medTimes.length > 1 && (
+                        <TouchableOpacity
+                          onPress={() => {
+                            const newTimes = medTimes.filter((_, i) => i !== index);
+                            setMedTimes(newTimes);
+                          }}
+                        >
+                          <Ionicons name="trash" size={20} color="#F44336" />
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                  ))}
+                  <TouchableOpacity
+                    style={styles.medAddTimeButton}
+                    onPress={() => setMedTimes([...medTimes, '09:00'])}
+                  >
+                    <Ionicons name="add-circle" size={20} color="#887CBC" />
+                    <Text style={styles.medAddTimeButtonText}>Agregar horario</Text>
+                  </TouchableOpacity>
+                  {showMedTimePicker && editingTimeIndex !== null && (
+                    <DateTimePicker
+                      value={new Date(`2000-01-01T${medTimes[editingTimeIndex]}:00`)}
+                      mode="time"
+                      display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                      onChange={(event, date) => {
+                        setShowMedTimePicker(Platform.OS === 'ios');
+                        if (date) {
+                          const newTimes = [...medTimes];
+                          newTimes[editingTimeIndex!] = `${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
+                          setMedTimes(newTimes);
+                        }
+                        if (event.type === 'set') {
+                          setEditingTimeIndex(null);
+                        }
+                      }}
+                    />
+                  )}
+                </View>
+              )}
+
+              {/* Fechas */}
+              <View style={styles.medInputGroup}>
+                <Text style={styles.medInputLabel}>Fecha de inicio</Text>
+                <TouchableOpacity
+                  style={styles.medDateButton}
+                  onPress={() => setShowMedStartDatePicker(true)}
+                >
+                  <Text style={styles.medDateButtonText}>
+                    {medStartDate.toLocaleDateString('es-ES')}
+                  </Text>
+                </TouchableOpacity>
+                {showMedStartDatePicker && (
+                  <DateTimePicker
+                    value={medStartDate}
+                    mode="date"
+                    display={Platform.OS === 'ios' ? 'compact' : 'default'}
+                    onChange={(event, date) => {
+                      setShowMedStartDatePicker(Platform.OS === 'ios');
+                      if (date) setMedStartDate(date);
+                    }}
+                  />
+                )}
+              </View>
+
+              <View style={styles.medInputGroup}>
+                <Text style={styles.medInputLabel}>Fecha de fin (opcional)</Text>
+                <TouchableOpacity
+                  style={styles.medDateButton}
+                  onPress={() => setShowMedEndDatePicker(true)}
+                >
+                  <Text style={styles.medDateButtonText}>
+                    {medEndDate ? medEndDate.toLocaleDateString('es-ES') : 'Sin fecha de fin'}
+                  </Text>
+                </TouchableOpacity>
+                {medEndDate && (
+                  <TouchableOpacity
+                    style={styles.medRemoveButton}
+                    onPress={() => setMedEndDate(null)}
+                  >
+                    <Text style={styles.medRemoveButtonText}>Quitar</Text>
+                  </TouchableOpacity>
+                )}
+                {showMedEndDatePicker && (
+                  <DateTimePicker
+                    value={medEndDate || new Date()}
+                    mode="date"
+                    display={Platform.OS === 'ios' ? 'compact' : 'default'}
+                    onChange={(event, date) => {
+                      setShowMedEndDatePicker(Platform.OS === 'ios');
+                      if (date) setMedEndDate(date);
+                    }}
+                  />
+                )}
+              </View>
+
+              {/* Notas */}
+              <View style={styles.medInputGroup}>
+                <Text style={styles.medInputLabel}>Notas (opcional)</Text>
+                <TextInput
+                  style={[styles.medInput, styles.medTextArea]}
+                  value={medNotes}
+                  onChangeText={setMedNotes}
+                  placeholder="Ej: Con alimento"
+                  multiline
+                  numberOfLines={3}
+                />
+              </View>
+
+              {/* Días a programar */}
+              <View style={styles.medInputGroup}>
+                <Text style={styles.medInputLabel}>Días a programar</Text>
+                <TextInput
+                  style={styles.medInput}
+                  value={medScheduleDays}
+                  onChangeText={setMedScheduleDays}
+                  placeholder="14"
+                  keyboardType="numeric"
+                />
+              </View>
+            </View>
+          </ScrollView>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* Modal de detalle de medicamento */}
+      <Modal
+        visible={showMedicationDetailModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowMedicationDetailModal(false)}
+      >
+        <View style={styles.medDetailOverlay}>
+          <View style={styles.medDetailContent}>
+            <View style={styles.medDetailHeader}>
+              <Text style={styles.medDetailTitle}>{selectedMedication?.name}</Text>
+              <TouchableOpacity onPress={() => setShowMedicationDetailModal(false)}>
+                <Ionicons name="close" size={28} color="#333" />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.medDetailBody}>
+              <View style={styles.medDetailRow}>
+                <Text style={styles.medDetailLabel}>Dosis:</Text>
+                <Text style={styles.medDetailValue}>
+                  {selectedMedication?.dose} {selectedMedication?.doseUnit}
+                </Text>
+              </View>
+
+              <View style={styles.medDetailRow}>
+                <Text style={styles.medDetailLabel}>Frecuencia:</Text>
+                <Text style={styles.medDetailValue}>
+                  {getMedicationTimes(selectedMedication || {}).length > 0
+                    ? getScheduleSummary(getMedicationTimes(selectedMedication || {}))
+                    : 'No especificado'}
+                </Text>
+              </View>
+
+              {selectedMedication?.startDate && (
+                <View style={styles.medDetailRow}>
+                  <Text style={styles.medDetailLabel}>Inicio:</Text>
+                  <Text style={styles.medDetailValue}>
+                    {new Date(selectedMedication.startDate).toLocaleDateString('es-ES')}
+                  </Text>
+                </View>
+              )}
+
+              {selectedMedication?.endDate && (
+                <View style={styles.medDetailRow}>
+                  <Text style={styles.medDetailLabel}>Fin:</Text>
+                  <Text style={styles.medDetailValue}>
+                    {new Date(selectedMedication.endDate).toLocaleDateString('es-ES')}
+                  </Text>
+                </View>
+              )}
+
+              {selectedMedication?.notes && (
+                <View style={styles.medDetailRow}>
+                  <Text style={styles.medDetailLabel}>Notas:</Text>
+                  <Text style={styles.medDetailValue}>{selectedMedication.notes}</Text>
+                </View>
+              )}
+            </View>
+
+            <View style={styles.medDetailActions}>
+              <TouchableOpacity
+                style={[styles.medDetailButton, styles.medDetailEditButton]}
+                onPress={() => {
+                  setShowMedicationDetailModal(false);
+                  openEditMedicationModal(selectedMedication);
+                }}
+              >
+                <Ionicons name="create" size={20} color="#FFF" />
+                <Text style={styles.medDetailButtonText}>Editar</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.medDetailButton, styles.medDetailDeleteButton]}
+                onPress={() => {
+                  Alert.alert(
+                    'Eliminar medicamento',
+                    '¿Estás seguro de que deseas eliminar este medicamento?',
+                    [
+                      { text: 'Cancelar', style: 'cancel' },
+                      {
+                        text: 'Eliminar',
+                        style: 'destructive',
+                        onPress: async () => {
+                          try {
+                            await medicationsService.deleteMedication(selectedMedication.id);
+                            setShowMedicationDetailModal(false);
+                            if (selectedChild) {
+                              await loadMedications(selectedChild.id);
+                            }
+                            Alert.alert('Éxito', 'Medicamento eliminado');
+                          } catch (error) {
+                            Alert.alert('Error', 'No se pudo eliminar el medicamento');
+                          }
+                        },
+                      },
+                    ]
+                  );
+                }}
+              >
+                <Ionicons name="trash" size={20} color="#FFF" />
+                <Text style={styles.medDetailButtonText}>Eliminar</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
       </Modal>
 
     </View>
@@ -4503,6 +5192,361 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.3)',
+  },
+
+  // ============= ESTILOS DE PESTAÑAS =============
+  tabsContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#FFF',
+    borderRadius: 12,
+    marginHorizontal: 20,
+    marginVertical: 15,
+    padding: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  tab: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    gap: 8,
+  },
+  activeTab: {
+    backgroundColor: '#F0ECFF',
+  },
+  tabText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#999',
+  },
+  activeTabText: {
+    color: '#887CBC',
+    fontWeight: '700',
+  },
+
+  // ============= ESTILOS DE MEDICAMENTOS =============
+  medicationsSection: {
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+  },
+  medicationsHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 15,
+  },
+  medicationsTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#FFF',
+  },
+  medicationsSubtitle: {
+    fontSize: 14,
+    color: '#FFF',
+    opacity: 0.8,
+    marginTop: 2,
+  },
+  addMedicationButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFF',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    gap: 6,
+  },
+  addMedicationButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#887CBC',
+  },
+  medicationsLoadingCard: {
+    backgroundColor: '#FFF',
+    borderRadius: 12,
+    padding: 20,
+    alignItems: 'center',
+    gap: 10,
+  },
+  medicationsLoadingText: {
+    fontSize: 14,
+    color: '#666',
+  },
+  emptyMedicationsCard: {
+    backgroundColor: '#FFF',
+    borderRadius: 12,
+    padding: 30,
+    alignItems: 'center',
+  },
+  emptyMedicationsText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#666',
+    marginTop: 12,
+  },
+  emptyMedicationsSubtext: {
+    fontSize: 14,
+    color: '#999',
+    marginTop: 6,
+    textAlign: 'center',
+  },
+  medicationCard: {
+    backgroundColor: '#FFF',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  medicationCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  medicationName: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#333',
+    flex: 1,
+  },
+  medicationStatus: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  medicationStatusText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#FFF',
+  },
+  medicationCardBody: {
+    gap: 8,
+  },
+  medicationInfoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  medicationInfoText: {
+    fontSize: 14,
+    color: '#666',
+    flex: 1,
+  },
+
+  // ============= ESTILOS DE MODALES DE MEDICAMENTOS =============
+  medModalContainer: {
+    flex: 1,
+    backgroundColor: '#F5F5F5',
+  },
+  medModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    backgroundColor: '#887CBC',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E0E0E0',
+  },
+  medModalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#FFF',
+  },
+  medModalCancelButton: {
+    fontSize: 16,
+    color: '#FFF',
+  },
+  medModalSaveButton: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#FFF',
+  },
+  medModalBody: {
+    padding: 20,
+  },
+  medInputGroup: {
+    marginBottom: 20,
+  },
+  medInputLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 8,
+  },
+  medInput: {
+    backgroundColor: '#FFF',
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+    color: '#333',
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+  },
+  medInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  medInputHelper: {
+    fontSize: 12,
+    color: '#999',
+    marginTop: 4,
+  },
+  medTextArea: {
+    minHeight: 80,
+    textAlignVertical: 'top',
+  },
+  medSegmentedControl: {
+    flexDirection: 'row',
+    backgroundColor: '#E0E0E0',
+    borderRadius: 8,
+    padding: 2,
+  },
+  medSegment: {
+    flex: 1,
+    paddingVertical: 10,
+    alignItems: 'center',
+    borderRadius: 6,
+  },
+  medActiveSegment: {
+    backgroundColor: '#FFF',
+  },
+  medSegmentText: {
+    fontSize: 14,
+    color: '#666',
+  },
+  medActiveSegmentText: {
+    color: '#887CBC',
+    fontWeight: '600',
+  },
+  medDateButton: {
+    backgroundColor: '#FFF',
+    borderRadius: 8,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+  },
+  medDateButtonText: {
+    fontSize: 16,
+    color: '#333',
+  },
+  medRemoveButton: {
+    marginTop: 8,
+    padding: 8,
+  },
+  medRemoveButtonText: {
+    fontSize: 14,
+    color: '#F44336',
+    fontWeight: '600',
+  },
+  medTimeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 10,
+  },
+  medTimeButton: {
+    flex: 1,
+    backgroundColor: '#FFF',
+    borderRadius: 8,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+  },
+  medTimeButtonText: {
+    fontSize: 16,
+    color: '#333',
+    textAlign: 'center',
+  },
+  medAddTimeButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    padding: 12,
+    backgroundColor: '#F0ECFF',
+    borderRadius: 8,
+  },
+  medAddTimeButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#887CBC',
+  },
+
+  // Modal de detalle
+  medDetailOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  medDetailContent: {
+    backgroundColor: '#FFF',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingBottom: 40,
+  },
+  medDetailHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E0E0E0',
+  },
+  medDetailTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#333',
+  },
+  medDetailBody: {
+    padding: 20,
+  },
+  medDetailRow: {
+    marginBottom: 16,
+  },
+  medDetailLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#999',
+    marginBottom: 4,
+  },
+  medDetailValue: {
+    fontSize: 16,
+    color: '#333',
+  },
+  medDetailActions: {
+    flexDirection: 'row',
+    gap: 12,
+    paddingHorizontal: 20,
+  },
+  medDetailButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  medDetailEditButton: {
+    backgroundColor: '#887CBC',
+  },
+  medDetailDeleteButton: {
+    backgroundColor: '#F44336',
+  },
+  medDetailButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FFF',
   },
 });
 

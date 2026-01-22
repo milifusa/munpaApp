@@ -6,7 +6,6 @@ import {
   ScrollView,
   TouchableOpacity,
   Image,
-  SafeAreaView,
   RefreshControl,
   ActivityIndicator,
   Alert,
@@ -15,7 +14,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import api from '../services/api';
 
 interface Recommendation {
@@ -41,7 +40,6 @@ interface Recommendation {
 }
 
 const WishlistScreen = ({ navigation }: any) => {
-  const insets = useSafeAreaInsets();
   const [wishlist, setWishlist] = useState<Recommendation[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -238,11 +236,11 @@ const WishlistScreen = ({ navigation }: any) => {
   );
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.content}>
         {/* Header */}
         <StatusBar barStyle="light-content" backgroundColor="#96d2d3" />
-        <LinearGradient colors={['#59C6C0', '#4AB8B3']} style={[styles.header, { paddingTop: Math.max(insets.top, Platform.OS === 'ios' ? 15 : 10) }]}>
+        <LinearGradient colors={['#59C6C0', '#4AB8B3']} style={styles.header}>
         <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
           <Ionicons name="arrow-back" size={24} color="#FFF" />
         </TouchableOpacity>
@@ -333,6 +331,7 @@ const styles = StyleSheet.create({
   // Header
   header: {
     paddingHorizontal: 20,
+    paddingTop: 6,
     paddingBottom: 20,
     flexDirection: 'row',
     alignItems: 'center',

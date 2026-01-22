@@ -1,6 +1,6 @@
 import 'react-native-gesture-handler';
 import React, { useEffect } from 'react';
-import { Platform, AppState, ErrorUtils, View, Text } from 'react-native';
+import { Platform, AppState, ErrorUtils, View, Text, TextInput } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { AuthProvider } from './src/contexts/AuthContext';
 import { MenuProvider } from './src/contexts/MenuContext';
@@ -8,6 +8,16 @@ import { ChatProvider } from './src/contexts/ChatContext';
 import AppNavigator from './src/navigation/AppNavigator';
 import { trackingService } from './src/services/trackingService';
 import sentryService from './src/services/sentryService';
+
+// Evita error de tipado en RN 0.81+
+(Text as any).defaultProps = {
+  allowFontScaling: false,
+};
+
+// Evita error de tipado en RN 0.81+
+(TextInput as any).defaultProps = {
+  allowFontScaling: false,
+};
 
 export default function App() {
   useEffect(() => {

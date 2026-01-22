@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRoute, useNavigation } from '@react-navigation/native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import LikeButton from '../components/LikeButton';
 import { shareContentHelper } from '../utils/shareContentHelper';
 import { Post } from '../types/posts';
@@ -20,22 +20,7 @@ import AttachedLists from '../components/AttachedLists';
 const PostDetailScreen: React.FC = () => {
   const route = useRoute<any>();
   const navigation = useNavigation<any>();
-  const insets = useSafeAreaInsets();
   const { post, onLike, formatDate, communityName, likingPostId } = route.params || {};
-
-  // Debug: verificar que el post tenga attachedLists
-  useEffect(() => {
-    if (post) {
-      console.log('📋 [POST DETAIL] Post recibido:', {
-        id: post.id,
-        hasAttachedLists: !!post.attachedLists,
-        attachedListsType: typeof post.attachedLists,
-        attachedListsIsArray: Array.isArray(post.attachedLists),
-        attachedListsLength: post.attachedLists?.length || 0,
-        attachedLists: post.attachedLists
-      });
-    }
-  }, [post]);
 
   if (!post) {
     return (
@@ -74,11 +59,11 @@ const PostDetailScreen: React.FC = () => {
   };
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <StatusBar barStyle="light-content" backgroundColor="#96d2d3" />
       
       {/* Header */}
-      <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
+      <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()}>
           <Ionicons name="arrow-back" size={24} color="white" />
         </TouchableOpacity>
@@ -197,7 +182,7 @@ const PostDetailScreen: React.FC = () => {
           </View>
         </View>
       </ScrollView>
-    </View>
+    </SafeAreaView>
   );
 };
 
@@ -211,6 +196,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
+    paddingTop: 6,
     paddingBottom: 15,
     backgroundColor: '#96d2d3',
   },

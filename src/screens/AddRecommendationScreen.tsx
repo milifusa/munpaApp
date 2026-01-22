@@ -6,15 +6,17 @@ import {
   ScrollView,
   TouchableOpacity,
   TextInput,
-  SafeAreaView,
   Alert,
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
+  StatusBar,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useRoute } from '@react-navigation/native';
 import api from '../services/api';
+import { colors } from '../styles/globalStyles';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 interface Category {
   id: string;
@@ -24,8 +26,9 @@ interface Category {
 }
 
 const AddRecommendationScreen = ({ navigation }: any) => {
+  const route = useRoute<any>();
+  const preselectedCategoryId = route.params?.categoryId as string | undefined;
   const insets = useSafeAreaInsets();
-  
   // Estados del formulario
   const [categoryId, setCategoryId] = useState('');
   const [name, setName] = useState('');
@@ -47,6 +50,12 @@ const AddRecommendationScreen = ({ navigation }: any) => {
   useEffect(() => {
     loadCategories();
   }, []);
+
+  useEffect(() => {
+    if (preselectedCategoryId) {
+      setCategoryId(preselectedCategoryId);
+    }
+  }, [preselectedCategoryId]);
 
   const loadCategories = async () => {
     try {
@@ -77,6 +86,7 @@ const AddRecommendationScreen = ({ navigation }: any) => {
     setIsSubmitting(true);
 
     try {
+      const selectedCategory = categories.find((category) => category.id === categoryId);
       const response = await api.createRecommendation({
         categoryId,
         name: name.trim(),
@@ -114,14 +124,15 @@ const AddRecommendationScreen = ({ navigation }: any) => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
+      <StatusBar barStyle="light-content" backgroundColor={colors.primary} />
       {/* Header */}
-      <View style={[styles.header, { paddingTop: insets.top }]}>
+      <View style={styles.header}>
         <TouchableOpacity
           style={styles.backButton}
           onPress={() => navigation.goBack()}
         >
-          <Ionicons name="arrow-back" size={24} color="#2C3E50" />
+          <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Agregar Recomendación</Text>
         <View style={styles.placeholder} />
@@ -329,17 +340,16 @@ const AddRecommendationScreen = ({ navigation }: any) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8F9FA',
+    backgroundColor: colors.primary,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
-    paddingBottom: 15,
-    backgroundColor: 'white',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
+    paddingTop: 6,
+    paddingBottom: 12,
+    backgroundColor: colors.primary,
   },
   backButton: {
     padding: 8,
@@ -347,13 +357,14 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#2C3E50',
+    color: '#FFFFFF',
   },
   placeholder: {
     width: 40,
   },
   keyboardView: {
     flex: 1,
+    backgroundColor: '#F8F9FA',
   },
   scrollView: {
     flex: 1,

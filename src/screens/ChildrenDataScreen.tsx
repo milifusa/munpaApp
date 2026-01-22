@@ -39,7 +39,7 @@ interface ChildData {
   years?: number;
   months?: number;
   isUnborn?: boolean;
-  weeksOfPregnancy?: number;
+  gestationWeeks?: number;
 }
 
 interface RouteParams {
@@ -57,16 +57,22 @@ const ChildrenDataScreen: React.FC = () => {
   const route = useRoute();
   const routeParams = route.params as RouteParams;
   
+  const { setUser, user } = useAuth();
+  
   // Valores por defecto si no se reciben parámetros
-  const childrenCount = routeParams?.childrenCount || 1;
+  const parsedChildrenCount = Number(routeParams?.childrenCount);
+  const profileChildrenCount = Number(user?.childrenCount);
+  const childrenCount = Number.isFinite(parsedChildrenCount) && parsedChildrenCount > 0
+    ? parsedChildrenCount
+    : (Number.isFinite(profileChildrenCount) && profileChildrenCount > 0 ? profileChildrenCount : 1);
   const gender = routeParams?.gender || 'F';
-  const pregnancyStatus = routeParams?.pregnancyStatus || 'not_pregnant';
+  const pregnancyStatus = (routeParams?.pregnancyStatus === 'pregnant' || user?.isPregnant)
+    ? 'pregnant'
+    : 'not_pregnant';
   const isMultiplePregnancy = routeParams?.isMultiplePregnancy || false;
   const isEditing = routeParams?.isEditing || false;
   const childData = routeParams?.childData;
   const childId = routeParams?.childId;
-  
-  const { setUser } = useAuth();
   
   // Inicializar con datos del hijo si está en modo edición
   const getInitialChildrenData = () => {
@@ -87,6 +93,7 @@ const ChildrenDataScreen: React.FC = () => {
           dueDate.setDate(dueDate.getDate() + (weeksRemaining * 7));
           initialData.dueDate = dueDate;
         }
+        initialData.gestationWeeks = childData.currentGestationWeeks || childData.gestationWeeks || undefined;
       } else {
         // Para hijos nacidos, usar birthDate si existe, si no calcular desde ageInMonths
         if (childData.birthDate) {
@@ -102,11 +109,17 @@ const ChildrenDataScreen: React.FC = () => {
       
       return [initialData];
     }
-    return Array(childrenCount).fill({ 
+    return Array(childrenCount).fill(null).map((_, index) => {
+      const unborn = pregnancyStatus === 'pregnant'
+        ? index >= (childrenCount - (isMultiplePregnancy ? 2 : 1))
+        : false;
+      return {
       name: '', 
       birthDate: new Date(), 
       dueDate: new Date(),
-      isUnborn: false 
+        isUnborn: unborn,
+        gestationWeeks: undefined
+      };
     });
   };
   
@@ -129,21 +142,32 @@ const ChildrenDataScreen: React.FC = () => {
         return false;
       }
       
-      if (child.isUnborn) {
-        // Validar fecha de parto
-        if (!child.dueDate) {
-          Alert.alert('Error', `Por favor selecciona la fecha esperada de parto para ${child.name}`);
+      const isUnborn = child.isUnborn ?? isUnbornChild(i);
+      if (isUnborn) {
+        const weeks = child.gestationWeeks;
+        const hasValidWeeks = typeof weeks === 'number' && weeks >= 1 && weeks <= 42;
+
+        if (!hasValidWeeks) {
+          Alert.alert('Error', `Por favor ingresa las semanas de gestación para ${child.name}`);
           return false;
         }
         
+        if (weeks !== undefined && (weeks < 1 || weeks > 42)) {
+          Alert.alert('Error', 'Las semanas de gestación deben estar entre 1 y 42');
+          return false;
+        }
+
+        const dueDateToValidate = hasValidWeeks ? computeDueDateFromWeeks(weeks as number) : null;
+        if (dueDateToValidate) {
         const today = new Date();
         today.setHours(0, 0, 0, 0);
         const twoWeeksAgo = new Date(today);
         twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14);
         
-        if (child.dueDate < twoWeeksAgo) {
+          if (dueDateToValidate < twoWeeksAgo) {
           Alert.alert('Error', `La fecha de parto para ${child.name} no puede ser hace más de 2 semanas`);
           return false;
+          }
         }
       } else {
         // Validar fecha de nacimiento
@@ -191,16 +215,24 @@ const ChildrenDataScreen: React.FC = () => {
       // Si estamos en modo edición, actualizar el hijo existente
       if (isEditing && childId) {
         const child = childrenData[0]; // Solo editamos un hijo a la vez
-        const isUnborn = child.isUnborn || false;
+        const isUnborn = child.isUnborn ?? false;
         
         const updateData: any = {
           name: child.name,
           isUnborn: isUnborn,
         };
         
-        if (isUnborn && child.dueDate) {
+        const weeks = child.gestationWeeks;
+        const hasValidWeeks = typeof weeks === 'number' && weeks >= 1 && weeks <= 42;
+        const dueDateFromWeeks = hasValidWeeks ? computeDueDateFromWeeks(weeks as number) : null;
+        const dueDateToSave = dueDateFromWeeks;
+
+        if (isUnborn && dueDateToSave) {
           // Usar nuevo sistema de fechas para bebés no nacidos
-          updateData.dueDate = formatDateToYYYYMMDD(child.dueDate);
+          updateData.dueDate = formatDateToYYYYMMDD(dueDateToSave);
+          if (hasValidWeeks) {
+            updateData.gestationWeeks = weeks;
+          }
         } else if (!isUnborn && child.birthDate) {
           // Usar nuevo sistema de fechas para hijos nacidos
           updateData.birthDate = formatDateToYYYYMMDD(child.birthDate);
@@ -227,13 +259,18 @@ const ChildrenDataScreen: React.FC = () => {
       // Modo creación
       // Preparar los datos en el formato del nuevo sistema de fechas
       const childrenToSave: CreateChildData[] = childrenData.map((child, index) => {
-        const isUnborn = isUnbornChild(index);
+        const isUnborn = child.isUnborn ?? isUnbornChild(index);
+        const weeks = child.gestationWeeks;
+        const hasValidWeeks = typeof weeks === 'number' && weeks >= 1 && weeks <= 42;
+        const dueDateFromWeeks = hasValidWeeks ? computeDueDateFromWeeks(weeks as number) : null;
+        const dueDateToSave = dueDateFromWeeks;
         
-        if (isUnborn && child.dueDate) {
+        if (isUnborn && dueDateToSave) {
           // Para bebé por nacer - usar nuevo sistema de fechas
           return {
             name: child.name,
-            dueDate: formatDateToYYYYMMDD(child.dueDate),
+            dueDate: formatDateToYYYYMMDD(dueDateToSave),
+            gestationWeeks: hasValidWeeks ? weeks : undefined,
             isUnborn: true,
           };
         } else if (!isUnborn && child.birthDate) {
@@ -248,6 +285,7 @@ const ChildrenDataScreen: React.FC = () => {
           return {
             name: child.name,
             isUnborn: isUnborn,
+            gestationWeeks: hasValidWeeks ? weeks : undefined,
           };
         }
       });
@@ -333,6 +371,14 @@ const ChildrenDataScreen: React.FC = () => {
             if (userData) {
               setUser(JSON.parse(userData));
             }
+            // Si está embarazada, actualizar perfil aunque omita los hijos
+            if (pregnancyStatus === 'pregnant') {
+              try {
+                await profileService.updateProfile({ isPregnant: true });
+              } catch (error) {
+                console.error('❌ Error actualizando estado de embarazo:', error);
+              }
+            }
             // Marcar que se omitió el registro (se considera como "ya revisado")
             await AsyncStorage.setItem('hasChildren', 'false');
             console.log('⏭️ Usuario omitió el registro de hijos');
@@ -349,33 +395,46 @@ const ChildrenDataScreen: React.FC = () => {
   };
 
   const getChildTitle = (index: number, child: ChildData) => {
-    // Si está embarazada, verificar si es bebé por nacer
-    if (pregnancyStatus === 'pregnant') {
-      const unbornStartIndex = childrenCount - (isMultiplePregnancy ? 2 : 1);
-      
-      if (index >= unbornStartIndex) {
-        // Es un bebé por nacer
-        if (isMultiplePregnancy && index === unbornStartIndex) {
-          return 'Bebé A por nacer';
-        } else if (isMultiplePregnancy && index === unbornStartIndex + 1) {
-          return 'Bebé B por nacer';
-        } else {
+    const isUnborn = child.isUnborn ?? isUnbornChild(index);
+    if (isUnborn) {
+      if (pregnancyStatus === 'pregnant' && isMultiplePregnancy) {
+        const unbornStartIndex = childrenCount - 2;
+        if (index === unbornStartIndex) return 'Bebé A por nacer';
+        if (index === unbornStartIndex + 1) return 'Bebé B por nacer';
+      }
           return 'Bebé por nacer';
         }
-      }
-    }
-    
-    // Hijo ya nacido
     return `Hijo ${index + 1}`;
   };
 
   const isUnbornChild = (index: number) => {
-    // Si está embarazada, verificar si es bebé por nacer
+    const explicit = childrenData[index]?.isUnborn;
+    if (explicit !== undefined) return explicit;
     if (pregnancyStatus === 'pregnant') {
       const unbornStartIndex = childrenCount - (isMultiplePregnancy ? 2 : 1);
       return index >= unbornStartIndex;
     }
     return false;
+  };
+
+  const addChildCard = () => {
+    setChildrenData(prev => ([
+      ...prev,
+      {
+        name: '',
+        birthDate: new Date(),
+        dueDate: new Date(),
+        isUnborn: false,
+        gestationWeeks: undefined
+      }
+    ]));
+  };
+
+  const computeDueDateFromWeeks = (weeks: number) => {
+    const weeksRemaining = 40 - weeks;
+    const dueDate = new Date();
+    dueDate.setDate(dueDate.getDate() + (weeksRemaining * 7));
+    return dueDate;
   };
 
   const getPregnancyInfo = (dueDate: Date) => {
@@ -417,7 +476,8 @@ const ChildrenDataScreen: React.FC = () => {
     
     if (selectedDate && selectedChildIndex !== null) {
       const child = childrenData[selectedChildIndex];
-      if (child.isUnborn) {
+      const isUnborn = child.isUnborn ?? isUnbornChild(selectedChildIndex);
+      if (isUnborn) {
         updateChildData(selectedChildIndex, 'dueDate', selectedDate);
       } else {
         updateChildData(selectedChildIndex, 'birthDate', selectedDate);
@@ -464,10 +524,12 @@ const ChildrenDataScreen: React.FC = () => {
             <View style={styles.infoContainer}>
                 <Ionicons name="heart" size={20} color="#FFFFFF" style={styles.infoIcon} />
               <Text style={styles.infoText}>
-                {isMultiplePregnancy 
-                    ? `👶👶 Registraremos 2 bebés por nacer (gemelos, trillizos, etc.)`
-                  : `👶 Registraremos 1 bebé por nacer`
-                }
+                {(() => {
+                  const unbornCount = childrenData.filter((c) => c.isUnborn).length;
+                  if (unbornCount > 1) return `👶👶 Registraremos ${unbornCount} bebés por nacer`;
+                  if (unbornCount === 1) return `👶 Registraremos 1 bebé por nacer`;
+                  return `👶 Selecciona si el bebé está en gestación`;
+                })()}
               </Text>
             </View>
           )}
@@ -475,12 +537,14 @@ const ChildrenDataScreen: React.FC = () => {
         </LinearGradient>
 
         <View style={styles.form}>
-          {childrenData.map((child, index) => (
+          {childrenData.map((child, index) => {
+            const isUnborn = child.isUnborn ?? isUnbornChild(index);
+            return (
             <View key={index} style={styles.childCard}>
               <View style={styles.cardHeader}>
                 <View style={styles.iconContainer}>
                   <Ionicons 
-                    name={child.isUnborn ? "heart" : "person"} 
+                    name={isUnborn ? "heart" : "person"} 
                     size={24} 
                     color="#59C6C0" 
                   />
@@ -504,7 +568,26 @@ const ChildrenDataScreen: React.FC = () => {
                 />
               </View>
 
-              {!isUnbornChild(index) ? (
+              <View style={styles.birthStatusContainer}>
+                <TouchableOpacity
+                  style={[styles.birthStatusButton, !isUnborn && styles.birthStatusButtonActive]}
+                  onPress={() => updateChildData(index, 'isUnborn', false)}
+                >
+                  <Text style={[styles.birthStatusText, !isUnborn && styles.birthStatusTextActive]}>
+                    Ya nació
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.birthStatusButton, isUnborn && styles.birthStatusButtonActive]}
+                  onPress={() => updateChildData(index, 'isUnborn', true)}
+                >
+                  <Text style={[styles.birthStatusText, isUnborn && styles.birthStatusTextActive]}>
+                    En gestación
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              {!isUnborn ? (
                 <View style={styles.dateContainer}>
                   <View style={styles.labelContainer}>
                     <Ionicons name="calendar-outline" size={18} color="#59C6C0" />
@@ -541,39 +624,37 @@ const ChildrenDataScreen: React.FC = () => {
                 </View>
               ) : (
                 <View style={styles.dateContainer}>
+                  <View style={styles.gestationContainer}>
                   <View style={styles.labelContainer}>
-                    <Ionicons name="heart-outline" size={18} color="#F57C00" />
-                    <Text style={styles.label}>Fecha esperada de parto</Text>
+                      <Ionicons name="time-outline" size={18} color="#F57C00" />
+                      <Text style={styles.label}>Semanas de gestación</Text>
                   </View>
-                  <TouchableOpacity
-                    style={styles.dateButton}
-                    onPress={() => openDatePicker(index)}
-                  >
-                    <Ionicons name="calendar" size={20} color="#F57C00" style={styles.dateIconLeft} />
-                    <Text style={styles.dateButtonText}>
-                      {child.dueDate 
-                        ? child.dueDate.toLocaleDateString('es-ES', { 
-                            year: 'numeric', 
-                            month: 'long', 
-                            day: 'numeric' 
-                          })
-                        : 'Seleccionar fecha'}
-                    </Text>
-                    <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
-                  </TouchableOpacity>
-                  
-                  {child.dueDate && (
-                    <View style={styles.pregnancyInfoContainer}>
-                      <Ionicons name="information-circle" size={20} color="#F57C00" />
-                      <Text style={styles.pregnancyInfoText}>
-                        {getPregnancyInfo(child.dueDate)}
-                  </Text>
+                    <TextInput
+                      style={styles.input}
+                      value={child.gestationWeeks !== undefined && child.gestationWeeks !== null ? String(child.gestationWeeks) : ''}
+                      onChangeText={(value) => {
+                        const numeric = value.replace(/[^0-9]/g, '');
+                        updateChildData(index, 'gestationWeeks', numeric ? parseInt(numeric, 10) : undefined);
+                      }}
+                      placeholder="Ej: 20"
+                      placeholderTextColor="#9CA3AF"
+                      keyboardType="number-pad"
+                      maxLength={2}
+                    />
+                    <Text style={styles.helperText}>Debe estar entre 1 y 42 semanas</Text>
                     </View>
-                  )}
                 </View>
               )}
             </View>
-          ))}
+          )})}
+
+          <TouchableOpacity
+            style={styles.addAnotherChildButton}
+            onPress={addChildCard}
+          >
+            <Ionicons name="add-circle" size={20} color="#FFFFFF" />
+            <Text style={styles.addAnotherChildText}>Agregar otro hijo</Text>
+          </TouchableOpacity>
 
           <View style={styles.buttonContainer}>
             <TouchableOpacity
@@ -641,12 +722,12 @@ const ChildrenDataScreen: React.FC = () => {
                   display="spinner"
                   onChange={handleDateChange}
                   maximumDate={
-                    childrenData[selectedChildIndex]?.isUnborn 
+                    (childrenData[selectedChildIndex]?.isUnborn ?? isUnbornChild(selectedChildIndex))
                       ? undefined 
                       : new Date()
                   }
                   minimumDate={
-                    childrenData[selectedChildIndex]?.isUnborn 
+                    (childrenData[selectedChildIndex]?.isUnborn ?? isUnbornChild(selectedChildIndex))
                       ? new Date()
                       : (() => {
                           const minDate = new Date();
@@ -690,12 +771,12 @@ const ChildrenDataScreen: React.FC = () => {
             display="default"
             onChange={handleDateChange}
             maximumDate={
-              childrenData[selectedChildIndex]?.isUnborn 
+              (childrenData[selectedChildIndex]?.isUnborn ?? isUnbornChild(selectedChildIndex))
                 ? undefined 
                 : new Date()
             }
             minimumDate={
-              childrenData[selectedChildIndex]?.isUnborn 
+              (childrenData[selectedChildIndex]?.isUnborn ?? isUnbornChild(selectedChildIndex))
                 ? new Date()
                 : (() => {
                     const minDate = new Date();
@@ -888,6 +969,60 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#F57C00',
     flex: 1,
+    fontFamily: 'Montserrat',
+  },
+  birthStatusContainer: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 12,
+  },
+  birthStatusButton: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+  },
+  birthStatusButtonActive: {
+    backgroundColor: '#59C6C0',
+    borderColor: '#59C6C0',
+  },
+  birthStatusText: {
+    fontSize: 14,
+    color: '#374151',
+    fontFamily: 'Montserrat',
+  },
+  birthStatusTextActive: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+    fontFamily: 'Montserrat-Bold',
+  },
+  addAnotherChildButton: {
+    marginTop: 8,
+    marginBottom: 16,
+    backgroundColor: '#59C6C0',
+    borderRadius: 12,
+    paddingVertical: 12,
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  addAnotherChildText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '700',
+    fontFamily: 'Montserrat-Bold',
+  },
+  gestationContainer: {
+    marginTop: 12,
+  },
+  helperText: {
+    marginTop: 6,
+    fontSize: 12,
+    color: '#6B7280',
     fontFamily: 'Montserrat',
   },
   // Estilos para el modal del date picker

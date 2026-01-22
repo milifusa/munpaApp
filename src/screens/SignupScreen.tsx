@@ -37,6 +37,7 @@ const SignupScreen: React.FC<SignupScreenProps> = ({ navigation }) => {
   const [childrenCount, setChildrenCount] = useState(0);
   const [pregnancyStatus, setPregnancyStatus] = useState<'none' | 'pregnant'>('none');
   const [isMultiplePregnancy, setIsMultiplePregnancy] = useState(false);
+  const [gestationWeeks, setGestationWeeks] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
   // Verificar si estamos en modo "completar perfil"
@@ -163,17 +164,27 @@ const SignupScreen: React.FC<SignupScreenProps> = ({ navigation }) => {
       return;
     }
 
+    if (pregnancyStatus === 'pregnant') {
+      const weeks = parseInt(gestationWeeks, 10);
+      if (!weeks || weeks < 1 || weeks > 42) {
+        Alert.alert('Error', 'Las semanas de gestación deben estar entre 1 y 42');
+        return;
+      }
+    }
+
     console.log('✅ Validación exitosa...');
     setIsLoading(true);
     try {
       if (isProfileCompletionMode) {
         // Modo completar perfil: actualizar perfil existente
         console.log('📊 Actualizando perfil con:', { displayName, gender, childrenCount, isPregnant: pregnancyStatus === 'pregnant' });
+        const weeks = pregnancyStatus === 'pregnant' ? parseInt(gestationWeeks, 10) : undefined;
         await profileService.updateProfile({
           displayName: displayName.trim(),
           gender,
           childrenCount,
           isPregnant: pregnancyStatus === 'pregnant',
+          gestationWeeks: weeks,
         });
         console.log('✅ Perfil actualizado exitosamente');
         
@@ -181,9 +192,11 @@ const SignupScreen: React.FC<SignupScreenProps> = ({ navigation }) => {
         await AsyncStorage.removeItem('needsProfileCompletion');
       } else {
         // Modo registro normal
-        console.log('📊 Datos a enviar:', { email, displayName, gender, childrenCount, pregnancyStatus });
-        const isPregnantForSignup = pregnancyStatus === 'pregnant' ? false : false;
-        await signup(email, password, displayName.trim(), gender, childrenCount, isPregnantForSignup);
+        const totalChildrenForSignup = childrenCount + (pregnancyStatus === 'pregnant' ? (isMultiplePregnancy ? 2 : 1) : 0);
+        const weeks = pregnancyStatus === 'pregnant' ? parseInt(gestationWeeks, 10) : undefined;
+        console.log('📊 Datos a enviar:', { email, displayName, gender, childrenCount: totalChildrenForSignup, pregnancyStatus });
+        const isPregnantForSignup = pregnancyStatus === 'pregnant';
+        await signup(email, password, displayName.trim(), gender, totalChildrenForSignup, isPregnantForSignup, weeks);
         console.log('✅ Registro completado exitosamente');
       }
       
@@ -461,6 +474,22 @@ const SignupScreen: React.FC<SignupScreenProps> = ({ navigation }) => {
             </View>
           )}
 
+          {gender && pregnancyStatus === 'pregnant' && (
+            <View style={styles.inputContainer}>
+              <Text style={styles.labelText}>Semanas de gestación *</Text>
+              <TextInput
+                style={styles.input}
+                value={gestationWeeks}
+                onChangeText={(value) => setGestationWeeks(value.replace(/[^0-9]/g, ''))}
+                placeholder="Ej: 20"
+                placeholderTextColor="#9CA3AF"
+                keyboardType="number-pad"
+                maxLength={2}
+              />
+              <Text style={styles.helperText}>Debe estar entre 1 y 42 semanas</Text>
+            </View>
+          )}
+
           {/* Botón Registro / Continuar */}
           <TouchableOpacity
             style={[styles.signupButton, isLoading && styles.buttonDisabled]}
@@ -591,6 +620,11 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.sm,
     textAlign: 'center',
     marginTop: spacing.xs,
+  },
+  helperText: {
+    marginTop: 6,
+    fontSize: 12,
+    color: '#6B7280',
   },
   genderContainer: {
     flexDirection: 'row',

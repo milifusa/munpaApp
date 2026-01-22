@@ -13,11 +13,10 @@ import {
   Modal,
   Dimensions,
   StatusBar,
-  SafeAreaView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
 // Importar expo-maps según la documentación oficial
@@ -454,10 +453,10 @@ const CreateProductScreen = () => {
   };
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <StatusBar barStyle="light-content" backgroundColor="#96d2d3" />
       {/* Header */}
-      <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
+      <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()}>
           <Ionicons name="close" size={28} color="white" />
         </TouchableOpacity>
@@ -1257,7 +1256,7 @@ const CreateProductScreen = () => {
           </View>
         </View>
       </Modal>
-    </View>
+    </SafeAreaView>
   );
 };
 
@@ -1272,6 +1271,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 15,
+    paddingTop: 6,
     paddingBottom: 15,
   },
   headerTitle: {

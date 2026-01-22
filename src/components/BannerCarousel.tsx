@@ -322,6 +322,10 @@ const BannerCarousel: React.FC<BannerCarouselProps> = ({ style, section, fallbac
     }
   };
 
+  if (loading && banners.length === 0 && !customBanner) {
+    return null;
+  }
+
   if (loading) {
     return (
       <View style={[styles.container, styles.loadingContainer, style]}>

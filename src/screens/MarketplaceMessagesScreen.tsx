@@ -15,7 +15,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import marketplaceService, { MarketplaceMessage } from '../services/marketplaceService';
 import { useAuth } from '../contexts/AuthContext';
 import { axiosInstance as api } from '../services/api';
@@ -25,7 +25,6 @@ const MarketplaceMessagesScreen = () => {
   const route = useRoute<any>();
   const { user } = useAuth();
   const { productId, otherUserId } = route.params || {};
-  const insets = useSafeAreaInsets();
 
   const [messages, setMessages] = useState<MarketplaceMessage[]>([]);
   const [loading, setLoading] = useState(true);
@@ -519,10 +518,10 @@ const MarketplaceMessagesScreen = () => {
   };
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <StatusBar barStyle="light-content" backgroundColor="#96d2d3" />
       {/* Header */}
-      <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
+      <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()}>
           <Ionicons name="arrow-back" size={24} color="white" />
         </TouchableOpacity>
@@ -597,7 +596,7 @@ const MarketplaceMessagesScreen = () => {
           </View>
         </KeyboardAvoidingView>
       )}
-    </View>
+    </SafeAreaView>
   );
 };
 
@@ -612,6 +611,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 15,
+    paddingTop: 6,
     paddingBottom: 15,
   },
   headerTitle: {

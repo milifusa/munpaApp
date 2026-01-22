@@ -7,7 +7,6 @@ import {
   FlatList,
   TextInput,
   Alert,
-  SafeAreaView,
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
@@ -17,7 +16,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRoute, useNavigation, useFocusEffect } from '@react-navigation/native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { listsService } from '../services/api';
 import { ListComment } from '../types/lists';
 
@@ -34,7 +33,6 @@ interface ItemCommentsScreenProps {
 const ItemCommentsScreen = () => {
   const route = useRoute<any>();
   const navigation = useNavigation<any>();
-  const insets = useSafeAreaInsets();
   const { listId, itemId, itemText } = route.params;
 
   const [comments, setComments] = useState<ListComment[]>([]);
@@ -177,10 +175,10 @@ const ItemCommentsScreen = () => {
   // Estado de carga
   if (isLoading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={styles.container} edges={['top']}>
         <StatusBar barStyle="light-content" backgroundColor="#96d2d3" />
         {/* Header */}
-        <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
+        <View style={styles.header}>
           <TouchableOpacity
             style={styles.backButton}
             onPress={() => navigation.goBack()}
@@ -200,10 +198,10 @@ const ItemCommentsScreen = () => {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <StatusBar barStyle="light-content" backgroundColor="#96d2d3" />
       {/* Header */}
-      <View style={[styles.header, { paddingTop: Platform.OS === 'ios' ? 10 : 10 }]}>
+      <View style={styles.header}>
         <TouchableOpacity
           style={styles.backButton}
           onPress={() => navigation.goBack()}
@@ -291,6 +289,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     backgroundColor: '#96d2d3',
     paddingHorizontal: 20,
+    paddingTop: 6,
     paddingBottom: 15,
   },
   backButton: {

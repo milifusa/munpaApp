@@ -15,6 +15,7 @@ import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { childrenService } from '../services/api';
+import { useAuth } from '../contexts/AuthContext';
 
 interface Child {
   id: string;
@@ -36,6 +37,7 @@ interface Child {
 
 const ChildrenListScreen: React.FC = () => {
   const navigation = useNavigation();
+  const { user } = useAuth();
   const [children, setChildren] = useState<Child[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -79,6 +81,7 @@ const ChildrenListScreen: React.FC = () => {
     navigation.navigate('ChildrenData', {
       childrenCount: 1,
       gender: 'F',
+      pregnancyStatus: user?.isPregnant ? 'pregnant' : 'not_pregnant',
     });
   };
 

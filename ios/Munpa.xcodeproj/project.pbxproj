@@ -8,27 +8,27 @@
 
 /* Begin PBXBuildFile section */
 		13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
-		2D2B882276B86C44C636D098 /* libPods-Munpa.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 6021227D189B7309F7F1A5AD /* libPods-Munpa.a */; };
+		354D8BE7BA0ECF472DC6EBD6 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 98570105001F86876206C492 /* PrivacyInfo.xcprivacy */; };
 		3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */; };
-		A2584BFCE0B9A7E29A910C50 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 4E8441C6C5F0746A9D21748A /* PrivacyInfo.xcprivacy */; };
+		8C5A6477A6183070FB91FE55 /* libPods-Munpa.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 05980BA943896CB41BE992EC /* libPods-Munpa.a */; };
 		BB2F792D24A3F905000567C9 /* Expo.plist in Resources */ = {isa = PBXBuildFile; fileRef = BB2F792C24A3F905000567C9 /* Expo.plist */; };
-		C47510535230452EA96A3555 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = A07E94CA601D4DF3BE121F0E /* GoogleService-Info.plist */; };
 		F11748422D0307B40044C1D9 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = F11748412D0307B40044C1D9 /* AppDelegate.swift */; };
-		F472C8DD4AF8860021D02253 /* ExpoModulesProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 26D930DF57664A72D493DB5C /* ExpoModulesProvider.swift */; };
+		F60FBD8A0F143501A0174667 /* ExpoModulesProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0DE971D6E0E93B6116FF11CF /* ExpoModulesProvider.swift */; };
+		F9ECD19F4F9D48C699F9657B /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 97A66ECDF6AC40F7ADFEF1B2 /* GoogleService-Info.plist */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		05980BA943896CB41BE992EC /* libPods-Munpa.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-Munpa.a"; sourceTree = BUILT_PRODUCTS_DIR; };
+		0DE971D6E0E93B6116FF11CF /* ExpoModulesProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ExpoModulesProvider.swift; path = "Pods/Target Support Files/Pods-Munpa/ExpoModulesProvider.swift"; sourceTree = "<group>"; };
 		13B07F961A680F5B00A75B9A /* Munpa.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Munpa.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		13B07FB51A68108700A75B9A /* Images.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Images.xcassets; path = Munpa/Images.xcassets; sourceTree = "<group>"; };
 		13B07FB61A68108700A75B9A /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = Info.plist; path = Munpa/Info.plist; sourceTree = "<group>"; };
-		26D930DF57664A72D493DB5C /* ExpoModulesProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ExpoModulesProvider.swift; path = "Pods/Target Support Files/Pods-Munpa/ExpoModulesProvider.swift"; sourceTree = "<group>"; };
-		4E8441C6C5F0746A9D21748A /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; name = PrivacyInfo.xcprivacy; path = Munpa/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
-		6021227D189B7309F7F1A5AD /* libPods-Munpa.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-Munpa.a"; sourceTree = BUILT_PRODUCTS_DIR; };
-		848B6499B4B61A27C9483843 /* Pods-Munpa.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Munpa.debug.xcconfig"; path = "Target Support Files/Pods-Munpa/Pods-Munpa.debug.xcconfig"; sourceTree = "<group>"; };
-		A07E94CA601D4DF3BE121F0E /* GoogleService-Info.plist */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 4; includeInIndex = 0; lastKnownFileType = text.plist.xml; name = "GoogleService-Info.plist"; path = "Munpa/GoogleService-Info.plist"; sourceTree = "<group>"; };
+		250812B77E8B7A4AEA214898 /* Pods-Munpa.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Munpa.release.xcconfig"; path = "Target Support Files/Pods-Munpa/Pods-Munpa.release.xcconfig"; sourceTree = "<group>"; };
+		97A66ECDF6AC40F7ADFEF1B2 /* GoogleService-Info.plist */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 4; includeInIndex = 0; lastKnownFileType = text.plist.xml; name = "GoogleService-Info.plist"; path = "Munpa/GoogleService-Info.plist"; sourceTree = "<group>"; };
+		98570105001F86876206C492 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; name = PrivacyInfo.xcprivacy; path = Munpa/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		A3A10A5C1DF9DF68DFA58CF4 /* Pods-Munpa.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Munpa.debug.xcconfig"; path = "Target Support Files/Pods-Munpa/Pods-Munpa.debug.xcconfig"; sourceTree = "<group>"; };
 		AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = SplashScreen.storyboard; path = Munpa/SplashScreen.storyboard; sourceTree = "<group>"; };
 		BB2F792C24A3F905000567C9 /* Expo.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = Expo.plist; sourceTree = "<group>"; };
-		C1497DF5AE6FDF0E2BAE2B0E /* Pods-Munpa.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Munpa.release.xcconfig"; path = "Target Support Files/Pods-Munpa/Pods-Munpa.release.xcconfig"; sourceTree = "<group>"; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
 		F11748412D0307B40044C1D9 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppDelegate.swift; path = Munpa/AppDelegate.swift; sourceTree = "<group>"; };
 		F11748442D0722820044C1D9 /* Munpa-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = "Munpa-Bridging-Header.h"; path = "Munpa/Munpa-Bridging-Header.h"; sourceTree = "<group>"; };
@@ -39,7 +39,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				2D2B882276B86C44C636D098 /* libPods-Munpa.a in Frameworks */,
+				8C5A6477A6183070FB91FE55 /* libPods-Munpa.a in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -55,17 +55,27 @@
 				13B07FB51A68108700A75B9A /* Images.xcassets */,
 				13B07FB61A68108700A75B9A /* Info.plist */,
 				AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */,
-				A07E94CA601D4DF3BE121F0E /* GoogleService-Info.plist */,
-				4E8441C6C5F0746A9D21748A /* PrivacyInfo.xcprivacy */,
+				97A66ECDF6AC40F7ADFEF1B2 /* GoogleService-Info.plist */,
+				98570105001F86876206C492 /* PrivacyInfo.xcprivacy */,
 			);
 			name = Munpa;
+			sourceTree = "<group>";
+		};
+		2048C9D887B41B01E29B41AE /* Pods */ = {
+			isa = PBXGroup;
+			children = (
+				A3A10A5C1DF9DF68DFA58CF4 /* Pods-Munpa.debug.xcconfig */,
+				250812B77E8B7A4AEA214898 /* Pods-Munpa.release.xcconfig */,
+			);
+			name = Pods;
+			path = Pods;
 			sourceTree = "<group>";
 		};
 		2D16E6871FA4F8E400B85C8A /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
 				ED297162215061F000B7C4FE /* JavaScriptCore.framework */,
-				6021227D189B7309F7F1A5AD /* libPods-Munpa.a */,
+				05980BA943896CB41BE992EC /* libPods-Munpa.a */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
@@ -84,8 +94,8 @@
 				832341AE1AAA6A7D00B99B32 /* Libraries */,
 				83CBBA001A601CBA00E9B192 /* Products */,
 				2D16E6871FA4F8E400B85C8A /* Frameworks */,
-				9A37AEA98694C7C338948222 /* Pods */,
-				AA8293D02618CC721B0ADE48 /* ExpoModulesProviders */,
+				2048C9D887B41B01E29B41AE /* Pods */,
+				ED083AB8788D91B76A25B568 /* ExpoModulesProviders */,
 			);
 			indentWidth = 2;
 			sourceTree = "<group>";
@@ -100,22 +110,12 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
-		9A37AEA98694C7C338948222 /* Pods */ = {
+		A66B0DD1DFBB1069DC8C0670 /* Munpa */ = {
 			isa = PBXGroup;
 			children = (
-				848B6499B4B61A27C9483843 /* Pods-Munpa.debug.xcconfig */,
-				C1497DF5AE6FDF0E2BAE2B0E /* Pods-Munpa.release.xcconfig */,
+				0DE971D6E0E93B6116FF11CF /* ExpoModulesProvider.swift */,
 			);
-			name = Pods;
-			path = Pods;
-			sourceTree = "<group>";
-		};
-		AA8293D02618CC721B0ADE48 /* ExpoModulesProviders */ = {
-			isa = PBXGroup;
-			children = (
-				C92C3946BA113F0861025CF9 /* Munpa */,
-			);
-			name = ExpoModulesProviders;
+			name = Munpa;
 			sourceTree = "<group>";
 		};
 		BB2F792B24A3F905000567C9 /* Supporting */ = {
@@ -127,12 +127,12 @@
 			path = Munpa/Supporting;
 			sourceTree = "<group>";
 		};
-		C92C3946BA113F0861025CF9 /* Munpa */ = {
+		ED083AB8788D91B76A25B568 /* ExpoModulesProviders */ = {
 			isa = PBXGroup;
 			children = (
-				26D930DF57664A72D493DB5C /* ExpoModulesProvider.swift */,
+				A66B0DD1DFBB1069DC8C0670 /* Munpa */,
 			);
-			name = Munpa;
+			name = ExpoModulesProviders;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -143,13 +143,13 @@
 			buildConfigurationList = 13B07F931A680F5B00A75B9A /* Build configuration list for PBXNativeTarget "Munpa" */;
 			buildPhases = (
 				08A4A3CD28434E44B6B9DE2E /* [CP] Check Pods Manifest.lock */,
-				5594AF2455DEC801AF01D2A9 /* [Expo] Configure project */,
+				C8E12F0788726152A8DBAECD /* [Expo] Configure project */,
 				13B07F871A680F5B00A75B9A /* Sources */,
 				13B07F8C1A680F5B00A75B9A /* Frameworks */,
 				13B07F8E1A680F5B00A75B9A /* Resources */,
 				00DD1BFF1BD5951E006B06BC /* Bundle React Native code and images */,
 				800E24972A6A228C8D4807E9 /* [CP] Copy Pods Resources */,
-				69D5BAABB85BAFCB6BAAE2CE /* [CP] Embed Pods Frameworks */,
+				59F2215F38FBA3CC92A711B8 /* [CP] Embed Pods Frameworks */,
 			);
 			buildRules = (
 			);
@@ -201,8 +201,8 @@
 				BB2F792D24A3F905000567C9 /* Expo.plist in Resources */,
 				13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */,
 				3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */,
-				C47510535230452EA96A3555 /* GoogleService-Info.plist in Resources */,
-				A2584BFCE0B9A7E29A910C50 /* PrivacyInfo.xcprivacy in Resources */,
+				F9ECD19F4F9D48C699F9657B /* GoogleService-Info.plist in Resources */,
+				354D8BE7BA0ECF472DC6EBD6 /* PrivacyInfo.xcprivacy in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -248,31 +248,7 @@
 			shellScript = "diff \"${PODS_PODFILE_DIR_PATH}/Podfile.lock\" \"${PODS_ROOT}/Manifest.lock\" > /dev/null\nif [ $? != 0 ] ; then\n    # print error to STDERR\n    echo \"error: The sandbox is not in sync with the Podfile.lock. Run 'pod install' or update your CocoaPods installation.\" >&2\n    exit 1\nfi\n# This output is used by Xcode 'outputs' to avoid re-running this script phase.\necho \"SUCCESS\" > \"${SCRIPT_OUTPUT_FILE_0}\"\n";
 			showEnvVarsInLog = 0;
 		};
-		5594AF2455DEC801AF01D2A9 /* [Expo] Configure project */ = {
-			isa = PBXShellScriptBuildPhase;
-			alwaysOutOfDate = 1;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputFileListPaths = (
-			);
-			inputPaths = (
-				"$(SRCROOT)/.xcode.env",
-				"$(SRCROOT)/.xcode.env.local",
-				"$(SRCROOT)/Munpa/Munpa.entitlements",
-				"$(SRCROOT)/Pods/Target Support Files/Pods-Munpa/expo-configure-project.sh",
-			);
-			name = "[Expo] Configure project";
-			outputFileListPaths = (
-			);
-			outputPaths = (
-				"$(SRCROOT)/Pods/Target Support Files/Pods-Munpa/ExpoModulesProvider.swift",
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "# This script configures Expo modules and generates the modules provider file.\nbash -l -c \"./Pods/Target\\ Support\\ Files/Pods-Munpa/expo-configure-project.sh\"\n";
-		};
-		69D5BAABB85BAFCB6BAAE2CE /* [CP] Embed Pods Frameworks */ = {
+		59F2215F38FBA3CC92A711B8 /* [CP] Embed Pods Frameworks */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -348,6 +324,30 @@
 			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-Munpa/Pods-Munpa-resources.sh\"\n";
 			showEnvVarsInLog = 0;
 		};
+		C8E12F0788726152A8DBAECD /* [Expo] Configure project */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"$(SRCROOT)/.xcode.env",
+				"$(SRCROOT)/.xcode.env.local",
+				"$(SRCROOT)/Munpa/Munpa.entitlements",
+				"$(SRCROOT)/Pods/Target Support Files/Pods-Munpa/expo-configure-project.sh",
+			);
+			name = "[Expo] Configure project";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(SRCROOT)/Pods/Target Support Files/Pods-Munpa/ExpoModulesProvider.swift",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "# This script configures Expo modules and generates the modules provider file.\nbash -l -c \"./Pods/Target\\ Support\\ Files/Pods-Munpa/expo-configure-project.sh\"\n";
+		};
 /* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
@@ -356,7 +356,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				F11748422D0307B40044C1D9 /* AppDelegate.swift in Sources */,
-				F472C8DD4AF8860021D02253 /* ExpoModulesProvider.swift in Sources */,
+				F60FBD8A0F143501A0174667 /* ExpoModulesProvider.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -365,7 +365,7 @@
 /* Begin XCBuildConfiguration section */
 		13B07F941A680F5B00A75B9A /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 848B6499B4B61A27C9483843 /* Pods-Munpa.debug.xcconfig */;
+			baseConfigurationReference = A3A10A5C1DF9DF68DFA58CF4 /* Pods-Munpa.debug.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
@@ -404,7 +404,7 @@
 		};
 		13B07F951A680F5B00A75B9A /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = C1497DF5AE6FDF0E2BAE2B0E /* Pods-Munpa.release.xcconfig */;
+			baseConfigurationReference = 250812B77E8B7A4AEA214898 /* Pods-Munpa.release.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
@@ -482,6 +482,19 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
+				HEADER_SEARCH_PATHS = (
+					"$(inherited)",
+					"${PODS_ROOT}/ReactCommon",
+					"${PODS_ROOT}/ReactCommon/react/nativemodule/core",
+					"${PODS_ROOT}/React-runtimeexecutor",
+					"${PODS_ROOT}/React-runtimeexecutor/platform/ios",
+					"${PODS_ROOT}/ReactCommon-Samples",
+					"${PODS_ROOT}/ReactCommon-Samples/platform/ios",
+					"${PODS_ROOT}/React-Fabric/react/renderer/components/view/platform/cxx",
+					"${PODS_ROOT}/React-NativeModulesApple",
+					"${PODS_ROOT}/React-graphics",
+					"${PODS_ROOT}/React-graphics/react/renderer/graphics/platform/ios",
+				);
 				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
 				LD_RUNPATH_SEARCH_PATHS = (
 					/usr/lib/swift,
@@ -538,6 +551,19 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
+				HEADER_SEARCH_PATHS = (
+					"$(inherited)",
+					"${PODS_ROOT}/ReactCommon",
+					"${PODS_ROOT}/ReactCommon/react/nativemodule/core",
+					"${PODS_ROOT}/React-runtimeexecutor",
+					"${PODS_ROOT}/React-runtimeexecutor/platform/ios",
+					"${PODS_ROOT}/ReactCommon-Samples",
+					"${PODS_ROOT}/ReactCommon-Samples/platform/ios",
+					"${PODS_ROOT}/React-Fabric/react/renderer/components/view/platform/cxx",
+					"${PODS_ROOT}/React-NativeModulesApple",
+					"${PODS_ROOT}/React-graphics",
+					"${PODS_ROOT}/React-graphics/react/renderer/graphics/platform/ios",
+				);
 				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
 				LD_RUNPATH_SEARCH_PATHS = (
 					/usr/lib/swift,

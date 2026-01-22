@@ -7,12 +7,11 @@ import {
   TouchableOpacity,
   TextInput,
   Image,
-  SafeAreaView,
   RefreshControl,
   ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import api from '../services/api';
 import BannerCarousel from '../components/BannerCarousel';
 

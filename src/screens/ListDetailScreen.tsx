@@ -10,7 +10,6 @@ import {
   TextInput,
   Modal,
   Platform,
-  SafeAreaView,
   RefreshControl,
   Image,
   KeyboardAvoidingView,
@@ -18,7 +17,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRoute, useNavigation, useFocusEffect } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '../contexts/AuthContext';
@@ -564,23 +563,17 @@ const ListDetailScreen = () => {
       return aCompleted ? 1 : -1;
     });
     
-    console.log('📋 [LIST DETAIL] Items ordenados:', {
-      total: items.length,
-      pendientes: sortedItems.filter(item => !(item.isCompleted || item.completed)).length,
-      completados: sortedItems.filter(item => item.isCompleted || item.completed).length
-    });
-    
     return sortedItems;
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={styles.safeArea} edges={['top']}>
       <StatusBar barStyle="light-content" backgroundColor="#96d2d3" />
       <View style={styles.contentWrapper}>
         {/* Header personalizado */}
         <LinearGradient
           colors={['#59C6C0', '#4DB8B3']}
-          style={[styles.header, { paddingTop: insets.top + 10 }]}
+          style={styles.header}
         >
         <TouchableOpacity
           style={styles.headerBackButton}
@@ -1201,6 +1194,7 @@ const styles = StyleSheet.create({
   // Header personalizado
   header: {
     backgroundColor: '#96d2d3',
+    paddingTop: 6,
     paddingBottom: 15,
     paddingHorizontal: 20,
     flexDirection: 'row',
