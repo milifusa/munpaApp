@@ -1394,21 +1394,15 @@ const HomeScreen: React.FC = () => {
           <View style={styles.scheduleAgenda}>
             <Text style={styles.scheduleAgendaTitle}>Horario de hoy</Text>
             
-            {/* Debug log */}
-            {console.log('📅 [AGENDA] wakeTimeToday disponible:', !!wakeTimeToday, wakeTimeToday)}
-            {console.log('📅 [AGENDA] Siestas disponibles:', sleepPrediction.prediction.dailySchedule?.allNaps?.length || 0)}
-            {console.log('📅 [AGENDA] Bedtime disponible:', !!sleepPrediction.prediction.bedtime?.time)}
-            
             {/* Lista de eventos del día */}
             <View style={styles.scheduleTimeline}>
               {/* Hora de despertar */}
               {wakeTimeToday && (() => {
-                console.log('⏰ [AGENDA] wakeTimeToday:', wakeTimeToday);
-                const wakeDate = new Date(wakeTimeToday);
-                console.log('⏰ [AGENDA] wakeDate:', wakeDate);
-                const hours = wakeDate.getHours();
-                const minutes = wakeDate.getMinutes();
-                const timeStr = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+                // Extraer hora directamente del string sin conversión de zona horaria
+                // wakeTimeToday formato: "2026-01-22T06:42:00.000Z"
+                const timePart = wakeTimeToday.split('T')[1]; // "06:42:00.000Z"
+                const [hoursStr, minutesStr] = timePart.split(':'); // ["06", "42", ...]
+                const timeStr = `${hoursStr}:${minutesStr}`;
                 console.log('⏰ [AGENDA] Mostrando hora de despertar:', timeStr);
                 
                 return (
@@ -1434,10 +1428,10 @@ const HomeScreen: React.FC = () => {
                 const napTime = nap.time || nap.startTime;
                 if (!napTime) return null;
                 
-                const napDate = new Date(napTime);
-                const hours = napDate.getHours();
-                const minutes = napDate.getMinutes();
-                const timeStr = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+                // Extraer hora directamente del string sin conversión de zona horaria
+                const timePart = napTime.split('T')[1]; // "10:52:00.000Z"
+                const [hoursStr, minutesStr] = timePart.split(':'); // ["10", "52", ...]
+                const timeStr = `${hoursStr}:${minutesStr}`;
                 
                 const isInProgress = nap.status === 'in_progress' || nap.isInProgress === true;
                 const isCompleted = nap.completed || nap.status === 'completed';
@@ -1473,10 +1467,10 @@ const HomeScreen: React.FC = () => {
               {/* Hora de dormir (Bedtime) */}
               {sleepPrediction.prediction.bedtime?.time && (() => {
                 const bedtimeStr = sleepPrediction.prediction.bedtime.time;
-                const bedtimeDate = new Date(bedtimeStr);
-                const hours = bedtimeDate.getHours();
-                const minutes = bedtimeDate.getMinutes();
-                const timeStr = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+                // Extraer hora directamente del string sin conversión de zona horaria
+                const timePart = bedtimeStr.split('T')[1]; // "19:00:00.000Z"
+                const [hoursStr, minutesStr] = timePart.split(':'); // ["19", "00", ...]
+                const timeStr = `${hoursStr}:${minutesStr}`;
                 
                 return (
                   <View style={styles.scheduleItem}>
