@@ -412,7 +412,8 @@ const HomeScreen: React.FC = () => {
         setSleepPrediction(predictionRes.value);
         
         // Si el nivel de presión es bajo, cargar sugerencias de actividades
-        if (predictionRes.value.prediction?.sleepPressure?.level === 'low') {
+        if (predictionRes.value.prediction?.sleepPressure?.level === 'low' || 
+            predictionRes.value.prediction?.sleepPressure?.level === 'medium') {
           loadActivitySuggestions(childId);
         }
         
@@ -1460,8 +1461,8 @@ const HomeScreen: React.FC = () => {
                 </View>
               )}
 
-              {/* Card de recordatorio de actividades - al lado del planeta cuando hay energía alta */}
-              {selectedChild && !activeSleep && activitySuggestions && sleepPrediction?.prediction?.sleepPressure?.level === 'low' && (
+              {/* Card de recordatorio de actividades - al lado del planeta cuando hay energía alta o media */}
+              {selectedChild && !activeSleep && activitySuggestions && (sleepPrediction?.prediction?.sleepPressure?.level === 'low' || sleepPrediction?.prediction?.sleepPressure?.level === 'medium') && (
                 <TouchableOpacity 
                   style={styles.activityReminderCardCompact}
                   onPress={() => {
@@ -1479,7 +1480,15 @@ const HomeScreen: React.FC = () => {
                     <View style={styles.activityReminderIconCompact}>
                       <Ionicons name="sparkles" size={16} color="#FFF" />
                     </View>
-                    <Text style={styles.activityReminderLabelCompact}>Energía alta</Text>
+                    <Text style={styles.activityReminderLabelCompact}>
+                      {(() => {
+                        const level = sleepPrediction?.prediction?.sleepPressure?.level;
+                        if (level === 'low') return 'Energía alta';
+                        if (level === 'medium') return 'Energía media';
+                        if (level === 'high') return 'Energía baja';
+                        return 'Energía';
+                      })()}
+                    </Text>
                   </View>
                   <Text style={styles.activityReminderTitleCompact}>
                     Hacer actividades
@@ -1874,8 +1883,8 @@ const HomeScreen: React.FC = () => {
           </View>
         )}
 
-        {/* Sugerencias de Actividades - solo cuando el bebé está DESPIERTO y tiene energía (presión baja) */}
-        {selectedChild && !activeSleep && activitySuggestions && sleepPrediction?.prediction?.sleepPressure?.level === 'low' && (
+        {/* Sugerencias de Actividades - solo cuando el bebé está DESPIERTO y tiene energía (presión baja o media) */}
+        {selectedChild && !activeSleep && activitySuggestions && (sleepPrediction?.prediction?.sleepPressure?.level === 'low' || sleepPrediction?.prediction?.sleepPressure?.level === 'medium') && (
           <View 
             ref={activitiesSectionRef}
             style={styles.activitiesSection}
