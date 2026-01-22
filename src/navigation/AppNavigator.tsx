@@ -447,15 +447,7 @@ const AuthenticatedNavigator = () => {
         name="Notifications"
         component={NotificationsScreen}
         options={{
-          title: 'Notificaciones',
-          headerShown: true,
-          headerStyle: {
-            backgroundColor: '#96d2d3',
-          },
-          headerTintColor: 'white',
-          headerTitleStyle: {
-            fontWeight: 'bold',
-          },
+          headerShown: false,
         }}
       />
       <Stack.Screen
