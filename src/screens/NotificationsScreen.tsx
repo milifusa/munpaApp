@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   StatusBar,
   Platform,
+  SafeAreaView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
@@ -303,60 +304,119 @@ const NotificationsScreen = () => {
 
   if (loading) {
     return (
-      <View style={styles.container}>
-        <StatusBar barStyle="light-content" backgroundColor="#96d2d3" />
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#59C6C0" />
+      <SafeAreaView style={styles.safeArea}>
+        <View style={styles.container}>
+          <StatusBar barStyle="light-content" backgroundColor="#96d2d3" />
+          
+          {/* Header personalizado */}
+          <View style={styles.header}>
+            <TouchableOpacity
+              style={styles.backButton}
+              onPress={() => navigation.goBack()}
+            >
+              <Ionicons name="arrow-back" size={24} color="#FFF" />
+            </TouchableOpacity>
+            <Text style={styles.headerTitle}>Notificaciones</Text>
+            <View style={styles.headerRight} />
+          </View>
+
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#59C6C0" />
+          </View>
         </View>
-      </View>
+      </SafeAreaView>
     );
   }
 
   return (
-    <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#96d2d3" />
-      {unreadCount > 0 && (
-        <View style={styles.markAllContainer}>
+    <SafeAreaView style={styles.safeArea}>
+      <View style={styles.container}>
+        <StatusBar barStyle="light-content" backgroundColor="#96d2d3" />
+        
+        {/* Header personalizado */}
+        <View style={styles.header}>
           <TouchableOpacity
-            style={styles.markAllButton}
-            onPress={markAllAsRead}
+            style={styles.backButton}
+            onPress={() => navigation.goBack()}
           >
-            <Text style={styles.markAllText}>Marcar todas como leídas</Text>
+            <Ionicons name="arrow-back" size={24} color="#FFF" />
           </TouchableOpacity>
+          <Text style={styles.headerTitle}>Notificaciones</Text>
+          <View style={styles.headerRight} />
         </View>
-      )}
 
-      {notifications.length === 0 ? (
-        <View style={styles.emptyContainer}>
-          <Ionicons name="notifications-off" size={64} color="#CCC" />
-          <Text style={styles.emptyText}>No tienes notificaciones</Text>
-          <Text style={styles.emptySubtext}>
-            Te notificaremos cuando recibas mensajes, compras o actualizaciones importantes
-          </Text>
-        </View>
-      ) : (
-        <FlatList
-          data={notifications}
-          renderItem={renderNotification}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.listContent}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={onRefresh}
-              tintColor="#59C6C0"
-            />
-          }
-        />
-      )}
-    </View>
+        {unreadCount > 0 && (
+          <View style={styles.markAllContainer}>
+            <TouchableOpacity
+              style={styles.markAllButton}
+              onPress={markAllAsRead}
+            >
+              <Text style={styles.markAllText}>Marcar todas como leídas</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {notifications.length === 0 ? (
+          <View style={styles.emptyContainer}>
+            <Ionicons name="notifications-off" size={64} color="#CCC" />
+            <Text style={styles.emptyText}>No tienes notificaciones</Text>
+            <Text style={styles.emptySubtext}>
+              Te notificaremos cuando recibas mensajes, compras o actualizaciones importantes
+            </Text>
+          </View>
+        ) : (
+          <FlatList
+            data={notifications}
+            renderItem={renderNotification}
+            keyExtractor={(item) => item.id}
+            contentContainerStyle={styles.listContent}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={onRefresh}
+                tintColor="#59C6C0"
+              />
+            }
+          />
+        )}
+      </View>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#96d2d3',
+  },
   container: {
     flex: 1,
     backgroundColor: '#F5F5F5',
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#96d2d3',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#FFF',
+    fontFamily: 'Montserrat',
+  },
+  headerRight: {
+    width: 40,
   },
   markAllContainer: {
     backgroundColor: '#96d2d3',
