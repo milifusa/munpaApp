@@ -1799,8 +1799,8 @@ const HomeScreen: React.FC = () => {
             >
               <Ionicons 
                 name="moon" 
-                size={20} 
-                color={homeTab === 'sleep' ? '#887CBC' : '#999'} 
+                size={18} 
+                color={homeTab === 'sleep' ? '#4A5568' : '#FFF'} 
               />
               <Text style={[styles.tabText, homeTab === 'sleep' && styles.activeTabText]}>
                 Sueño
@@ -1813,8 +1813,8 @@ const HomeScreen: React.FC = () => {
             >
               <Ionicons 
                 name="medkit" 
-                size={20} 
-                color={homeTab === 'medications' ? '#887CBC' : '#999'} 
+                size={18} 
+                color={homeTab === 'medications' ? '#4A5568' : '#FFF'} 
               />
               <Text style={[styles.tabText, homeTab === 'medications' && styles.activeTabText]}>
                 Medicamentos
@@ -5184,37 +5184,32 @@ const styles = StyleSheet.create({
   // ============= ESTILOS DE PESTAÑAS =============
   tabsContainer: {
     flexDirection: 'row',
-    backgroundColor: '#FFF',
-    borderRadius: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 25,
     marginHorizontal: 20,
     marginVertical: 15,
     padding: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
   },
   tab: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 12,
+    paddingVertical: 10,
     paddingHorizontal: 16,
-    borderRadius: 8,
-    gap: 8,
+    borderRadius: 20,
+    gap: 6,
   },
   activeTab: {
-    backgroundColor: '#F0ECFF',
+    backgroundColor: '#FFFFFF',
   },
   tabText: {
     fontSize: 14,
-    fontWeight: '500',
-    color: '#999',
+    fontWeight: '600',
+    color: '#FFF',
   },
   activeTabText: {
-    color: '#887CBC',
+    color: '#4A5568',
     fontWeight: '700',
   },
   tabBadge: {
