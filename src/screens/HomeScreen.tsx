@@ -1348,29 +1348,31 @@ const HomeScreen: React.FC = () => {
           
           {/* Carita de presión de sueño */}
           <View style={styles.sleepPlanetContainer}>
-            {/* Imagen del planeta/carita según estado */}
-            <Image 
-              source={getSleepPressureImage()} 
-              style={styles.planetImageSimple}
-              resizeMode="contain"
-            />
+            <View style={styles.sleepPlanetRow}>
+              {/* Imagen del planeta/carita según estado */}
+              <Image 
+                source={getSleepPressureImage()} 
+                style={styles.planetImageSimple}
+                resizeMode="contain"
+              />
               
-            {/* Información de siesta activa sobre la carita */}
-            {activeSleep && (
-              <View style={styles.activeSleepInfo}>
-                <Text style={styles.activeSleepTitle}>
-                  {isPaused ? '⏸ Pausada' : '😴 Durmiendo'}
-                </Text>
-                <Text style={styles.activeSleepTime}>
-                  {formatDuration(elapsedSleepTime / 60, false)}
-                </Text>
-                {sleepPrediction?.prediction?.nextNap?.expectedDuration && (
-                  <Text style={styles.activeSleepSubtitle}>
-                    de {formatDuration(sleepPrediction.prediction.nextNap.expectedDuration)} min
+              {/* Información de siesta activa al lado de la carita */}
+              {activeSleep && (
+                <View style={styles.activeSleepInfoCompact}>
+                  <Text style={styles.activeSleepTitleCompact}>
+                    {isPaused ? '⏸ Pausada' : '😴 Durmiendo'}
                   </Text>
-                )}
-              </View>
-            )}
+                  <Text style={styles.activeSleepTimeCompact}>
+                    {formatDuration(elapsedSleepTime / 60, false)}
+                  </Text>
+                  {sleepPrediction?.prediction?.nextNap?.expectedDuration && (
+                    <Text style={styles.activeSleepSubtitleCompact}>
+                      de {formatDuration(sleepPrediction.prediction.nextNap.expectedDuration)} min
+                    </Text>
+                  )}
+                </View>
+              )}
+            </View>
             
           {/* Mensaje de presión de sueño - SOLO cuando NO hay siesta activa */}
           {!activeSleep && !activitySuggestions && (
@@ -1428,14 +1430,24 @@ const HomeScreen: React.FC = () => {
                 const napTime = nap.time || nap.startTime;
                 if (!napTime) return null;
                 
-                // Extraer hora directamente del string sin conversión de zona horaria
+                // Extraer hora de inicio directamente del string sin conversión de zona horaria
                 const timePart = napTime.split('T')[1]; // "10:52:00.000Z"
                 const [hoursStr, minutesStr] = timePart.split(':'); // ["10", "52", ...]
-                const timeStr = `${hoursStr}:${minutesStr}`;
+                const startTimeStr = `${hoursStr}:${minutesStr}`;
+                
+                // Calcular hora de fin (inicio + duración)
+                const duration = nap.actualDuration || nap.expectedDuration || nap.duration || 0;
+                const startHours = parseInt(hoursStr);
+                const startMinutes = parseInt(minutesStr);
+                const totalMinutes = startHours * 60 + startMinutes + duration;
+                const endHours = Math.floor(totalMinutes / 60) % 24;
+                const endMinutes = totalMinutes % 60;
+                const endTimeStr = `${endHours.toString().padStart(2, '0')}:${endMinutes.toString().padStart(2, '0')}`;
+                
+                const timeRangeStr = `${startTimeStr} - ${endTimeStr}`;
                 
                 const isInProgress = nap.status === 'in_progress' || nap.isInProgress === true;
                 const isCompleted = nap.completed || nap.status === 'completed';
-                const duration = nap.actualDuration || nap.expectedDuration || nap.duration || 0;
                 
                 const dotColor = isInProgress ? '#8B5CF6' : (isCompleted ? '#4CAF50' : '#56CCF2');
                 const iconName = isCompleted ? "checkmark-circle" : (isInProgress ? "moon" : "moon-outline");
@@ -1444,7 +1456,7 @@ const HomeScreen: React.FC = () => {
                 return (
                   <View key={`nap-${index}`} style={styles.scheduleItem}>
                     <View style={styles.scheduleTimeContainer}>
-                      <Text style={styles.scheduleTime}>{timeStr}</Text>
+                      <Text style={styles.scheduleTime}>{timeRangeStr}</Text>
                     </View>
                     <View style={[styles.scheduleDot, { backgroundColor: dotColor }]} />
                     <View style={styles.scheduleContent}>
@@ -4303,10 +4315,39 @@ const styles = StyleSheet.create({
     paddingVertical: 20,
     alignSelf: 'center',
   },
-  planetImageSimple: {
-    width: 180,
-    height: 180,
+  sleepPlanetRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
   },
+  planetImageSimple: {
+    width: 140,
+    height: 140,
+  },
+  // Estilos compactos para info de siesta activa (al lado de la carita)
+  activeSleepInfoCompact: {
+    justifyContent: 'center',
+  },
+  activeSleepTitleCompact: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#FFF',
+    marginBottom: 4,
+    fontFamily: 'Montserrat',
+  },
+  activeSleepTimeCompact: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#FFF',
+    marginBottom: 2,
+    fontFamily: 'Montserrat',
+  },
+  activeSleepSubtitleCompact: {
+    fontSize: 12,
+    color: 'rgba(255, 255, 255, 0.8)',
+    fontFamily: 'Montserrat',
+  },
+  // Estilos antiguos (por si acaso)
   activeSleepInfo: {
     marginTop: 15,
     alignItems: 'center',
@@ -4354,7 +4395,7 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   scheduleTimeContainer: {
-    width: 60,
+    width: 100, // Más ancho para "07:55 - 08:33"
     paddingTop: 4,
   },
   scheduleTime: {
