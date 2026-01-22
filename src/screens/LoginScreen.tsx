@@ -9,7 +9,9 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  StatusBar,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../contexts/AuthContext';
 import MunpaLogo from '../components/MunpaLogo';
 import SocialLoginButton from '../components/SocialLoginButton';
@@ -29,6 +31,7 @@ interface LoginScreenProps {
 const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const { login, loginWithGoogle, loginWithApple } = useAuth();
 
@@ -112,43 +115,71 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
+      <StatusBar barStyle="light-content" backgroundColor="#96d2d3" />
       <ScrollView
         contentContainerStyle={styles.scrollContainer}
         keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
       >
         {/* Logo y Header */}
         <View style={styles.header}>
           <MunpaLogo size="mega" showTagline={true} />
+          <Text style={styles.welcomeText}>¡Bienvenida de nuevo!</Text>
+          <Text style={styles.subtitleText}>Ingresa para continuar</Text>
         </View>
 
         {/* Formulario */}
         <View style={styles.form}>
           {/* Campo Email */}
           <View style={styles.inputContainer}>
-            <TextInput
-              style={styles.input}
-              placeholder="Correo electrónico"
-              placeholderTextColor="#FFFFFF"
-              value={email}
-              onChangeText={setEmail}
-              keyboardType="email-address"
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
+            <View style={styles.inputWrapper}>
+              <Ionicons 
+                name="mail-outline" 
+                size={20} 
+                color="#FFF" 
+                style={styles.inputIcon} 
+              />
+              <TextInput
+                style={styles.input}
+                placeholder="Correo electrónico"
+                placeholderTextColor="rgba(255, 255, 255, 0.7)"
+                value={email}
+                onChangeText={setEmail}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+            </View>
           </View>
 
           {/* Campo Contraseña */}
           <View style={styles.inputContainer}>
-            <TextInput
-              style={styles.input}
-              placeholder="Contraseña"
-              placeholderTextColor="#FFFFFF"
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
+            <View style={styles.inputWrapper}>
+              <Ionicons 
+                name="lock-closed-outline" 
+                size={20} 
+                color="#FFF" 
+                style={styles.inputIcon} 
+              />
+              <TextInput
+                style={styles.input}
+                placeholder="Contraseña"
+                placeholderTextColor="rgba(255, 255, 255, 0.7)"
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry={!showPassword}
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+              <TouchableOpacity
+                style={styles.eyeButton}
+                onPress={() => setShowPassword(!showPassword)}
+              >
+                <Text style={styles.eyeIcon}>
+                  {showPassword ? '👁️' : '🙈'}
+                </Text>
+              </TouchableOpacity>
+            </View>
           </View>
 
           {/* Botón Login */}
@@ -158,9 +189,14 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
             disabled={isLoading}
           >
             {isLoading ? (
-              <Text style={styles.loginButtonText}>Iniciando sesión...</Text>
+              <View style={styles.buttonContent}>
+                <Text style={styles.loginButtonText}>Iniciando sesión...</Text>
+              </View>
             ) : (
-              <Text style={styles.loginButtonText}>Iniciar sesión</Text>
+              <View style={styles.buttonContent}>
+                <Text style={styles.loginButtonText}>Iniciar sesión</Text>
+                <Ionicons name="arrow-forward" size={20} color="#FFF" />
+              </View>
             )}
           </TouchableOpacity>
         </View>
@@ -173,19 +209,17 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
           >
             <Text style={styles.linkText}>¿Olvidaste tu contraseña?</Text>
           </TouchableOpacity>
-          
-          <TouchableOpacity
-            style={styles.linkButton}
-            onPress={() => navigation.navigate('Signup')}
-          >
-            <Text style={styles.linkText}>Crear cuenta</Text>
-          </TouchableOpacity>
+        </View>
+
+        {/* Divider */}
+        <View style={styles.dividerContainer}>
+          <View style={styles.divider} />
+          <Text style={styles.dividerText}>O ingresa con</Text>
+          <View style={styles.divider} />
         </View>
 
         {/* Login Social */}
         <View style={styles.socialContainer}>
-          <Text style={styles.socialText}>O ingresa con:</Text>
-          
           {/* Login con Apple - solo disponible en iOS - PRIMERO según Apple Guidelines */}
           {Platform.OS === 'ios' && (
             <TouchableOpacity
@@ -193,7 +227,8 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
               onPress={handleAppleLogin}
               disabled={isLoading}
             >
-              <Text style={styles.appleButtonText}>  Continuar con Apple</Text>
+              <Ionicons name="logo-apple" size={24} color="#FFF" />
+              <Text style={styles.appleButtonText}>Continuar con Apple</Text>
             </TouchableOpacity>
           )}
           
@@ -202,7 +237,16 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
             onPress={handleGoogleLogin}
             disabled={isLoading}
           >
-            <Text style={styles.googleButtonText}>G  Continuar con Google</Text>
+            <Ionicons name="logo-google" size={24} color="#DB4437" />
+            <Text style={styles.googleButtonText}>Continuar con Google</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Crear cuenta */}
+        <View style={styles.signupContainer}>
+          <Text style={styles.signupText}>¿No tienes cuenta? </Text>
+          <TouchableOpacity onPress={() => navigation.navigate('Signup')}>
+            <Text style={styles.signupLink}>Crear cuenta</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -213,82 +257,122 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#96d2d3', // Fondo púrpura principal actualizado
-    paddingBottom: 0,
+    backgroundColor: '#96d2d3',
   },
   scrollContainer: {
     flexGrow: 1,
     justifyContent: 'center',
-    padding: spacing.lg,
-    paddingBottom: 0,
+    padding: spacing.xl,
+    paddingTop: spacing['3xl'],
   },
   header: {
     alignItems: 'center',
     marginBottom: spacing['2xl'],
   },
+  welcomeText: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: colors.white,
+    marginTop: spacing.lg,
+    textAlign: 'center',
+  },
+  subtitleText: {
+    fontSize: typography.sizes.base,
+    color: 'rgba(255, 255, 255, 0.9)',
+    marginTop: spacing.xs,
+    textAlign: 'center',
+  },
   form: {
-    backgroundColor: 'transparent',
-    marginBottom: spacing.lg,
+    marginBottom: spacing.xl,
   },
   inputContainer: {
     marginBottom: spacing.md,
   },
-  input: {
-    backgroundColor: '#A99DD9', // Púrpura más claro para inputs
-    borderRadius: borderRadius.base,
-    padding: spacing.md,
-    fontSize: typography.sizes.base,
-    // fontFamily: 'Montserrat' // Temporalmente comentado,
-    color: '#2D3748', // Color más oscuro para mejor contraste
-    minHeight: 48,
-    textAlign: 'center',
-  },
-  loginButton: {
-    backgroundColor: '#B4C14B', // Verde lima actualizado para el botón
-    borderRadius: borderRadius.base,
-    padding: spacing.md,
+  inputWrapper: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: 48,
-    marginTop: spacing.md,
+    backgroundColor: 'rgba(169, 157, 217, 0.8)',
+    borderRadius: borderRadius.lg,
+    paddingHorizontal: spacing.md,
+    minHeight: 56,
     ...shadows.base,
   },
+  inputIcon: {
+    marginRight: spacing.sm,
+  },
+  input: {
+    flex: 1,
+    fontSize: typography.sizes.base,
+    color: colors.white,
+    paddingVertical: spacing.sm,
+  },
+  eyeButton: {
+    padding: spacing.xs,
+    marginLeft: spacing.xs,
+  },
+  eyeIcon: {
+    fontSize: 20,
+  },
+  loginButton: {
+    backgroundColor: '#B4C14B',
+    borderRadius: borderRadius.lg,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 56,
+    marginTop: spacing.lg,
+    ...shadows.lg,
+  },
   buttonDisabled: {
-    backgroundColor: colors.gray[300],
+    backgroundColor: colors.gray[400],
     opacity: 0.6,
+  },
+  buttonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
   },
   loginButtonText: {
     color: colors.white,
-    fontSize: typography.sizes.base,
+    fontSize: typography.sizes.lg,
     fontWeight: '700',
     textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   linksContainer: {
     alignItems: 'center',
-    marginBottom: 0,
-    paddingBottom: spacing.xl,
+    marginBottom: spacing.xl,
   },
   linkButton: {
     padding: spacing.sm,
-    marginBottom: spacing.xs,
   },
   linkText: {
     color: colors.white,
     fontSize: typography.sizes.sm,
-    // fontFamily: 'Montserrat' // Temporalmente comentado,
-    textAlign: 'center',
+    fontWeight: '600',
+    textDecorationLine: 'underline',
+  },
+  dividerContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: spacing.xl,
+  },
+  divider: {
+    flex: 1,
+    height: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+  },
+  dividerText: {
+    color: 'rgba(255, 255, 255, 0.9)',
+    fontSize: typography.sizes.sm,
+    marginHorizontal: spacing.md,
+    fontWeight: '500',
   },
   socialContainer: {
-    alignItems: 'center',
     width: '100%',
+    marginBottom: spacing.xl,
   },
-  socialText: {
-    color: colors.white,
-    fontSize: typography.sizes.sm,
-    marginBottom: spacing.md,
-    textAlign: 'center',
-  },
-  // Botones de login social - Tamaño completo y equivalentes
   socialLoginButton: {
     width: '100%',
     flexDirection: 'row',
@@ -296,12 +380,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: 14,
     paddingHorizontal: 20,
-    borderRadius: 8,
+    borderRadius: borderRadius.lg,
     marginBottom: 12,
-    minHeight: 48,
+    minHeight: 56,
+    gap: spacing.sm,
     ...shadows.base,
   },
-  // Botón de Apple - Negro (Apple guidelines)
   appleButton: {
     backgroundColor: '#000000',
     borderWidth: 0,
@@ -310,11 +394,9 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',
-    textAlign: 'center',
   },
-  // Botón de Google - Blanco con borde
   googleButton: {
-    backgroundColor: '#F7FAFC',
+    backgroundColor: '#FFFFFF',
     borderWidth: 1,
     borderColor: '#E0E0E0',
   },
@@ -322,14 +404,23 @@ const styles = StyleSheet.create({
     color: '#000000',
     fontSize: 16,
     fontWeight: '600',
-    textAlign: 'center',
   },
-  socialButtons: {
+  signupContainer: {
     flexDirection: 'row',
+    justifyContent: 'center',
     alignItems: 'center',
+    marginTop: spacing.lg,
+    paddingBottom: spacing.xl,
   },
-  socialSpacer: {
-    width: spacing.lg,
+  signupText: {
+    color: 'rgba(255, 255, 255, 0.9)',
+    fontSize: typography.sizes.base,
+  },
+  signupLink: {
+    color: colors.white,
+    fontSize: typography.sizes.base,
+    fontWeight: '700',
+    textDecorationLine: 'underline',
   },
 });
 
