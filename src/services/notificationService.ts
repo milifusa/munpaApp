@@ -3,8 +3,7 @@ import * as Device from 'expo-device';
 import { Alert, Platform } from 'react-native';
 import Constants from 'expo-constants';
 import { axiosInstance as api } from './api';
-import { getApp } from 'firebase/app';
-import { getMessaging, getToken } from 'firebase/messaging';
+import messaging from '@react-native-firebase/messaging';
 
 // Configurar cómo se manejan las notificaciones cuando la app está en primer plano
 Notifications.setNotificationHandler({
@@ -131,7 +130,7 @@ const notificationService = {
       if (!token) {
         console.log('🔔 [NOTIF] No hay token existente, solicitando permisos...');
         
-        // Solicitar permisos
+        // Solicitar permisos (Expo maneja esto bien en ambas plataformas)
         const { status: existingStatus } = await Notifications.getPermissionsAsync();
         let finalStatus = existingStatus;
         console.log('🔔 [NOTIF] Estado de permisos actual:', existingStatus);
@@ -148,47 +147,46 @@ const notificationService = {
           return null;
         }
 
-        // Obtener token FCM usando Firebase Messaging
+        // Obtener token FCM usando @react-native-firebase/messaging
         if (Device.isDevice) {
           console.log('🔔 [NOTIF] Dispositivo real detectado, obteniendo token FCM...');
           
           try {
-            // Intentar obtener token FCM desde Firebase Messaging
-            const firebaseApp = getApp();
+            // Verificar estado de autorización de Firebase Messaging
+            const authStatus = await messaging().requestPermission();
+            const enabled =
+              authStatus === messaging.AuthorizationStatus.AUTHORIZED ||
+              authStatus === messaging.AuthorizationStatus.PROVISIONAL;
+
+            if (!enabled) {
+              console.log('⚠️ [NOTIF] Usuario no autorizó notificaciones de Firebase');
+              return null;
+            }
+
+            console.log('✅ [NOTIF] Autorización de Firebase Messaging concedida');
             
-            // Para iOS, necesitamos obtener el APNS token primero y luego Firebase lo convierte a FCM
-            if (Platform.OS === 'ios') {
-              console.log('🍎 [NOTIF] iOS detectado, obteniendo APNS token primero...');
-              const deviceToken = await Notifications.getDevicePushTokenAsync();
-              console.log('✅ [NOTIF] APNS token obtenido, esperando conversión a FCM por Firebase...');
+            // Obtener token FCM directamente (funciona en iOS y Android)
+            token = await messaging().getToken();
+            tokenType = 'fcm';
+            
+            if (!token) {
+              console.error('❌ [NOTIF] No se pudo obtener token FCM (token vacío)');
+              return null;
             }
             
-            // Obtener token FCM
-            const messaging = getMessaging(firebaseApp);
-            token = await getToken(messaging, {
-              vapidKey: Constants.expoConfig?.extra?.firebaseVapidKey
-            });
-            tokenType = 'fcm';
-            console.log(`✅ [NOTIF] Token FCM obtenido:`, token?.substring(0, 50) + '...');
+            console.log(`✅ [NOTIF] Token FCM obtenido (${token.length} caracteres):`, token.substring(0, 50) + '...');
+            console.log(`🔍 [NOTIF] Token completo para debug:`, token);
             
           } catch (fcmError: any) {
             console.error('❌ [NOTIF] Error obteniendo token FCM:', fcmError);
             console.error('❌ [NOTIF] Error details:', fcmError.message);
+            console.error('❌ [NOTIF] Error stack:', fcmError.stack);
             
-            // Fallback a token de Expo si Firebase no funciona
-            console.log('🔔 [NOTIF] Fallback: usando token de Expo...');
-            const projectId = Constants.expoConfig?.extra?.eas?.projectId;
-            if (!projectId) {
-              console.error('❌ [NOTIF] No se encontró el projectId en la configuración');
-              return null;
-            }
-            const tokenData = await Notifications.getExpoPushTokenAsync({ projectId });
-            token = tokenData.data;
-            tokenType = 'expo';
-            console.log('✅ [NOTIF] Token Expo obtenido:', token?.substring(0, 50) + '...');
+            // NO usar fallback a Expo si queremos FCM puro
+            return null;
           }
         } else {
-          console.log('⚠️ [NOTIF] Simulador detectado, no se puede obtener token');
+          console.log('⚠️ [NOTIF] Simulador detectado, no se puede obtener token FCM real');
           return null;
         }
       } else {
@@ -200,7 +198,8 @@ const notificationService = {
       // Registrar token con el backend
       if (token) {
         console.log('📤 [NOTIF] Enviando token al backend...');
-        console.log('📤 [NOTIF] Token:', token.substring(0, 50) + '...');
+        console.log('📤 [NOTIF] Token (primeros 50 chars):', token.substring(0, 50) + '...');
+        console.log('📤 [NOTIF] Token length:', token.length);
         console.log('📤 [NOTIF] Token Type:', tokenType);
         console.log('📤 [NOTIF] Platform:', Platform.OS);
         console.log('📤 [NOTIF] Device ID:', Constants.deviceId || 'unknown');
