@@ -411,10 +411,12 @@ const HomeScreen: React.FC = () => {
         
         setSleepPrediction(predictionRes.value);
         
-        // Si el nivel de presión es bajo, cargar sugerencias de actividades
-        if (predictionRes.value.prediction?.sleepPressure?.level === 'low' || 
-            predictionRes.value.prediction?.sleepPressure?.level === 'medium') {
+        // Si el nivel de presión es BAJO (energía alta), cargar sugerencias de actividades
+        if (predictionRes.value.prediction?.sleepPressure?.level === 'low') {
           loadActivitySuggestions(childId);
+        } else {
+          // Si no hay energía alta, limpiar sugerencias
+          setActivitySuggestions(null);
         }
         
         // 🔔 REPROGRAMAR notificaciones automáticas cada vez que se actualizan las predicciones
@@ -1461,24 +1463,41 @@ const HomeScreen: React.FC = () => {
                 </View>
               )}
 
-              {/* Card de recordatorio de actividades - al lado del planeta cuando hay energía alta o media */}
-              {selectedChild && !activeSleep && activitySuggestions && (sleepPrediction?.prediction?.sleepPressure?.level === 'low' || sleepPrediction?.prediction?.sleepPressure?.level === 'medium') && (
+              {/* Card de recordatorio dinámico según nivel de energía */}
+              {selectedChild && !activeSleep && sleepPrediction?.prediction?.sleepPressure && (
                 <TouchableOpacity 
-                  style={styles.activityReminderCardCompact}
+                  style={[
+                    styles.activityReminderCardCompact,
+                    sleepPrediction.prediction.sleepPressure.level === 'low' && styles.activityReminderCardHigh,
+                    sleepPrediction.prediction.sleepPressure.level === 'medium' && styles.activityReminderCardMedium,
+                    sleepPrediction.prediction.sleepPressure.level === 'high' && styles.activityReminderCardLow,
+                  ]}
                   onPress={() => {
-                    activitiesSectionRef.current?.measureLayout(
-                      // @ts-ignore
-                      scrollViewRef.current,
-                      (x, y) => {
-                        scrollViewRef.current?.scrollTo({ y: y - 20, animated: true });
-                      }
-                    );
+                    // Solo hacer scroll a actividades si hay energía alta
+                    if (sleepPrediction.prediction.sleepPressure.level === 'low' && activitySuggestions) {
+                      activitiesSectionRef.current?.measureLayout(
+                        // @ts-ignore
+                        scrollViewRef.current,
+                        (x, y) => {
+                          scrollViewRef.current?.scrollTo({ y: y - 20, animated: true });
+                        }
+                      );
+                    }
                   }}
                   activeOpacity={0.8}
+                  disabled={sleepPrediction.prediction.sleepPressure.level !== 'low'}
                 >
                   <View style={styles.activityReminderHeaderCompact}>
                     <View style={styles.activityReminderIconCompact}>
-                      <Ionicons name="sparkles" size={16} color="#FFF" />
+                      <Ionicons 
+                        name={
+                          sleepPrediction.prediction.sleepPressure.level === 'low' ? 'sparkles' :
+                          sleepPrediction.prediction.sleepPressure.level === 'medium' ? 'hand-left' :
+                          'moon'
+                        } 
+                        size={16} 
+                        color="#FFF" 
+                      />
                     </View>
                     <Text style={styles.activityReminderLabelCompact}>
                       {(() => {
@@ -1491,12 +1510,20 @@ const HomeScreen: React.FC = () => {
                     </Text>
                   </View>
                   <Text style={styles.activityReminderTitleCompact}>
-                    Hacer actividades
+                    {(() => {
+                      const level = sleepPrediction?.prediction?.sleepPressure?.level;
+                      if (level === 'low') return 'Hacer actividades';
+                      if (level === 'medium') return `Relajar a ${selectedChild.name}`;
+                      if (level === 'high') return 'Hora de dormir';
+                      return 'Hacer actividades';
+                    })()}
                   </Text>
-                  <View style={styles.activityReminderFooterCompact}>
-                    <Text style={styles.activityReminderButtonTextCompact}>Ver sugerencias</Text>
-                    <Ionicons name="arrow-forward" size={14} color="#FFF" />
-                  </View>
+                  {sleepPrediction.prediction.sleepPressure.level === 'low' && activitySuggestions && (
+                    <View style={styles.activityReminderFooterCompact}>
+                      <Text style={styles.activityReminderButtonTextCompact}>Ver sugerencias</Text>
+                      <Ionicons name="arrow-forward" size={14} color="#FFF" />
+                    </View>
+                  )}
                 </TouchableOpacity>
               )}
             </View>
@@ -1883,8 +1910,8 @@ const HomeScreen: React.FC = () => {
           </View>
         )}
 
-        {/* Sugerencias de Actividades - solo cuando el bebé está DESPIERTO y tiene energía (presión baja o media) */}
-        {selectedChild && !activeSleep && activitySuggestions && (sleepPrediction?.prediction?.sleepPressure?.level === 'low' || sleepPrediction?.prediction?.sleepPressure?.level === 'medium') && (
+        {/* Sugerencias de Actividades - SOLO cuando el bebé está DESPIERTO y tiene ENERGÍA ALTA */}
+        {selectedChild && !activeSleep && activitySuggestions && sleepPrediction?.prediction?.sleepPressure?.level === 'low' && (
           <View 
             ref={activitiesSectionRef}
             style={styles.activitiesSection}
@@ -4819,7 +4846,7 @@ const styles = StyleSheet.create({
   // Estilos para card de recordatorio de actividades (compacto, al lado del planeta)
   activityReminderCardCompact: {
     width: 160, // Ancho fijo más pequeño
-    backgroundColor: 'rgba(245, 158, 11, 0.95)',
+    backgroundColor: 'rgba(245, 158, 11, 0.95)', // Default amarillo (energía alta)
     borderRadius: 16,
     padding: 12,
     marginLeft: 16,
@@ -4830,6 +4857,21 @@ const styles = StyleSheet.create({
     elevation: 6,
     justifyContent: 'space-between',
     height: 140, // Altura fija
+  },
+  activityReminderCardHigh: {
+    // Energía ALTA (low sleep pressure) - Amarillo vibrante
+    backgroundColor: 'rgba(245, 158, 11, 0.95)',
+    shadowColor: '#F59E0B',
+  },
+  activityReminderCardMedium: {
+    // Energía MEDIA (medium sleep pressure) - Azul suave
+    backgroundColor: 'rgba(59, 130, 246, 0.95)',
+    shadowColor: '#3B82F6',
+  },
+  activityReminderCardLow: {
+    // Energía BAJA (high sleep pressure) - Púrpura oscuro
+    backgroundColor: 'rgba(139, 92, 246, 0.95)',
+    shadowColor: '#8B5CF6',
   },
   activityReminderHeaderCompact: {
     flexDirection: 'row',
