@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -178,6 +178,10 @@ const HomeScreen: React.FC = () => {
   const [medStartDate, setMedStartDate] = useState(new Date());
   const [medEndDate, setMedEndDate] = useState<Date | null>(null);
   const [medNotes, setMedNotes] = useState('');
+  
+  // Refs para scroll
+  const scrollViewRef = useRef<ScrollView>(null);
+  const activitiesSectionRef = useRef<View>(null);
   const [medScheduleDays, setMedScheduleDays] = useState('14');
   const [showMedStartDatePicker, setShowMedStartDatePicker] = useState(false);
   const [showMedEndDatePicker, setShowMedEndDatePicker] = useState(false);
@@ -1291,6 +1295,7 @@ const HomeScreen: React.FC = () => {
   return (
     <View style={styles.container}>
       <ScrollView
+        ref={scrollViewRef}
         style={styles.scrollView}
         showsVerticalScrollIndicator={false}
       >
@@ -1341,9 +1346,35 @@ const HomeScreen: React.FC = () => {
         {/* Contenido de la pestaña SUEÑO */}
         {homeTab === 'sleep' && selectedChild && (
           <>
-          {/* Título de Sueño */}
+          {/* Título de Sueño con mensaje emocional */}
           <View style={styles.sleepTitleContainer}>
-            <Text style={styles.sleepTitle}>Recomendación de sueño</Text>
+            <Text style={styles.sleepTitle}>
+              {(() => {
+                // Mensaje emocional basado en el estado del día
+                if (activeSleep) {
+                  return `${selectedChild.name} está durmiendo bien 💤`;
+                }
+                
+                if (sleepPrediction?.prediction?.dailySchedule?.allNaps) {
+                  const completedNaps = sleepPrediction.prediction.dailySchedule.allNaps.filter(
+                    (nap: any) => nap.completed || nap.status === 'completed'
+                  );
+                  const totalNaps = sleepPrediction.prediction.dailySchedule.allNaps.length;
+                  
+                  if (completedNaps.length === 0) {
+                    return `Buen día para ${selectedChild.name} 💚`;
+                  } else if (completedNaps.length >= totalNaps - 1) {
+                    return `${selectedChild.name} va muy bien hoy 💛`;
+                  } else if (sleepPrediction.prediction.sleepPressure?.level === 'high') {
+                    return `Ojo: ${selectedChild.name} se nota cansado 😴`;
+                  } else {
+                    return `Día tranquilo con ${selectedChild.name} ✨`;
+                  }
+                }
+                
+                return `Recomendación de sueño`;
+              })()}
+            </Text>
           </View>
           
           {/* Carita de presión de sueño */}
@@ -1371,6 +1402,37 @@ const HomeScreen: React.FC = () => {
                     </Text>
                   )}
                 </View>
+              )}
+
+              {/* Card de recordatorio de actividades - al lado del planeta cuando hay energía alta */}
+              {selectedChild && !activeSleep && activitySuggestions && sleepPrediction?.prediction?.sleepPressure?.level === 'low' && (
+                <TouchableOpacity 
+                  style={styles.activityReminderCardCompact}
+                  onPress={() => {
+                    activitiesSectionRef.current?.measureLayout(
+                      // @ts-ignore
+                      scrollViewRef.current,
+                      (x, y) => {
+                        scrollViewRef.current?.scrollTo({ y: y - 20, animated: true });
+                      }
+                    );
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <View style={styles.activityReminderHeaderCompact}>
+                    <View style={styles.activityReminderIconCompact}>
+                      <Ionicons name="sparkles" size={16} color="#FFF" />
+                    </View>
+                    <Text style={styles.activityReminderLabelCompact}>Energía alta</Text>
+                  </View>
+                  <Text style={styles.activityReminderTitleCompact}>
+                    Hacer actividades
+                  </Text>
+                  <View style={styles.activityReminderFooterCompact}>
+                    <Text style={styles.activityReminderButtonTextCompact}>Ver sugerencias</Text>
+                    <Ionicons name="arrow-forward" size={14} color="#FFF" />
+                  </View>
+                </TouchableOpacity>
               )}
             </View>
             
@@ -1442,11 +1504,11 @@ const HomeScreen: React.FC = () => {
                 if (!napTime) return null;
                 
                 // Extraer hora de inicio directamente del string sin conversión de zona horaria
-                const timePart = napTime.split('T')[1]; // "10:52:00.000Z"
-                const [hoursStr, minutesStr] = timePart.split(':'); // ["10", "52", ...]
+                const timePart = napTime.split('T')[1];
+                const [hoursStr, minutesStr] = timePart.split(':');
                 const startTimeStr = `${hoursStr}:${minutesStr}`;
                 
-                // Calcular hora de fin (inicio + duración)
+                // Calcular hora de fin
                 const duration = nap.actualDuration || nap.expectedDuration || nap.duration || 0;
                 const startHours = parseInt(hoursStr);
                 const startMinutes = parseInt(minutesStr);
@@ -1460,27 +1522,92 @@ const HomeScreen: React.FC = () => {
                 const isInProgress = nap.status === 'in_progress' || nap.isInProgress === true;
                 const isCompleted = nap.completed || nap.status === 'completed';
                 
+                // Determinar si es la próxima siesta
+                const now = new Date();
+                const napDate = new Date(napTime);
+                const isNext = !isCompleted && !isInProgress && napDate > now;
+                
                 const dotColor = isInProgress ? '#8B5CF6' : (isCompleted ? '#4CAF50' : '#56CCF2');
                 const iconName = isCompleted ? "checkmark-circle" : (isInProgress ? "moon" : "moon-outline");
-                const statusText = isCompleted ? "Completada" : (isInProgress ? "En progreso" : "Programada");
+                
+                // Mensaje más humano
+                let statusMessage = '';
+                if (isCompleted) {
+                  const hours = Math.floor(duration / 60);
+                  const mins = duration % 60;
+                  const expectedDuration = nap.expectedDuration || duration;
+                  const diff = duration - expectedDuration;
+                  
+                  if (hours > 0) {
+                    statusMessage = `Durmió ${hours}h ${mins}m 😴`;
+                  } else {
+                    statusMessage = `Durmió ${mins} min 😴`;
+                  }
+                  
+                  // Feedback adicional
+                  if (diff > 15) {
+                    statusMessage += ' · Excelente siesta';
+                  } else if (diff < -15) {
+                    statusMessage += ' · Se quedó corto';
+                  }
+                } else if (isInProgress) {
+                  statusMessage = 'Durmiendo ahora...';
+                } else {
+                  const minutesUntil = Math.floor((napDate.getTime() - now.getTime()) / 1000 / 60);
+                  if (minutesUntil < 30 && minutesUntil > 0) {
+                    statusMessage = `¡En ${minutesUntil} min!`;
+                  } else {
+                    statusMessage = `${duration} min`;
+                  }
+                }
+                
+                // Estilo diferente para completadas (más pequeñas)
+                const cardStyle = isCompleted ? 
+                  [styles.scheduleCard, styles.scheduleCardCompleted, { borderLeftColor: dotColor }] :
+                  isInProgress ?
+                  [styles.scheduleCard, styles.scheduleCardActive, { borderLeftColor: dotColor }] :
+                  [styles.scheduleCard, { borderLeftColor: dotColor }];
                 
                 return (
                   <View key={`nap-${index}`} style={styles.scheduleItem}>
                     <View style={styles.scheduleTimeContainer}>
-                      <Text style={styles.scheduleTime}>{timeRangeStr}</Text>
+                      <Text style={[
+                        styles.scheduleTime,
+                        isCompleted && styles.scheduleTimeCompleted
+                      ]}>
+                        {isCompleted ? startTimeStr : timeRangeStr}
+                      </Text>
                     </View>
-                    <View style={[styles.scheduleDot, { backgroundColor: dotColor }]} />
+                    <View style={[
+                      styles.scheduleDot, 
+                      { backgroundColor: dotColor },
+                      isInProgress && styles.scheduleDotActive
+                    ]} />
                     <View style={styles.scheduleContent}>
                       <TouchableOpacity 
-                        style={[styles.scheduleCard, { borderLeftColor: dotColor }]}
+                        style={cardStyle}
                         onPress={() => showNapDetail(nap, index)}
                         activeOpacity={0.7}
                       >
                         <View style={styles.scheduleCardHeader}>
-                          <Ionicons name={iconName} size={20} color={dotColor} />
-                          <Text style={styles.scheduleCardTitle}>Siesta {index + 1}</Text>
+                          <Ionicons 
+                            name={iconName} 
+                            size={isCompleted ? 16 : 20} 
+                            color={dotColor} 
+                          />
+                          <Text style={[
+                            styles.scheduleCardTitle,
+                            isCompleted && styles.scheduleCardTitleCompleted
+                          ]}>
+                            Siesta {index + 1}
+                          </Text>
                         </View>
-                        <Text style={styles.scheduleCardDuration}>{duration} min · {statusText}</Text>
+                        <Text style={[
+                          styles.scheduleCardDuration,
+                          isInProgress && styles.scheduleCardDurationActive
+                        ]}>
+                          {statusMessage}
+                        </Text>
                       </TouchableOpacity>
                     </View>
                   </View>
@@ -1685,7 +1812,10 @@ const HomeScreen: React.FC = () => {
 
         {/* Sugerencias de Actividades - solo cuando el bebé está DESPIERTO y tiene energía (presión baja) */}
         {selectedChild && !activeSleep && activitySuggestions && sleepPrediction?.prediction?.sleepPressure?.level === 'low' && (
-          <View style={styles.activitiesSection}>
+          <View 
+            ref={activitiesSectionRef}
+            style={styles.activitiesSection}
+          >
             <View style={styles.activitiesSectionHeader}>
               <Text style={styles.activitiesSectionTitle}>
                 Actividades para {selectedChild.name}
@@ -4329,15 +4459,19 @@ const styles = StyleSheet.create({
   sleepPlanetRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: 16,
+    paddingHorizontal: 16,
   },
   planetImageSimple: {
-    width: 140,
-    height: 140,
+    width: 120,
+    height: 120,
   },
   // Estilos compactos para info de siesta activa (al lado de la carita)
   activeSleepInfoCompact: {
     justifyContent: 'center',
+    flex: 1,
+    paddingLeft: 8,
   },
   activeSleepTitleCompact: {
     fontSize: 14,
@@ -4356,6 +4490,67 @@ const styles = StyleSheet.create({
   activeSleepSubtitleCompact: {
     fontSize: 12,
     color: 'rgba(255, 255, 255, 0.8)',
+    fontFamily: 'Montserrat',
+  },
+
+  // Estilos para card de recordatorio de actividades (compacto, al lado del planeta)
+  activityReminderCardCompact: {
+    width: 160, // Ancho fijo más pequeño
+    backgroundColor: 'rgba(245, 158, 11, 0.95)',
+    borderRadius: 16,
+    padding: 12,
+    marginLeft: 16,
+    shadowColor: '#F59E0B',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
+    justifyContent: 'space-between',
+    height: 140, // Altura fija
+  },
+  activityReminderHeaderCompact: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 8,
+  },
+  activityReminderIconCompact: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  activityReminderLabelCompact: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: 'rgba(255, 255, 255, 0.9)',
+    fontFamily: 'Montserrat',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  activityReminderContentCompact: {
+    flex: 1,
+  },
+  activityReminderTitleCompact: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#FFF',
+    fontFamily: 'Montserrat',
+    lineHeight: 20,
+    marginBottom: 'auto',
+  },
+  activityReminderFooterCompact: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 12,
+  },
+  activityReminderButtonTextCompact: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#FFF',
     fontFamily: 'Montserrat',
   },
   // Estilos antiguos (por si acaso)
@@ -4453,10 +4648,40 @@ const styles = StyleSheet.create({
     padding: 12,
     borderLeftWidth: 4,
   },
+  scheduleCardCompleted: {
+    opacity: 0.7,
+    padding: 10,
+  },
+  scheduleCardActive: {
+    backgroundColor: 'rgba(139, 92, 246, 0.2)',
+    borderLeftWidth: 5,
+  },
   scheduleCardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+  },
+  scheduleCardTitleCompleted: {
+    fontSize: 14,
+  },
+  scheduleTimeCompleted: {
+    fontSize: 13,
+    opacity: 0.8,
+  },
+  scheduleDotActive: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    borderWidth: 3,
+    shadowColor: '#8B5CF6',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.6,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  scheduleCardDurationActive: {
+    fontWeight: '700',
+    color: '#FFF',
   },
   scheduleCardTitle: {
     fontSize: 15,
@@ -4469,6 +4694,49 @@ const styles = StyleSheet.create({
     color: 'rgba(255, 255, 255, 0.8)',
     marginTop: 4,
     marginLeft: 28,
+    fontFamily: 'Montserrat',
+  },
+
+  // Estilos para card de recordatorio de actividades
+  activityReminderCard: {
+    marginHorizontal: 20,
+    marginTop: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    borderRadius: 16,
+    padding: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    borderWidth: 2,
+    borderColor: 'rgba(245, 158, 11, 0.3)',
+  },
+  activityReminderIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'rgba(245, 158, 11, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  activityReminderContent: {
+    flex: 1,
+  },
+  activityReminderTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#FFF',
+    fontFamily: 'Montserrat',
+  },
+  activityReminderButton: {
+    backgroundColor: 'rgba(245, 158, 11, 0.3)',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+  },
+  activityReminderButtonText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#FFF',
     fontFamily: 'Montserrat',
   },
   
