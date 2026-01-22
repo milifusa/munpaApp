@@ -872,6 +872,63 @@ const HomeScreen: React.FC = () => {
     }
   };
 
+  // Función para iniciar siesta directamente desde el Home
+  const handleQuickStartNap = async () => {
+    if (!selectedChild) return;
+    
+    // Verificar que haya hora de despertar registrada HOY
+    if (!wakeTimeToday) {
+      Alert.alert(
+        '⚠️ Hora de Despertar Requerida',
+        'Debes registrar primero la hora de despertar de hoy para poder agregar siestas.',
+        [
+          {
+            text: 'Cancelar',
+            style: 'cancel'
+          },
+          {
+            text: 'Registrar ahora',
+            onPress: () => {
+              setSelectedWakeTime(new Date());
+              setShowWakeTimeModal(true);
+            }
+          }
+        ]
+      );
+      return;
+    }
+
+    try {
+      setLoadingSleep(true);
+      const now = new Date();
+      
+      console.log('💤 [HOME] Iniciando siesta directamente:', {
+        childId: selectedChild.id,
+        startTime: now.toISOString()
+      });
+
+      const response = await sleepService.recordSleep({
+        childId: selectedChild.id,
+        type: 'nap',
+        startTime: now.toISOString(),
+      });
+      
+      if (response.success && response.sleepEvent) {
+        setActiveSleep(response.sleepEvent);
+        
+        Alert.alert('✓ Siesta iniciada', 'El seguimiento de la siesta ha comenzado');
+        
+        // Recargar datos para actualizar la UI
+        loadSleepData(selectedChild.id);
+      }
+    } catch (error: any) {
+      console.error('❌ Error iniciando siesta:', error);
+      Alert.alert('Error', error.response?.data?.message || 'No se pudo iniciar la siesta');
+    } finally {
+      setLoadingSleep(false);
+    }
+  };
+
 
   const getSleepPressureMessage = () => {
     const childName = selectedChild?.name || 'tu bebé';
@@ -2140,8 +2197,8 @@ const HomeScreen: React.FC = () => {
                   setSelectedWakeTime(new Date());
                   setShowWakeTimeModal(true);
                 } else {
-                  // @ts-ignore
-                  navigation.navigate('SleepTracker', { childId: selectedChild?.id });
+                  // Iniciar siesta directamente
+                  handleQuickStartNap();
                 }
               }}
             >
@@ -2153,7 +2210,7 @@ const HomeScreen: React.FC = () => {
               <Text style={styles.fixedAddButtonText}>
                 {isBedtimeSoon 
                   ? "registrar hora de dormir" 
-                  : (wakeTimeToday ? "añadir siesta" : "agregar hora de despertar")
+                  : (wakeTimeToday ? "iniciar siesta" : "agregar hora de despertar")
                 }
               </Text>
             </TouchableOpacity>
