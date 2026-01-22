@@ -1984,8 +1984,34 @@ const HomeScreen: React.FC = () => {
                     </Text>
                   </View>
                   
-                  {/* Grid de información: Próxima toma y Frecuencia */}
+                  {/* Grid de información: Última toma, Próxima toma y Frecuencia */}
                   <View style={styles.medicationInfoGrid}>
+                    {/* Última toma */}
+                    <View style={styles.medicationInfoGridItem}>
+                      <Text style={styles.medicationInfoLabel}>Última toma</Text>
+                      <Text style={styles.medicationInfoValue}>
+                        {(() => {
+                          const times = getMedicationTimes(medication);
+                          if (times.length === 0) return '—';
+                          
+                          const now = new Date();
+                          const currentHour = now.getHours();
+                          const currentMinute = now.getMinutes();
+                          const currentTotalMinutes = currentHour * 60 + currentMinute;
+                          
+                          // Encontrar la última toma (la más reciente que ya pasó)
+                          const pastTimes = times.filter((time: string) => {
+                            const [h, m] = time.split(':').map(Number);
+                            const timeTotalMinutes = h * 60 + m;
+                            return timeTotalMinutes <= currentTotalMinutes;
+                          });
+                          
+                          // Retornar la última del array (la más reciente)
+                          return pastTimes.length > 0 ? pastTimes[pastTimes.length - 1] : '—';
+                        })()}
+                      </Text>
+                    </View>
+                    
                     {/* Próxima toma */}
                     <View style={styles.medicationInfoGridItem}>
                       <Text style={styles.medicationInfoLabel}>Próxima toma</Text>
@@ -5478,23 +5504,25 @@ const styles = StyleSheet.create({
   },
   medicationInfoGrid: {
     flexDirection: 'row',
-    gap: 12,
+    gap: 8,
     marginBottom: 12,
   },
   medicationInfoGridItem: {
     flex: 1,
     backgroundColor: '#F7FAFC',
     borderRadius: 12,
-    padding: 12,
+    padding: 10,
   },
   medicationInfoLabel: {
-    fontSize: 12,
+    fontSize: 10,
     color: '#718096',
     marginBottom: 4,
     fontWeight: '500',
+    textTransform: 'uppercase',
+    letterSpacing: 0.3,
   },
   medicationInfoValue: {
-    fontSize: 16,
+    fontSize: 14,
     color: '#1A202C',
     fontWeight: '700',
     fontFamily: 'Montserrat',
