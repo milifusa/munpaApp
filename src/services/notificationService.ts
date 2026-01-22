@@ -147,11 +147,14 @@ const notificationService = {
           return null;
         }
 
-        // Obtener token FCM usando @react-native-firebase/messaging
+        // Obtener token: Intentar FCM primero, fallback a Expo si no funciona
         if (Device.isDevice) {
-          console.log('🔔 [NOTIF] Dispositivo real detectado, obteniendo token FCM...');
+          console.log('🔔 [NOTIF] Dispositivo real detectado, intentando obtener token FCM...');
           
           try {
+            // Verificar si el módulo de messaging está disponible
+            console.log('🔍 [NOTIF] Verificando disponibilidad de Firebase Messaging...');
+            
             // Verificar estado de autorización de Firebase Messaging
             const authStatus = await messaging().requestPermission();
             const enabled =
@@ -160,18 +163,18 @@ const notificationService = {
 
             if (!enabled) {
               console.log('⚠️ [NOTIF] Usuario no autorizó notificaciones de Firebase');
-              return null;
+              throw new Error('Usuario no autorizó notificaciones de Firebase');
             }
 
             console.log('✅ [NOTIF] Autorización de Firebase Messaging concedida');
             
-            // Obtener token FCM directamente (funciona en iOS y Android)
+            // Obtener token FCM directamente (funciona en iOS y Android nativos)
             token = await messaging().getToken();
             tokenType = 'fcm';
             
             if (!token) {
-              console.error('❌ [NOTIF] No se pudo obtener token FCM (token vacío)');
-              return null;
+              console.error('❌ [NOTIF] Token FCM vacío, intentando fallback a Expo...');
+              throw new Error('Token FCM vacío');
             }
             
             console.log(`✅ [NOTIF] Token FCM obtenido (${token.length} caracteres):`, token.substring(0, 50) + '...');
@@ -180,14 +183,45 @@ const notificationService = {
           } catch (fcmError: any) {
             console.error('❌ [NOTIF] Error obteniendo token FCM:', fcmError);
             console.error('❌ [NOTIF] Error details:', fcmError.message);
-            console.error('❌ [NOTIF] Error stack:', fcmError.stack);
             
-            // NO usar fallback a Expo si queremos FCM puro
-            return null;
+            // Fallback a Expo Push Token para desarrollo/testing
+            console.log('🔄 [NOTIF] Fallback: intentando obtener token de Expo...');
+            try {
+              const projectId = Constants.expoConfig?.extra?.eas?.projectId;
+              if (!projectId) {
+                console.error('❌ [NOTIF] No se encontró projectId en configuración');
+                return null;
+              }
+              
+              const tokenData = await Notifications.getExpoPushTokenAsync({ projectId });
+              token = tokenData.data;
+              tokenType = 'expo';
+              console.log('⚠️ [NOTIF] Token Expo obtenido (DESARROLLO):', token.substring(0, 50) + '...');
+              console.log('⚠️ [NOTIF] ADVERTENCIA: Token Expo no funcionará con FCM en producción');
+              console.log('⚠️ [NOTIF] Necesitas hacer build nativo: npx expo run:ios');
+              
+            } catch (expoError: any) {
+              console.error('❌ [NOTIF] Error obteniendo token de Expo:', expoError);
+              return null;
+            }
           }
         } else {
-          console.log('⚠️ [NOTIF] Simulador detectado, no se puede obtener token FCM real');
-          return null;
+          console.log('⚠️ [NOTIF] Simulador detectado, usando token de Expo para desarrollo...');
+          try {
+            const projectId = Constants.expoConfig?.extra?.eas?.projectId;
+            if (!projectId) {
+              console.error('❌ [NOTIF] No se encontró projectId en configuración');
+              return null;
+            }
+            
+            const tokenData = await Notifications.getExpoPushTokenAsync({ projectId });
+            token = tokenData.data;
+            tokenType = 'expo';
+            console.log('📱 [NOTIF] Token Expo obtenido (SIMULADOR):', token.substring(0, 50) + '...');
+          } catch (error: any) {
+            console.error('❌ [NOTIF] Error obteniendo token de Expo:', error);
+            return null;
+          }
         }
       } else {
         // Si hay token existente, asumimos que es FCM

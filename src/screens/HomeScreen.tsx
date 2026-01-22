@@ -1583,7 +1583,6 @@ const HomeScreen: React.FC = () => {
                 const timePart = wakeTimeToday.split('T')[1]; // "06:42:00.000Z"
                 const [hoursStr, minutesStr] = timePart.split(':'); // ["06", "42", ...]
                 const timeStr = `${hoursStr}:${minutesStr}`;
-                console.log('⏰ [AGENDA] Mostrando hora de despertar:', timeStr);
                 
                 return (
                   <View style={styles.scheduleItem}>
