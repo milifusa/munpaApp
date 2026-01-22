@@ -154,6 +154,11 @@ const HomeScreen: React.FC = () => {
   const [showWakeTimePicker, setShowWakeTimePicker] = useState(false);
   const [wakeTimeToday, setWakeTimeToday] = useState<string | null>(null);
 
+  // Estados para modal de inicio rápido de siesta
+  const [showStartNapModal, setShowStartNapModal] = useState(false);
+  const [selectedNapStartTime, setSelectedNapStartTime] = useState(new Date());
+  const [showNapStartTimePicker, setShowNapStartTimePicker] = useState(false);
+
   // Estados para modal de detalles de órbita
   const [showOrbitDetailModal, setShowOrbitDetailModal] = useState(false);
   const [orbitDetailData, setOrbitDetailData] = useState<any>(null);
@@ -872,7 +877,7 @@ const HomeScreen: React.FC = () => {
     }
   };
 
-  // Función para iniciar siesta directamente desde el Home
+  // Función para abrir modal de inicio rápido de siesta
   const handleQuickStartNap = async () => {
     if (!selectedChild) return;
     
@@ -898,23 +903,42 @@ const HomeScreen: React.FC = () => {
       return;
     }
 
+    // Abrir modal para seleccionar hora de inicio
+    setSelectedNapStartTime(new Date());
+    setShowStartNapModal(true);
+    if (Platform.OS === 'android') {
+      setShowNapStartTimePicker(true);
+    }
+  };
+
+  // Función para confirmar inicio de siesta con hora seleccionada
+  const handleConfirmStartNap = async () => {
+    if (!selectedChild) return;
+
     try {
       setLoadingSleep(true);
       const now = new Date();
       
-      console.log('💤 [HOME] Iniciando siesta directamente:', {
+      // Validar que no sea futura
+      if (selectedNapStartTime > now) {
+        Alert.alert('Error', 'No puedes registrar una siesta que comienza en el futuro');
+        return;
+      }
+      
+      console.log('💤 [HOME] Iniciando siesta:', {
         childId: selectedChild.id,
-        startTime: now.toISOString()
+        startTime: selectedNapStartTime.toISOString()
       });
 
       const response = await sleepService.recordSleep({
         childId: selectedChild.id,
         type: 'nap',
-        startTime: now.toISOString(),
+        startTime: selectedNapStartTime.toISOString(),
       });
       
       if (response.success && response.sleepEvent) {
         setActiveSleep(response.sleepEvent);
+        setShowStartNapModal(false);
         
         Alert.alert('✓ Siesta iniciada', 'El seguimiento de la siesta ha comenzado');
         
@@ -2598,6 +2622,110 @@ const HomeScreen: React.FC = () => {
                 onPress={handleRecordWakeTime}
               >
                 <Text style={styles.modalConfirmText}>Registrar</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Modal de inicio rápido de siesta */}
+      <Modal
+        visible={showStartNapModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowStartNapModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.wakeModalContent}>
+            <View style={styles.napModalHeader}>
+              <Ionicons name="moon" size={32} color="#887CBC" />
+              <Text style={styles.napModalTitle}>Iniciar Siesta</Text>
+            </View>
+
+            <Text style={styles.napModalDescription}>
+              Selecciona la hora de inicio de la siesta
+            </Text>
+
+            <View style={styles.modalTimeSection}>
+              {Platform.OS === 'ios' ? (
+                <DateTimePicker
+                  value={selectedNapStartTime}
+                  mode="time"
+                  display="spinner"
+                  onChange={(event, date) => {
+                    if (date) {
+                      const today = new Date();
+                      const newTime = new Date(
+                        today.getFullYear(),
+                        today.getMonth(),
+                        today.getDate(),
+                        date.getHours(),
+                        date.getMinutes()
+                      );
+                      setSelectedNapStartTime(newTime);
+                    }
+                  }}
+                  style={styles.dateTimePicker}
+                />
+              ) : (
+                <>
+                  <TouchableOpacity
+                    style={styles.wakeTimeButton}
+                    onPress={() => setShowNapStartTimePicker(true)}
+                  >
+                    <Ionicons name="time-outline" size={24} color="#887CBC" />
+                    <Text style={styles.wakeTimeButtonText}>
+                      {selectedNapStartTime.toLocaleTimeString('es-ES', {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        hour12: false,
+                      })}
+                    </Text>
+                  </TouchableOpacity>
+                  
+                  {showNapStartTimePicker && (
+                    <DateTimePicker
+                      value={selectedNapStartTime}
+                      mode="time"
+                      display="default"
+                      onChange={(event, date) => {
+                        setShowNapStartTimePicker(false);
+                        if (date) {
+                          const today = new Date();
+                          const newTime = new Date(
+                            today.getFullYear(),
+                            today.getMonth(),
+                            today.getDate(),
+                            date.getHours(),
+                            date.getMinutes()
+                          );
+                          setSelectedNapStartTime(newTime);
+                        }
+                      }}
+                    />
+                  )}
+                </>
+              )}
+            </View>
+
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalCancelButton]}
+                onPress={() => setShowStartNapModal(false)}
+              >
+                <Text style={{ fontSize: 16, color: '#FFF' }}>Cancelar</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={[styles.modalButton, styles.napModalConfirmButton]}
+                onPress={handleConfirmStartNap}
+                disabled={loadingSleep}
+              >
+                {loadingSleep ? (
+                  <ActivityIndicator color="#FFF" />
+                ) : (
+                  <Text style={styles.modalConfirmText}>Iniciar</Text>
+                )}
               </TouchableOpacity>
             </View>
           </View>
@@ -4518,6 +4646,25 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 8,
   },
+  napModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 12,
+    marginBottom: 16,
+  },
+  napModalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#887CBC',
+    fontFamily: 'Montserrat',
+  },
+  napModalDescription: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 20,
+    textAlign: 'center',
+  },
   wakeModalTitle: {
     fontSize: 20,
     fontWeight: 'bold',
@@ -4597,6 +4744,9 @@ const styles = StyleSheet.create({
   },
   wakeModalConfirmButton: {
     backgroundColor: '#FFA726',
+  },
+  napModalConfirmButton: {
+    backgroundColor: '#887CBC',
   },
   modalConfirmText: {
     fontSize: 16,
