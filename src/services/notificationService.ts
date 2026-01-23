@@ -169,7 +169,55 @@ const notificationService = {
         if (Device.isDevice) {
           console.log('🔔 [NOTIF] Dispositivo real detectado, intentando obtener token FCM...');
           
-          Alert.alert('🔍 DEBUG', 'Paso 4: Dispositivo real, intentando FCM...', [{ text: 'OK' }]);
+          // Verificar si estamos en Expo Go o build nativo
+          const isExpoGo = Constants.appOwnership === 'expo';
+          const executionEnv = Constants.executionEnvironment;
+          
+          console.log('🔍 [NOTIF] App Ownership:', Constants.appOwnership);
+          console.log('🔍 [NOTIF] Execution Environment:', executionEnv);
+          console.log('🔍 [NOTIF] Es Expo Go?:', isExpoGo);
+          
+          if (isExpoGo) {
+            // Estamos en Expo Go, saltar directamente a Expo tokens
+            Alert.alert(
+              '⚠️ Expo Go Detectado',
+              'Estas usando Expo Go. FCM requiere build nativo.\n\nUsando token Expo para desarrollo.',
+              [{ text: 'OK' }]
+            );
+            
+            console.log('⚠️ [NOTIF] Expo Go detectado, usando token Expo directamente...');
+            
+            try {
+              const projectId = Constants.expoConfig?.extra?.eas?.projectId;
+              if (!projectId) {
+                console.error('❌ [NOTIF] No se encontró projectId en configuración');
+                Alert.alert('❌ ERROR', 'No se encontró projectId', [{ text: 'OK' }]);
+                return null;
+              }
+              
+              const tokenData = await Notifications.getExpoPushTokenAsync({ projectId });
+              token = tokenData.data;
+              tokenType = 'expo';
+              
+              console.log('✅ [NOTIF] Token Expo obtenido:', token);
+              
+              // Copiar token al clipboard
+              Clipboard.setString(token);
+              
+              Alert.alert(
+                '⚠️ Token Expo (Expo Go)',
+                `TIPO: EXPO\nLongitud: ${token.length} chars\n\n✅ Token copiado al portapapeles\n\nToken:\n${token}\n\n⚠️ Para usar FCM, haz build nativo:\nnpx expo run:ios`,
+                [{ text: 'Entendido' }]
+              );
+              
+            } catch (expoError: any) {
+              console.error('❌ [NOTIF] Error obteniendo token Expo:', expoError);
+              Alert.alert('❌ ERROR', `Error Expo: ${expoError.message}`, [{ text: 'OK' }]);
+              return null;
+            }
+          } else {
+            // Build nativo, intentar FCM
+            Alert.alert('🔍 DEBUG', 'Paso 4: Build nativo detectado, intentando FCM...', [{ text: 'OK' }]);
           
           try {
             // Verificar si el módulo de messaging está disponible
@@ -250,6 +298,7 @@ const notificationService = {
               return null;
             }
           }
+          } // Cierre del else (build nativo)
         } else {
           console.log('⚠️ [NOTIF] Simulador detectado, usando token de Expo para desarrollo...');
           try {
