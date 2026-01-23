@@ -4,7 +4,7 @@ module.exports = ({ config }) => ({
   ...config,
   name: 'Munpa',
   slug: 'munpaApp',
-  version: '2.0.1',
+  version: '2.0.2',
   orientation: 'portrait',
   icon: './assets/icon.png',
   userInterfaceStyle: 'light',
@@ -17,7 +17,7 @@ module.exports = ({ config }) => ({
   ios: {
     supportsTablet: true,
     bundleIdentifier: 'com.munpa.app',
-    buildNumber: '2.0.1',
+    buildNumber: '2.0.2',
     icon: './assets/icon.png',
     infoPlist: {
       ITSAppUsesNonExemptEncryption: false,

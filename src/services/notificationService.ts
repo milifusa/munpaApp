@@ -1,6 +1,7 @@
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import { Alert, Platform } from 'react-native';
+import * as Clipboard from '@react-native-clipboard/clipboard';
 import Constants from 'expo-constants';
 import { axiosInstance as api } from './api';
 import messaging from '@react-native-firebase/messaging';
@@ -121,8 +122,18 @@ const notificationService = {
    */
   async registerToken(existingToken?: string): Promise<string | null> {
     try {
+      console.log('🚀 [NOTIF] ========================================');
+      console.log('🚀 [NOTIF] INICIO DE registerToken()');
+      console.log('🚀 [NOTIF] ========================================');
       console.log('🔔 [NOTIF] Iniciando registro de token...');
       console.log('🔔 [NOTIF] Token existente:', existingToken ? existingToken.substring(0, 50) + '...' : 'ninguno');
+      
+      // Alerta INMEDIATA para confirmar que se ejecuta
+      Alert.alert(
+        '🚀 INICIO registerToken()',
+        'La funcion registerToken() se esta ejecutando ahora',
+        [{ text: 'OK' }]
+      );
       
       let token = existingToken;
       let tokenType: 'fcm' | 'apns' | 'expo' = 'fcm'; // Por defecto FCM
@@ -130,10 +141,14 @@ const notificationService = {
       if (!token) {
         console.log('🔔 [NOTIF] No hay token existente, solicitando permisos...');
         
+        Alert.alert('🔍 DEBUG', 'Paso 1: Solicitando permisos...', [{ text: 'OK' }]);
+        
         // Solicitar permisos (Expo maneja esto bien en ambas plataformas)
         const { status: existingStatus } = await Notifications.getPermissionsAsync();
         let finalStatus = existingStatus;
         console.log('🔔 [NOTIF] Estado de permisos actual:', existingStatus);
+
+        Alert.alert('🔍 DEBUG', `Paso 2: Permisos actuales: ${existingStatus}`, [{ text: 'OK' }]);
 
         if (existingStatus !== 'granted') {
           console.log('🔔 [NOTIF] Solicitando permisos...');
@@ -144,16 +159,23 @@ const notificationService = {
 
         if (finalStatus !== 'granted') {
           console.log('⚠️ [NOTIF] Permiso de notificaciones no concedido');
+          Alert.alert('❌ ERROR', 'Permisos de notificaciones no concedidos', [{ text: 'OK' }]);
           return null;
         }
+
+        Alert.alert('🔍 DEBUG', 'Paso 3: Permisos OK, obteniendo token...', [{ text: 'OK' }]);
 
         // Obtener token: Intentar FCM primero, fallback a Expo si no funciona
         if (Device.isDevice) {
           console.log('🔔 [NOTIF] Dispositivo real detectado, intentando obtener token FCM...');
           
+          Alert.alert('🔍 DEBUG', 'Paso 4: Dispositivo real, intentando FCM...', [{ text: 'OK' }]);
+          
           try {
             // Verificar si el módulo de messaging está disponible
             console.log('🔍 [NOTIF] Verificando disponibilidad de Firebase Messaging...');
+            
+            Alert.alert('🔍 DEBUG', 'Paso 5: Solicitando permisos Firebase...', [{ text: 'OK' }]);
             
             // Verificar estado de autorización de Firebase Messaging
             const authStatus = await messaging().requestPermission();
@@ -163,10 +185,13 @@ const notificationService = {
 
             if (!enabled) {
               console.log('⚠️ [NOTIF] Usuario no autorizó notificaciones de Firebase');
+              Alert.alert('⚠️ ADVERTENCIA', 'Firebase no autorizado, usando Expo...', [{ text: 'OK' }]);
               throw new Error('Usuario no autorizó notificaciones de Firebase');
             }
 
             console.log('✅ [NOTIF] Autorización de Firebase Messaging concedida');
+            
+            Alert.alert('🔍 DEBUG', 'Paso 6: Firebase OK, obteniendo token FCM...', [{ text: 'OK' }]);
             
             // Obtener token FCM directamente (funciona en iOS y Android nativos)
             token = await messaging().getToken();
@@ -180,10 +205,13 @@ const notificationService = {
             console.log(`✅ [NOTIF] Token FCM obtenido (${token.length} caracteres):`, token.substring(0, 50) + '...');
             console.log(`🔍 [NOTIF] Token completo para debug:`, token);
             
-            // Mostrar alerta con el token FCM COMPLETO
+            // Copiar token al clipboard
+            Clipboard.setString(token);
+            
+            // Mostrar alerta confirmando que se copió
             Alert.alert(
-              '✅ Token FCM Obtenido',
-              `TIPO: FCM\nLongitud: ${token.length} chars\n\nTOKEN COMPLETO:\n${token}`,
+              '✅ Token FCM Copiado',
+              `TIPO: FCM\nLongitud: ${token.length} chars\n\n✅ Token copiado al portapapeles\n\nPrimeros caracteres:\n${token.substring(0, 60)}...\n\nÚltimos caracteres:\n...${token.substring(token.length - 40)}`,
               [{ text: 'OK' }]
             );
             
@@ -207,10 +235,13 @@ const notificationService = {
               console.log('⚠️ [NOTIF] ADVERTENCIA: Token Expo no funcionará con FCM en producción');
               console.log('⚠️ [NOTIF] Necesitas hacer build nativo: npx expo run:ios');
               
-              // Mostrar alerta con el token Expo COMPLETO
+              // Copiar token al clipboard
+              Clipboard.setString(token);
+              
+              // Mostrar alerta confirmando que se copió
               Alert.alert(
                 '⚠️ Token Expo (Desarrollo)',
-                `TIPO: EXPO (Fallback)\nLongitud: ${token.length} chars\n\nTOKEN COMPLETO:\n${token}\n\n⚠️ Este token NO funcionará con FCM.\nHaz build nativo: npx expo run:ios`,
+                `TIPO: EXPO (Fallback)\nLongitud: ${token.length} chars\n\n✅ Token copiado al portapapeles\n\nToken:\n${token}\n\n⚠️ Este token NO funcionará con FCM.\nHaz build nativo: npx expo run:ios`,
                 [{ text: 'Entendido' }]
               );
               
@@ -276,6 +307,15 @@ const notificationService = {
     } catch (error: any) {
       console.error('❌ [NOTIF] Error registrando token:', error);
       console.error('❌ [NOTIF] Error details:', error.response?.data || error.message);
+      console.error('❌ [NOTIF] Error stack:', error.stack);
+      
+      // Alerta de ERROR
+      Alert.alert(
+        '❌ ERROR en registerToken()',
+        `Ocurrió un error:\n\n${error.message}\n\nRevisa la consola para más detalles`,
+        [{ text: 'OK' }]
+      );
+      
       return null;
     }
   },

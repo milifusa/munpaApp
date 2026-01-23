@@ -8,10 +8,12 @@ import {
   Modal,
   ScrollView,
   Image,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../contexts/AuthContext';
+import Constants from 'expo-constants';
 
 const { width, height } = Dimensions.get('window');
 
@@ -23,6 +25,12 @@ interface GlobalMenuProps {
 const GlobalMenu: React.FC<GlobalMenuProps> = ({ visible, onClose }) => {
   const navigation = useNavigation();
   const { user, logout } = useAuth();
+
+  // Obtener versión y build number
+  const appVersion = Constants.expoConfig?.version || '0.0.0';
+  const buildNumber = Platform.OS === 'ios' 
+    ? Constants.expoConfig?.ios?.buildNumber || '1.0.0'
+    : Constants.expoConfig?.android?.versionCode?.toString() || '1';
 
   const menuItems = [
     {
@@ -159,7 +167,12 @@ const GlobalMenu: React.FC<GlobalMenuProps> = ({ visible, onClose }) => {
 
           {/* Footer del menú */}
           <View style={styles.menuFooter}>
-            <Text style={styles.versionText}>Munpa App v1.0.0</Text>
+            <Text style={styles.versionText}>
+              Munpa App v{appVersion}
+            </Text>
+            <Text style={styles.buildText}>
+              Build {buildNumber} • {Platform.OS === 'ios' ? 'iOS' : 'Android'}
+            </Text>
           </View>
         </View>
       </View>
@@ -264,7 +277,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   versionText: {
-    fontSize: 12,
+    fontSize: 13,
+    color: '#666',
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  buildText: {
+    fontSize: 11,
     color: '#999',
   },
 });

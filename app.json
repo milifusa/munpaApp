@@ -2,7 +2,7 @@
   "expo": {
     "name": "Munpa",
     "slug": "munpaApp",
-    "version": "0.0.4",
+    "version": "2.0.2",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -15,7 +15,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.munpa.app",
-      "buildNumber": "1.0.8",
+      "buildNumber": "1.0.46",
       "icon": "./assets/icon.png",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
