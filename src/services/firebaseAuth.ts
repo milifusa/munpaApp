@@ -25,25 +25,38 @@ let auth;
 
 export const initializeFirebaseAuth = () => {
   try {
+    // Si auth ya está inicializado, retornarlo
+    if (auth) {
+      console.log('✅ [FIREBASE AUTH] Auth ya estaba inicializado, reutilizando...');
+      return auth;
+    }
+    
+    // Inicializar o obtener la app de Firebase
     if (getApps().length === 0) {
-      console.log('🔥 [FIREBASE AUTH] Inicializando Firebase Web SDK...');
+      console.log('🔥 [FIREBASE AUTH] Inicializando Firebase Web SDK por primera vez...');
       app = initializeApp(firebaseConfig);
-      
-      // Inicializar Auth con persistencia en AsyncStorage
+    } else {
+      console.log('🔥 [FIREBASE AUTH] Firebase app ya existe, obteniendo instancia...');
+      app = getApp();
+    }
+    
+    // Intentar obtener Auth existente primero
+    try {
+      auth = getAuth(app);
+      console.log('✅ [FIREBASE AUTH] Auth obtenido de instancia existente');
+    } catch (authError: any) {
+      // Si no existe, inicializarlo con persistencia
+      console.log('🔥 [FIREBASE AUTH] Inicializando Auth con AsyncStorage...');
       auth = initializeAuth(app, {
         persistence: getReactNativePersistence(AsyncStorage)
       });
-      
-      console.log('✅ [FIREBASE AUTH] Firebase inicializado correctamente');
-    } else {
-      app = getApp();
-      auth = getAuth(app);
-      console.log('✅ [FIREBASE AUTH] Firebase ya estaba inicializado');
+      console.log('✅ [FIREBASE AUTH] Auth inicializado correctamente con persistencia');
     }
     
     return auth;
-  } catch (error) {
+  } catch (error: any) {
     console.error('❌ [FIREBASE AUTH] Error inicializando Firebase:', error);
+    console.error('❌ [FIREBASE AUTH] Error details:', error.message);
     throw error;
   }
 };
