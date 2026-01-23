@@ -170,12 +170,19 @@ const notificationService = {
           console.log('🔔 [NOTIF] Dispositivo real detectado, intentando obtener token FCM...');
           
           // Verificar si estamos en Expo Go o build nativo
-          const isExpoGo = Constants.appOwnership === 'expo';
-          const executionEnv = Constants.executionEnvironment;
+          const appOwnership = Constants.appOwnership;
+          const isExpoGo = appOwnership === 'expo';
+          const isStandalone = appOwnership === 'standalone' || appOwnership === null;
           
-          console.log('🔍 [NOTIF] App Ownership:', Constants.appOwnership);
-          console.log('🔍 [NOTIF] Execution Environment:', executionEnv);
+          console.log('🔍 [NOTIF] App Ownership:', appOwnership);
           console.log('🔍 [NOTIF] Es Expo Go?:', isExpoGo);
+          console.log('🔍 [NOTIF] Es Standalone/EAS Build?:', isStandalone);
+          
+          Alert.alert(
+            '🔍 DEBUG - Entorno',
+            `App Ownership: ${appOwnership}\nExpo Go: ${isExpoGo}\nStandalone: ${isStandalone}`,
+            [{ text: 'OK' }]
+          );
           
           if (isExpoGo) {
             // Estamos en Expo Go, saltar directamente a Expo tokens
@@ -216,8 +223,8 @@ const notificationService = {
               return null;
             }
           } else {
-            // Build nativo, intentar FCM
-            Alert.alert('🔍 DEBUG', 'Paso 4: Build nativo detectado, intentando FCM...', [{ text: 'OK' }]);
+            // Build nativo (EAS Build, npx expo run:ios, etc), intentar FCM
+            Alert.alert('🔍 DEBUG', `Paso 4: Build nativo/EAS detectado (${appOwnership}), intentando FCM...`, [{ text: 'OK' }]);
           
           try {
             // Verificar si el módulo de messaging está disponible
