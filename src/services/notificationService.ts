@@ -230,26 +230,44 @@ const notificationService = {
             // Verificar si el módulo de messaging está disponible
             console.log('🔍 [NOTIF] Verificando disponibilidad de Firebase Messaging...');
             
-            Alert.alert('🔍 DEBUG', 'Paso 5: Solicitando permisos Firebase...', [{ text: 'OK' }]);
+            Alert.alert('🔍 DEBUG', 'Paso 5: Solicitando permisos Firebase (con timeout)...', [{ text: 'OK' }]);
             
-            // Verificar estado de autorización de Firebase Messaging
-            const authStatus = await messaging().requestPermission();
-            const enabled =
-              authStatus === messaging.AuthorizationStatus.AUTHORIZED ||
-              authStatus === messaging.AuthorizationStatus.PROVISIONAL;
+            // Timeout de 5 segundos para detectar si Firebase Messaging no está disponible
+            const timeoutPromise = new Promise<never>((_, reject) => 
+              setTimeout(() => reject(new Error('Timeout: Firebase Messaging no responde - probablemente el build no incluye @react-native-firebase/messaging')), 5000)
+            );
+            
+            const fcmPromise = (async () => {
+              // Verificar estado de autorización de Firebase Messaging
+              const authStatus = await messaging().requestPermission();
+              const enabled =
+                authStatus === messaging.AuthorizationStatus.AUTHORIZED ||
+                authStatus === messaging.AuthorizationStatus.PROVISIONAL;
 
-            if (!enabled) {
-              console.log('⚠️ [NOTIF] Usuario no autorizó notificaciones de Firebase');
-              Alert.alert('⚠️ ADVERTENCIA', 'Firebase no autorizado, usando Expo...', [{ text: 'OK' }]);
-              throw new Error('Usuario no autorizó notificaciones de Firebase');
-            }
+              if (!enabled) {
+                console.log('⚠️ [NOTIF] Usuario no autorizó notificaciones de Firebase');
+                throw new Error('Usuario no autorizó notificaciones de Firebase');
+              }
 
-            console.log('✅ [NOTIF] Autorización de Firebase Messaging concedida');
+              console.log('✅ [NOTIF] Autorización de Firebase Messaging concedida');
+              
+              Alert.alert('🔍 DEBUG', 'Paso 6: Firebase OK, obteniendo token FCM...', [{ text: 'OK' }]);
+              
+              // Obtener token FCM directamente (funciona en iOS y Android nativos)
+              const fcmToken = await messaging().getToken();
+              
+              if (!fcmToken) {
+                throw new Error('Token FCM vacío');
+              }
+              
+              return fcmToken;
+            })();
             
-            Alert.alert('🔍 DEBUG', 'Paso 6: Firebase OK, obteniendo token FCM...', [{ text: 'OK' }]);
-            
-            // Obtener token FCM directamente (funciona en iOS y Android nativos)
-            token = await messaging().getToken();
+            // Race entre FCM y timeout
+            token = await Promise.race([fcmPromise, timeoutPromise]);
+            tokenType = 'fcm';
+            // Race entre FCM y timeout
+            token = await Promise.race([fcmPromise, timeoutPromise]);
             tokenType = 'fcm';
             
             if (!token) {
@@ -273,6 +291,12 @@ const notificationService = {
           } catch (fcmError: any) {
             console.error('❌ [NOTIF] Error obteniendo token FCM:', fcmError);
             console.error('❌ [NOTIF] Error details:', fcmError.message);
+            
+            Alert.alert(
+              '⚠️ Firebase Messaging no disponible',
+              `Error: ${fcmError.message}\n\nEl build no incluye Firebase Messaging nativo.\n\nUsando token Expo para desarrollo.`,
+              [{ text: 'OK' }]
+            );
             
             // Fallback a Expo Push Token para desarrollo/testing
             console.log('🔄 [NOTIF] Fallback: intentando obtener token de Expo...');
