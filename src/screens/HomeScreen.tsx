@@ -178,6 +178,7 @@ const HomeScreen: React.FC = () => {
   const [medTimes, setMedTimes] = useState<string[]>(['08:00']);
   const [medEveryHours, setMedEveryHours] = useState('');
   const [medFirstDose, setMedFirstDose] = useState(new Date());
+  const [medEndTime, setMedEndTime] = useState(new Date());
   const [medStartDate, setMedStartDate] = useState(new Date());
   const [medEndDate, setMedEndDate] = useState<Date | null>(null);
   const [medNotes, setMedNotes] = useState('');
@@ -189,6 +190,7 @@ const HomeScreen: React.FC = () => {
   const [showMedStartDatePicker, setShowMedStartDatePicker] = useState(false);
   const [showMedEndDatePicker, setShowMedEndDatePicker] = useState(false);
   const [showMedFirstDosePicker, setShowMedFirstDosePicker] = useState(false);
+  const [showMedEndTimePicker, setShowMedEndTimePicker] = useState(false);
   const [showMedTimePicker, setShowMedTimePicker] = useState(false);
   const [editingTimeIndex, setEditingTimeIndex] = useState<number | null>(null);
   
@@ -568,6 +570,7 @@ const HomeScreen: React.FC = () => {
     setMedTimes(['08:00']);
     setMedEveryHours('');
     setMedFirstDose(new Date());
+    setMedEndTime(new Date());
     setMedStartDate(new Date());
     setMedEndDate(null);
     setMedNotes('');
@@ -592,6 +595,14 @@ const HomeScreen: React.FC = () => {
         const firstDose = new Date();
         firstDose.setHours(parseInt(hours), parseInt(minutes));
         setMedFirstDose(firstDose);
+      }
+      if (medication.endTime) {
+        const [hours, minutes] = medication.endTime.split(':');
+        const lastDose = new Date();
+        lastDose.setHours(parseInt(hours), parseInt(minutes));
+        setMedEndTime(lastDose);
+      } else {
+        setMedEndTime(new Date());
       }
     }
     
@@ -619,6 +630,12 @@ const HomeScreen: React.FC = () => {
       let repeatEveryMinutes: number | undefined;
       let startTime: string | undefined;
       let endTime: string | undefined;
+
+      const doseValue = parseFloat(medDose.trim());
+      if (isNaN(doseValue) || doseValue <= 0) {
+        Alert.alert('Error', 'Ingresa una dosis válida');
+        return;
+      }
       
       if (medScheduleMode === 'times') {
         times = medTimes;
@@ -628,8 +645,9 @@ const HomeScreen: React.FC = () => {
           Alert.alert('Error', 'Ingresa un intervalo válido en horas (ej: 0.1 para 6 minutos, 1 para 1 hora)');
           return;
         }
-        repeatEveryMinutes = hours * 60;
+        repeatEveryMinutes = Math.round(hours * 60);
         startTime = `${medFirstDose.getHours().toString().padStart(2, '0')}:${medFirstDose.getMinutes().toString().padStart(2, '0')}`;
+        endTime = `${medEndTime.getHours().toString().padStart(2, '0')}:${medEndTime.getMinutes().toString().padStart(2, '0')}`;
       }
       
       const scheduleDays = parseInt(medScheduleDays);
@@ -641,7 +659,7 @@ const HomeScreen: React.FC = () => {
       if (editingMedication) {
         await medicationsService.updateMedication(editingMedication.id, {
           name: medName.trim(),
-          dose: medDose.trim(),
+          dose: doseValue,
           doseUnit: medDoseUnit.trim() || "ml",
           times: medScheduleMode === "times" ? times : undefined,
           repeatEveryMinutes,
@@ -655,7 +673,7 @@ const HomeScreen: React.FC = () => {
       } else {
         await medicationsService.addMedication(selectedChild.id, {
           name: medName.trim(),
-          dose: medDose.trim(),
+          dose: doseValue,
           doseUnit: medDoseUnit.trim() || "ml",
           times: medScheduleMode === "times" ? times : undefined,
           repeatEveryMinutes,
@@ -2959,6 +2977,29 @@ const HomeScreen: React.FC = () => {
                         onChange={(event, date) => {
                           setShowMedFirstDosePicker(Platform.OS === 'ios');
                           if (date) setMedFirstDose(date);
+                        }}
+                      />
+                    )}
+                  </View>
+
+                  <View style={styles.medInputGroup}>
+                    <Text style={styles.medInputLabel}>Hora fin</Text>
+                    <TouchableOpacity
+                      style={styles.medDateButton}
+                      onPress={() => setShowMedEndTimePicker(true)}
+                    >
+                      <Text style={styles.medDateButtonText}>
+                        {medEndTime.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
+                      </Text>
+                    </TouchableOpacity>
+                    {showMedEndTimePicker && (
+                      <DateTimePicker
+                        value={medEndTime}
+                        mode="time"
+                        display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                        onChange={(event, date) => {
+                          setShowMedEndTimePicker(Platform.OS === 'ios');
+                          if (date) setMedEndTime(date);
                         }}
                       />
                     )}
