@@ -16,12 +16,13 @@ import {
   ActivityIndicator,
   SafeAreaView,
 } from "react-native";
-import { useNavigation, DrawerActions } from "@react-navigation/native";
+import { useNavigation, useRoute, DrawerActions } from "@react-navigation/native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import * as Notifications from "expo-notifications";
+import { Audio } from "expo-av";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from "../contexts/AuthContext";
 import {
@@ -29,10 +30,20 @@ import {
   profileService,
   sleepService,
   activitiesService,
+  recommendationsService,
+  marketplaceService,
+  communitiesService,
+  guideService,
+  faqService,
+  categoriesService,
+  locationsService,
+  authService,
 } from "../services/api";
 import { medicationsService } from "../services/childProfileService";
 import { imageUploadService } from "../services/imageUploadService";
 import notificationService from "../services/notificationService";
+import analyticsService from "../services/analyticsService";
+import learningService from "../services/learning-service";
 import {
   colors,
   typography,
@@ -41,9 +52,17 @@ import {
   shadows,
 } from "../styles/globalStyles";
 import { useFonts } from "../hooks/useFonts";
+import { useLocation } from "../hooks/useLocation";
 import BannerCarousel from "../components/BannerCarousel";
 import { SleepEntry } from "../types/sleep";
 import { LinearGradient } from "expo-linear-gradient";
+
+const WHITE_NOISE_LOCAL = require("../../assets/whitenoise.mp3");
+const WHITE_NOISE_URLS = [
+  "https://cdn.pixabay.com/audio/2022/03/15/audio_0c3a1a9ea6.mp3",
+  "https://cdn.pixabay.com/audio/2022/02/23/audio_5d01c5d8b1.mp3",
+];
+const WHITE_NOISE_LOAD_TIMEOUT_MS = 20000;
 
 // Función para formatear hora SIN conversión (para predicciones que ya vienen en hora local)
 const formatTimeFromISO = (isoString: string): string => {
@@ -104,6 +123,8 @@ interface Child {
   ageInMonths: number | null;
   isUnborn: boolean;
   gestationWeeks?: number | null;
+  birthDate?: string | null;
+  dueDate?: string | null;
   photoUrl?: string | null;
   createdAt: any;
   // Campos calculados por el backend
@@ -113,6 +134,52 @@ interface Child {
   registeredGestationWeeks?: number | null;
   daysSinceCreation?: number;
   isOverdue?: boolean;
+}
+
+interface TodayRecommendation {
+  id: string;
+  name: string;
+  imageUrl?: string;
+  distance?: number;
+  cityName?: string;
+  countryName?: string;
+  city?: string;
+  country?: string;
+  averageRating?: number;
+  rating?: number;
+  stats?: {
+    averageRating?: number;
+  };
+}
+
+interface TodayProduct {
+  id: string;
+  title?: string;
+  name?: string;
+  images?: string[];
+  imageUrl?: string;
+  distance?: number;
+}
+
+interface TodayCommunityPost {
+  id: string;
+  content?: string;
+  imageUrl?: string;
+  authorName?: string;
+  communityId?: string;
+  likeCount?: number;
+  commentCount?: number;
+  createdAt?: string;
+}
+
+interface TodayGuide {
+  title?: string;
+  subtitle?: string;
+  description?: string;
+  tip?: string;
+  weeks?: number;
+  isPregnant?: boolean;
+  source?: string;
 }
 
 
@@ -125,6 +192,7 @@ const CARITAS = [CARITA_1, CARITA_2, CARITA_3];
 const HomeScreen: React.FC = () => {
   const { user, setUser } = useAuth();
   const navigation = useNavigation();
+  const route = useRoute<any>();
   const insets = useSafeAreaInsets();
   const [children, setChildren] = useState<Child[]>([]);
   const [selectedChild, setSelectedChild] = useState<Child | null>(null);
@@ -158,15 +226,75 @@ const HomeScreen: React.FC = () => {
   const [showStartNapModal, setShowStartNapModal] = useState(false);
   const [selectedNapStartTime, setSelectedNapStartTime] = useState(new Date());
   const [showNapStartTimePicker, setShowNapStartTimePicker] = useState(false);
+  const napTimeInitializedRef = useRef(false);
+  const [napPickerKey, setNapPickerKey] = useState(0);
 
   // Estados para modal de detalles de órbita
   const [showOrbitDetailModal, setShowOrbitDetailModal] = useState(false);
   const [orbitDetailData, setOrbitDetailData] = useState<any>(null);
 
   // ============= ESTADOS PARA MEDICAMENTOS =============
-  const [homeTab, setHomeTab] = useState<'sleep' | 'medications'>('sleep');
+  const [homeTab, setHomeTab] = useState<'sleep' | 'medications' | 'today'>('today');
   const [medications, setMedications] = useState<any[]>([]);
   const [loadingMedications, setLoadingMedications] = useState(false);
+
+  // Recomendaciones cercanas para pestaña Hoy
+  const [todayRecommendations, setTodayRecommendations] = useState<TodayRecommendation[]>([]);
+  const [loadingTodayRecommendations, setLoadingTodayRecommendations] = useState(false);
+  const [todayRecommendationsError, setTodayRecommendationsError] = useState<string | null>(null);
+
+  const [todayMarketProducts, setTodayMarketProducts] = useState<TodayProduct[]>([]);
+  const [loadingTodayMarket, setLoadingTodayMarket] = useState(false);
+  const [todayMarketError, setTodayMarketError] = useState<string | null>(null);
+
+  const [todayCommunityPosts, setTodayCommunityPosts] = useState<TodayCommunityPost[]>([]);
+  const [loadingTodayCommunityPosts, setLoadingTodayCommunityPosts] = useState(false);
+  const [todayCommunityError, setTodayCommunityError] = useState<string | null>(null);
+
+  const [todayGuide, setTodayGuide] = useState<TodayGuide | null>(null);
+  const [loadingTodayGuide, setLoadingTodayGuide] = useState(false);
+  const [todayGuideError, setTodayGuideError] = useState<string | null>(null);
+  const [todayFaqQuestions, setTodayFaqQuestions] = useState<string[]>([]);
+  const [loadingTodayFaq, setLoadingTodayFaq] = useState(false);
+
+  const [showActivityDetailModal, setShowActivityDetailModal] = useState(false);
+  const [selectedActivityDetail, setSelectedActivityDetail] = useState<any>(null);
+
+  const {
+    latitude: todayLat,
+    longitude: todayLon,
+    loading: todayLocationLoading,
+    error: todayLocationError,
+    permissionGranted: todayLocationGranted,
+    getCurrentLocation,
+  } = useLocation();
+
+  const formatActivityFieldLabel = (key: string) => {
+    const normalized = key.replace(/_/g, ' ').toLowerCase();
+    const map: Record<string, string> = {
+      description: 'Descripcion',
+      duration: 'Duracion',
+      durationmin: 'Duracion',
+      materials: 'Materiales',
+      steps: 'Pasos',
+      tips: 'Consejos',
+      benefits: 'Beneficios',
+      age: 'Edad recomendada',
+      agerange: 'Edad recomendada',
+      category: 'Categoria',
+      location: 'Lugar',
+      time: 'Tiempo',
+    };
+    if (map[normalized]) return map[normalized];
+    return normalized.replace(/\b\w/g, (c) => c.toUpperCase());
+  };
+
+  const formatActivityFieldValue = (value: any) => {
+    if (value == null) return '';
+    if (Array.isArray(value)) return value.join(', ');
+    if (typeof value === 'object') return JSON.stringify(value, null, 2);
+    return String(value);
+  };
   
   // Modal para agregar/editar medicamento
   const [showMedicationModal, setShowMedicationModal] = useState(false);
@@ -186,6 +314,7 @@ const HomeScreen: React.FC = () => {
   // Refs para scroll
   const scrollViewRef = useRef<ScrollView>(null);
   const activitiesSectionRef = useRef<View>(null);
+  const todayActivitiesRef = useRef<View>(null);
   const [medScheduleDays, setMedScheduleDays] = useState('14');
   const [showMedStartDatePicker, setShowMedStartDatePicker] = useState(false);
   const [showMedEndDatePicker, setShowMedEndDatePicker] = useState(false);
@@ -197,6 +326,21 @@ const HomeScreen: React.FC = () => {
   // Modal de detalle de medicamento
   const [showMedicationDetailModal, setShowMedicationDetailModal] = useState(false);
   const [selectedMedication, setSelectedMedication] = useState<any | null>(null);
+  const [showChildSelector, setShowChildSelector] = useState(false);
+  const [now, setNow] = useState(new Date());
+  const [showWhiteNoiseModal, setShowWhiteNoiseModal] = useState(false);
+  const [whiteNoiseSound, setWhiteNoiseSound] = useState<Audio.Sound | null>(null);
+  const [whiteNoisePlaying, setWhiteNoisePlaying] = useState(false);
+  const [whiteNoiseLoading, setWhiteNoiseLoading] = useState(false);
+  const [whiteNoiseDurationMinutes, setWhiteNoiseDurationMinutes] = useState<number | null>(30);
+  const [whiteNoiseTimer, setWhiteNoiseTimer] = useState<ReturnType<typeof setTimeout> | null>(null);
+  const [whiteNoiseError, setWhiteNoiseError] = useState<string | null>(null);
+  const lastLocationSyncRef = useRef<string | null>(null);
+  const [isLocationReady, setIsLocationReady] = useState(false);
+  const lastTodayLoadKeyRef = useRef<string | null>(null);
+  const todayLoadInFlightRef = useRef(false);
+  const activitySuggestionsInFlightRef = useRef(false);
+  const lastActivitySuggestionsChildRef = useRef<string | null>(null);
 
   useEffect(() => {
     loadData();
@@ -218,6 +362,11 @@ const HomeScreen: React.FC = () => {
     return () => {
       subscription.remove();
     };
+  }, []);
+
+  useEffect(() => {
+    const interval = setInterval(() => setNow(new Date()), 60000);
+    return () => clearInterval(interval);
   }, []);
 
   // Refrescar datos cuando se regrese a esta pantalla
@@ -254,13 +403,36 @@ const HomeScreen: React.FC = () => {
     // No usar setInterval, solo verificar cuando cambian las dependencias
   }, [children]);
 
-  // Cargar datos de sueño cuando cambia el hijo seleccionado
+  useEffect(() => {
+    const handleHeaderSelection = async () => {
+      const savedChildId = await AsyncStorage.getItem('selectedChildId');
+      if (savedChildId && savedChildId !== selectedChild?.id && children.length > 0) {
+        const child = children.find((c: Child) => c.id === savedChildId);
+        if (child) {
+          console.log('🔄 [HOME] Hijo seleccionado desde header:', child.name);
+          setSelectedChild(child);
+        }
+      }
+    };
+
+    if (route?.params?.refresh || route?.params?.selectedChildId) {
+      handleHeaderSelection();
+    }
+  }, [route?.params?.refresh, route?.params?.selectedChildId, children, selectedChild?.id]);
+
+  // Cargar datos de medicamentos cuando cambia el hijo seleccionado
   useEffect(() => {
     if (selectedChild) {
-      loadSleepData(selectedChild.id);
       loadMedications(selectedChild.id);
     }
   }, [selectedChild]);
+
+  // Cargar datos de sueño solo cuando se está en la pestaña Sueño
+  useEffect(() => {
+    if (homeTab === 'sleep' && selectedChild) {
+      loadSleepData(selectedChild.id);
+    }
+  }, [homeTab, selectedChild]);
 
   // 🔔 Iniciar verificaciones periódicas de notificaciones cuando hay hijo seleccionado
   useEffect(() => {
@@ -269,6 +441,69 @@ const HomeScreen: React.FC = () => {
       // Ya no se programan notificaciones de sueño
     }
   }, [selectedChild?.id]);
+
+  useEffect(() => {
+    if (homeTab !== 'today' || !selectedChild) return;
+    setIsLocationReady(false);
+  }, [homeTab, selectedChild?.id]);
+
+  useEffect(() => {
+    if (homeTab !== 'today' || !selectedChild) return;
+    if (!todayLat || !todayLon) {
+      if (todayLocationLoading) return;
+      if (!todayLocationGranted || todayLocationError) {
+        setIsLocationReady(true);
+        return;
+      }
+      getCurrentLocation();
+      return;
+    }
+    const run = async () => {
+      if (todayLocationGranted) {
+        const locationKey = `${todayLat.toFixed(4)}|${todayLon.toFixed(4)}`;
+        if (lastLocationSyncRef.current !== locationKey) {
+          lastLocationSyncRef.current = locationKey;
+          await syncUserLocation(todayLat, todayLon);
+        }
+      }
+      setIsLocationReady(true);
+    };
+    run();
+  }, [homeTab, selectedChild, todayLat, todayLon, todayLocationLoading, todayLocationGranted, todayLocationError]);
+
+  useEffect(() => {
+    if (homeTab !== 'today' || !selectedChild || !isLocationReady) return;
+    const loadKey = `${selectedChild.id}|${todayLat?.toFixed(4) || 'na'}|${todayLon?.toFixed(4) || 'na'}`;
+    if (todayLoadInFlightRef.current) return;
+    if (lastTodayLoadKeyRef.current === loadKey) return;
+
+    const loadAll = async () => {
+      try {
+        todayLoadInFlightRef.current = true;
+        lastTodayLoadKeyRef.current = loadKey;
+        await Promise.allSettled([
+          loadTodayRecommendations(),
+          loadTodayMarket(),
+          loadTodayCommunityPosts(),
+          loadActivitySuggestions(selectedChild.id),
+          loadTodayGuide(selectedChild),
+          loadTodayFaq(selectedChild.id),
+        ]);
+      } finally {
+        todayLoadInFlightRef.current = false;
+      }
+    };
+    loadAll();
+  }, [homeTab, selectedChild, todayLat, todayLon, todayLocationLoading, isLocationReady]);
+
+  useEffect(() => {
+    if (showStartNapModal) {
+      const now = new Date();
+      setSelectedNapStartTime(now);
+      napTimeInitializedRef.current = true;
+      setNapPickerKey(Date.now());
+    }
+  }, [showStartNapModal]);
 
   // Contador en tiempo real para sueño activo (con pausas)
   useEffect(() => {
@@ -379,6 +614,9 @@ const HomeScreen: React.FC = () => {
   };
 
   const loadSleepData = async (childId: string) => {
+    if (homeTab !== 'sleep') {
+      return;
+    }
     try {
       setLoadingSleep(true);
 
@@ -528,18 +766,23 @@ const HomeScreen: React.FC = () => {
 
   // Función para cargar sugerencias de actividades
   const loadActivitySuggestions = async (childId: string) => {
+    if (activitySuggestionsInFlightRef.current) return;
+    if (lastActivitySuggestionsChildRef.current === childId && activitySuggestions) return;
     try {
+      activitySuggestionsInFlightRef.current = true;
       setLoadingActivities(true);
       
       const response = await activitiesService.getActivitySuggestions(childId);
       
       if (response.success) {
         setActivitySuggestions(response);
+        lastActivitySuggestionsChildRef.current = childId;
       }
     } catch (error) {
       console.error('❌ [ACTIVITIES] Error cargando sugerencias:', error);
       setActivitySuggestions(null);
     } finally {
+      activitySuggestionsInFlightRef.current = false;
       setLoadingActivities(false);
     }
   };
@@ -558,6 +801,132 @@ const HomeScreen: React.FC = () => {
       setMedications([]);
     } finally {
       setLoadingMedications(false);
+    }
+  };
+
+  const loadTodayRecommendations = async () => {
+    if (!todayLat || !todayLon) return;
+
+    try {
+      setLoadingTodayRecommendations(true);
+      setTodayRecommendationsError(null);
+
+      const response = await recommendationsService.getNearbyTop({
+        latitude: todayLat,
+        longitude: todayLon,
+        radius: 1000000,
+        limit: 3,
+      });
+
+      const items =
+        (Array.isArray(response?.data) && response.data) ||
+        (Array.isArray(response?.data?.data) && response.data.data) ||
+        (Array.isArray(response?.data?.recommendations) && response.data.recommendations) ||
+        (Array.isArray(response?.recommendations) && response.recommendations) ||
+        [];
+      setTodayRecommendations(items);
+    } catch (error: any) {
+      console.error('❌ [TODAY] Error cargando recomendaciones cercanas:', error);
+      setTodayRecommendations([]);
+      setTodayRecommendationsError('No se pudieron cargar las recomendaciones cercanas');
+    } finally {
+      setLoadingTodayRecommendations(false);
+    }
+  };
+
+  const loadTodayMarket = async () => {
+    if (!todayLat || !todayLon) return;
+
+    try {
+      setLoadingTodayMarket(true);
+      setTodayMarketError(null);
+
+      const response = await marketplaceService.getNearbyTop({
+        latitude: todayLat,
+        longitude: todayLon,
+        radius: 1000000,
+        limit: 3,
+      });
+
+      const items =
+        (Array.isArray(response?.data) && response.data) ||
+        (Array.isArray(response?.data?.data) && response.data.data) ||
+        (Array.isArray(response?.data?.products) && response.data.products) ||
+        (Array.isArray(response?.products) && response.products) ||
+        [];
+      setTodayMarketProducts(items);
+    } catch (error: any) {
+      console.error('❌ [TODAY] Error cargando productos cercanos:', error);
+      setTodayMarketProducts([]);
+      setTodayMarketError('No se pudieron cargar productos cercanos');
+    } finally {
+      setLoadingTodayMarket(false);
+    }
+  };
+
+  const loadTodayCommunityPosts = async () => {
+    try {
+      setLoadingTodayCommunityPosts(true);
+      setTodayCommunityError(null);
+      const response = await communitiesService.getTopPosts(3);
+      const items =
+        (Array.isArray(response?.data) && response.data) ||
+        (Array.isArray(response?.data?.data) && response.data.data) ||
+        (Array.isArray(response?.data?.posts) && response.data.posts) ||
+        (Array.isArray(response?.posts) && response.posts) ||
+        (Array.isArray(response) && response) ||
+        [];
+      setTodayCommunityPosts(items);
+    } catch (error: any) {
+      console.error('❌ [TODAY] Error cargando top posts:', error);
+      setTodayCommunityPosts([]);
+      setTodayCommunityError('No se pudieron cargar los posts');
+    } finally {
+      setLoadingTodayCommunityPosts(false);
+    }
+  };
+
+  const loadTodayGuide = async (child: Child) => {
+    try {
+      setLoadingTodayGuide(true);
+      setTodayGuideError(null);
+
+      if (!child.id) {
+        setTodayGuide(null);
+        setTodayGuideError('No se pudo determinar el niño para la guía');
+        return;
+      }
+
+      console.log('📘 [GUIDE] Payload enviado:', { childId: child.id });
+      const response = await learningService.getTodayGuide({ childId: child.id });
+      if (response?.success && response?.data) {
+        setTodayGuide(response.data);
+      } else {
+        setTodayGuide(null);
+      }
+    } catch (error: any) {
+      console.error('❌ [GUIDE] Error cargando guía de hoy:', error);
+      setTodayGuide(null);
+      setTodayGuideError('No se pudo cargar la guía de hoy');
+    } finally {
+      setLoadingTodayGuide(false);
+    }
+  };
+
+  const loadTodayFaq = async (childId: string) => {
+    try {
+      setLoadingTodayFaq(true);
+      const response = await faqService.getMomsFaq(childId);
+      const questions =
+        (Array.isArray(response?.data?.questions) && response.data.questions) ||
+        (Array.isArray(response?.questions) && response.questions) ||
+        [];
+      setTodayFaqQuestions(questions);
+    } catch (error) {
+      console.error('❌ [FAQ] Error cargando preguntas frecuentes:', error);
+      setTodayFaqQuestions([]);
+    } finally {
+      setLoadingTodayFaq(false);
     }
   };
 
@@ -929,7 +1298,9 @@ const HomeScreen: React.FC = () => {
     }
 
     // Abrir modal para seleccionar hora de inicio
-    setSelectedNapStartTime(new Date());
+    const now = new Date();
+    setSelectedNapStartTime(now);
+    napTimeInitializedRef.current = true;
     setShowStartNapModal(true);
     if (Platform.OS === 'android') {
       setShowNapStartTimePicker(true);
@@ -943,22 +1314,34 @@ const HomeScreen: React.FC = () => {
     try {
       setLoadingSleep(true);
       const now = new Date();
+      // Normalizar a "hoy" por si el picker quedó con una fecha distinta
+      const normalizedStart = new Date(
+        now.getFullYear(),
+        now.getMonth(),
+        now.getDate(),
+        selectedNapStartTime.getHours(),
+        selectedNapStartTime.getMinutes()
+      );
       
       // Validar que no sea futura
-      if (selectedNapStartTime > now) {
+      if (normalizedStart > now) {
         Alert.alert('Error', 'No puedes registrar una siesta que comienza en el futuro');
         return;
       }
       
       console.log('💤 [HOME] Iniciando siesta:', {
         childId: selectedChild.id,
-        startTime: selectedNapStartTime.toISOString()
+        startTime: normalizedStart.toISOString()
+      });
+      analyticsService.logEvent('sleep_nap_start', {
+        child_id: selectedChild.id,
+        start_time: normalizedStart.toISOString(),
       });
 
       const response = await sleepService.recordSleep({
         childId: selectedChild.id,
         type: 'nap',
-        startTime: selectedNapStartTime.toISOString(),
+        startTime: normalizedStart.toISOString(),
       });
       
       if (response.success && response.sleepEvent) {
@@ -1098,6 +1481,306 @@ const HomeScreen: React.FC = () => {
       childId: child.id,
       child: child,
     });
+  };
+
+  const openHealthProfile = () => {
+    if (!selectedChild) {
+      Alert.alert('Selecciona un hijo', 'Primero elige un hijo para ver su salud.');
+      return;
+    }
+    // @ts-ignore
+    navigation.navigate("ChildProfile", {
+      childId: selectedChild.id,
+      child: selectedChild,
+      initialTab: 'health',
+    });
+  };
+
+  const openAdvisories = async () => {
+    try {
+      const response = await categoriesService.getCategories();
+      const categories =
+        response?.data ||
+        response?.data?.data ||
+        response?.categories ||
+        [];
+      const normalize = (value: string) =>
+        value
+          .toLowerCase()
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '');
+      const advisoryCategory = categories.find((category: any) =>
+        normalize(category?.name || '').includes('asesori')
+      );
+
+      if (advisoryCategory?.id) {
+        // @ts-ignore
+        navigation.navigate('Recommendations', {
+          screen: 'CategoryRecommendations',
+          params: {
+            categoryId: advisoryCategory.id,
+            categoryName: advisoryCategory.name || 'Asesorías',
+          },
+        });
+        return;
+      }
+    } catch (error) {
+      console.error('❌ [HOME] Error abriendo asesorías:', error);
+    }
+
+    // Fallback si no se pudo resolver la categoría
+    // @ts-ignore
+    navigation.navigate('Recommendations');
+  };
+
+  const handleSelectChild = async (child: Child) => {
+    setSelectedChild(child);
+    await AsyncStorage.setItem('selectedChildId', child.id);
+    setShowChildSelector(false);
+  };
+
+  const getGreeting = () => {
+    const hour = now.getHours();
+    if (hour < 12) return 'Buenos días';
+    if (hour < 19) return 'Buenas tardes';
+    return 'Buenas noches';
+  };
+
+  const getGreetingEmoji = () => {
+    const hour = now.getHours();
+    if (hour < 12) return '☀️';
+    if (hour < 19) return '🌤️';
+    return '🌙';
+  };
+
+  const normalizeLocationName = (value: string) =>
+    value
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .trim();
+
+  const syncUserLocation = async (latitude: number, longitude: number) => {
+    try {
+      const reverse = await locationsService.reverseGeocode(latitude, longitude);
+      const data = reverse?.data || reverse?.data?.data || reverse?.result || reverse?.data?.result;
+      const cityName = data?.city || '';
+      const countryName = data?.country || '';
+
+      const defaultCountryId = "8vxktoVnUFO89rOx5RGJ";
+      const defaultCityId = "m9Xvkq7Bf9Q2aUgi5yn7";
+
+      if (!countryName) {
+        await authService.updateLocation({
+          latitude,
+          longitude,
+          countryId: defaultCountryId,
+          cityId: defaultCityId,
+        });
+        return;
+      }
+
+      const countriesResponse = await locationsService.getCountries();
+      const countries =
+        countriesResponse?.data ||
+        countriesResponse?.countries ||
+        countriesResponse?.data?.data ||
+        [];
+      const normalizedCountry = normalizeLocationName(countryName);
+      const country = countries.find(
+        (item: any) => normalizeLocationName(item?.name || '') === normalizedCountry
+      );
+
+      let cityId: string | undefined;
+      let countryId: string | undefined;
+
+      if (country?.id) {
+        countryId = country.id;
+        if (cityName) {
+          const citiesResponse = await locationsService.getCities(country.id);
+          const cities =
+            citiesResponse?.data ||
+            citiesResponse?.cities ||
+            citiesResponse?.data?.data ||
+            [];
+          const normalizedCity = normalizeLocationName(cityName);
+          const city = cities.find(
+            (item: any) => normalizeLocationName(item?.name || '') === normalizedCity
+          );
+          if (city?.id) {
+            cityId = city.id;
+          }
+        }
+      }
+
+      await authService.updateLocation({
+        latitude,
+        longitude,
+        countryId: countryId || defaultCountryId,
+        cityId: cityId || defaultCityId,
+      });
+    } catch (error) {
+      console.error('❌ [HOME] Error sincronizando ubicación:', error);
+    }
+  };
+
+  const navigateToDouli = (question: string) => {
+    (navigation as any).navigate('Doula', {
+      screen: 'DoulaMain',
+      params: { question },
+    });
+  };
+
+  const applyWhiteNoiseDuration = (minutes: number | null) => {
+    setWhiteNoiseDurationMinutes(minutes);
+    if (whiteNoiseTimer) {
+      clearTimeout(whiteNoiseTimer);
+      setWhiteNoiseTimer(null);
+    }
+    if (whiteNoisePlaying && whiteNoiseSound && minutes) {
+      const ms = minutes * 60 * 1000;
+      const timer = setTimeout(async () => {
+        try {
+          await whiteNoiseSound.stopAsync();
+        } catch (error) {
+          console.warn('⚠️ [WHITE NOISE] Error deteniendo por duración:', error);
+        } finally {
+          setWhiteNoisePlaying(false);
+          setWhiteNoiseTimer(null);
+        }
+      }, ms);
+      setWhiteNoiseTimer(timer);
+    }
+  };
+
+  const openWhiteNoiseModal = async () => {
+    setShowWhiteNoiseModal(true);
+    analyticsService.logEvent('white_noise_open', {
+      child_id: selectedChild?.id || null,
+    });
+    setWhiteNoiseError(null);
+  };
+
+  const loadWhiteNoiseSound = async (): Promise<Audio.Sound | null> => {
+    if (whiteNoiseSound) return whiteNoiseSound;
+    if (whiteNoiseLoading) return null;
+
+    try {
+      setWhiteNoiseLoading(true);
+      setWhiteNoiseError(null);
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: false,
+        staysActiveInBackground: false,
+        playsInSilentModeIOS: true,
+      });
+
+      // Primero intenta con audio local para evitar bloqueos de red
+      try {
+        const { sound } = await Audio.Sound.createAsync(
+          WHITE_NOISE_LOCAL,
+          { shouldPlay: false, isLooping: true, volume: 0.6 }
+        );
+        setWhiteNoiseSound(sound);
+        return sound;
+      } catch (error) {
+        console.warn('⚠️ [WHITE NOISE] Error cargando audio local, intentando remoto:', error);
+      }
+
+      let lastError: unknown = null;
+      for (const url of WHITE_NOISE_URLS) {
+        let timeoutId: ReturnType<typeof setTimeout> | null = null;
+        try {
+          const timeoutPromise = new Promise<never>((_, reject) => {
+            timeoutId = setTimeout(() => {
+              reject(new Error("Timeout cargando audio"));
+            }, WHITE_NOISE_LOAD_TIMEOUT_MS);
+          });
+
+          const { sound } = await Promise.race([
+            Audio.Sound.createAsync(
+              { uri: url },
+              { shouldPlay: false, isLooping: true, volume: 0.6 }
+            ),
+            timeoutPromise,
+          ]);
+
+          if (timeoutId) clearTimeout(timeoutId);
+          setWhiteNoiseSound(sound);
+          return sound;
+        } catch (error) {
+          if (timeoutId) clearTimeout(timeoutId);
+          lastError = error;
+        }
+      }
+
+      throw lastError || new Error("No se pudo cargar el audio");
+    } catch (error) {
+      console.error('❌ [WHITE NOISE] Error cargando sonido:', error);
+      setWhiteNoiseError("No se pudo cargar el audio. Toca reintentar.");
+      return null;
+    } finally {
+      setWhiteNoiseLoading(false);
+    }
+  };
+
+  const toggleWhiteNoise = async () => {
+    const sound = whiteNoiseSound || (await loadWhiteNoiseSound());
+    if (!sound) return;
+    const status = await sound.getStatusAsync();
+    if (!status.isLoaded) return;
+    if (status.isPlaying) {
+      await sound.pauseAsync();
+      setWhiteNoisePlaying(false);
+      if (whiteNoiseTimer) {
+        clearTimeout(whiteNoiseTimer);
+        setWhiteNoiseTimer(null);
+      }
+      analyticsService.logEvent('white_noise_pause', {
+        child_id: selectedChild?.id || null,
+      });
+    } else {
+      await sound.playAsync();
+      setWhiteNoisePlaying(true);
+      if (whiteNoiseDurationMinutes) {
+        const ms = whiteNoiseDurationMinutes * 60 * 1000;
+        const timer = setTimeout(async () => {
+          try {
+            await sound.stopAsync();
+          } catch (error) {
+            console.warn('⚠️ [WHITE NOISE] Error deteniendo por duración:', error);
+          } finally {
+            setWhiteNoisePlaying(false);
+            setWhiteNoiseTimer(null);
+          }
+        }, ms);
+        setWhiteNoiseTimer(timer);
+      }
+      analyticsService.logEvent('white_noise_play', {
+        child_id: selectedChild?.id || null,
+      });
+    }
+  };
+
+  const closeWhiteNoiseModal = async () => {
+    setShowWhiteNoiseModal(false);
+    analyticsService.logEvent('white_noise_close', {
+      child_id: selectedChild?.id || null,
+    });
+    setWhiteNoiseError(null);
+    if (whiteNoiseTimer) {
+      clearTimeout(whiteNoiseTimer);
+      setWhiteNoiseTimer(null);
+    }
+    if (whiteNoiseSound) {
+      try {
+        await whiteNoiseSound.stopAsync();
+        await whiteNoiseSound.unloadAsync();
+      } catch (error) {
+        console.warn('⚠️ [WHITE NOISE] Error cerrando sonido:', error);
+      }
+      setWhiteNoiseSound(null);
+      setWhiteNoisePlaying(false);
+    }
   };
 
   const getProfileImage = () => {
@@ -1365,6 +2048,12 @@ const HomeScreen: React.FC = () => {
     return { x, y, hour, minute, angle, radian };
   };
 
+  const userFirstName = user?.displayName?.split(' ')[0] || 'Mamá';
+  const childFirstName = selectedChild?.name?.split(' ')[0] || 'Tu bebé';
+  const selectedChildIndex = selectedChild
+    ? Math.max(0, children.findIndex((child) => child.id === selectedChild.id))
+    : 0;
+
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
@@ -1380,17 +2069,29 @@ const HomeScreen: React.FC = () => {
         style={styles.scrollView}
         showsVerticalScrollIndicator={false}
       >
-        {/* Saludo Personalizado */}
-        <View style={styles.greetingSection}>
-          <View style={styles.greetingTextContainer}>
-            <Text style={styles.greetingHello}>¡Hola </Text>
-            <Text style={styles.greetingName}>{user?.displayName}!</Text>
-          </View>
+        <View style={styles.greetingBlock}>
+          <Text style={styles.greetingTitle}>
+            {getGreeting()}, {userFirstName}! {getGreetingEmoji()}
+          </Text>
         </View>
 
-        {/* Pestañas de Sueño / Medicamentos */}
+        {/* Pestañas de Hoy / Sueño / Medicina */}
         {selectedChild && (
           <View style={styles.tabsContainer}>
+            <TouchableOpacity
+              style={[styles.tab, homeTab === 'today' && styles.activeTab]}
+              onPress={() => setHomeTab('today')}
+            >
+              <Ionicons
+                name="calendar"
+                size={18}
+                color={homeTab === 'today' ? '#4A5568' : '#FFF'}
+              />
+              <Text style={[styles.tabText, homeTab === 'today' && styles.activeTabText]}>
+                Hoy
+              </Text>
+            </TouchableOpacity>
+
             <TouchableOpacity
               style={[styles.tab, homeTab === 'sleep' && styles.activeTab]}
               onPress={() => setHomeTab('sleep')}
@@ -1415,12 +2116,345 @@ const HomeScreen: React.FC = () => {
                 color={homeTab === 'medications' ? '#4A5568' : '#FFF'} 
               />
               <Text style={[styles.tabText, homeTab === 'medications' && styles.activeTabText]}>
-                Medicamentos
+                Medicina
                 {medications.filter(m => m.active).length > 0 && (
                   <Text style={styles.tabBadge}> ({medications.filter(m => m.active).length})</Text>
                 )}
               </Text>
             </TouchableOpacity>
+          </View>
+        )}
+
+        {/* Contenido de la pestaña HOY */}
+        {homeTab === 'today' && selectedChild && (
+          <View style={styles.todaySection}>
+            <Text style={styles.todayTitle}>Tu día en Munpa</Text>
+            <Text style={styles.todaySubtitle}></Text>
+            <View style={styles.todayGuideCard}>
+              <Text style={styles.todayGuideLabel}>Tu guía de hoy</Text>
+              {loadingTodayGuide ? (
+                <View style={styles.todayGuideLoading}>
+                  <ActivityIndicator color="#6B5CA5" />
+                  <Text style={styles.todayGuideLoadingText}>
+                    Douli está aprendiendo de {childFirstName}...
+                  </Text>
+                </View>
+              ) : (
+                <>
+                  <Text style={styles.todayGuideWeek}>
+                    {todayGuide?.title ||
+                      `🌱 Semana ${selectedChild?.ageInMonths ? Math.max(1, Math.round(selectedChild.ageInMonths * 4.345)) : 1}: El descubrimiento`}
+                  </Text>
+                  {todayGuide?.subtitle ? (
+                    <Text style={styles.todayGuideSubtitle}>{todayGuide.subtitle}</Text>
+                  ) : null}
+                  <Text style={styles.todayGuideText}>
+                    {todayGuide?.description ||
+                      `A esta edad, ${childFirstName} descubre nuevas texturas, sonidos y movimientos. Unos minutos de juego guiado pueden marcar la diferencia.`}
+                  </Text>
+                  <View style={styles.todayGuideTipCard}>
+                    <View style={styles.todayGuideTipIcon}>
+                      <Ionicons name="bulb" size={16} color="#6B5CA5" />
+                    </View>
+                    <Text style={styles.todayGuideTipText}>
+                      {todayGuide?.tip ||
+                        activitySuggestions?.suggestions?.generalTip ||
+                        activitySuggestions?.suggestions?.warningIfTired ||
+                        `${childFirstName} parece aburrido. El juego con un espejo ayuda a su autoconocimiento.`}
+                    </Text>
+                  </View>
+                </>
+              )}
+              {activitySuggestions?.suggestions?.activities?.length > 0 && (
+                <View style={styles.todayGuideActivities}>
+                  <Text style={styles.todayGuideActivitiesTitle}>
+                    Douli te recomienda estas actividades para {childFirstName}:
+                  </Text>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                    {activitySuggestions.suggestions.activities.map((activity: any, index: number) => (
+                      <TouchableOpacity
+                        key={`${activity?.title || 'activity'}-${index}`}
+                        style={styles.todayGuideActivityCard}
+                        onPress={() => {
+                          setSelectedActivityDetail(activity);
+                          setShowActivityDetailModal(true);
+                        }}
+                      >
+                        <View style={styles.todayGuideActivityHeader}>
+                          <Ionicons name="sparkles" size={16} color="#6B5CA5" />
+                          <Text style={styles.todayGuideActivityText} numberOfLines={2}>
+                            {activity.title || 'Actividad'}
+                          </Text>
+                        </View>
+                        {activity.description && (
+                          <Text style={styles.todayGuideActivityDesc} numberOfLines={3}>
+                            {activity.description}
+                          </Text>
+                        )}
+                        {activity.benefits && (
+                          <Text style={styles.todayGuideActivityMeta} numberOfLines={1}>
+                            Beneficios: {Array.isArray(activity.benefits) ? activity.benefits.join(', ') : activity.benefits}
+                          </Text>
+                        )}
+                        {activity.duration && (
+                          <Text style={styles.todayGuideActivityMeta}>
+                            Duración: {activity.duration}
+                          </Text>
+                        )}
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                </View>
+              )}
+            </View>
+
+            <Text style={styles.todaySectionTitle}>Herramientas</Text>
+            <View style={styles.todayToolsRow}>
+              <TouchableOpacity style={[styles.todayToolCard, styles.todayToolCardSounds]} onPress={openWhiteNoiseModal}>
+                <Ionicons name="musical-notes" size={22} color="#FFF" />
+                <Text style={styles.todayToolTitle}>Sonidos</Text>
+                <Text style={styles.todayToolSubtitle}>Ruido Blanco</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.todayToolCard, styles.todayToolCardAdvisories]} onPress={openAdvisories}>
+                <Ionicons name="school" size={22} color="#FFF" />
+                <Text style={styles.todayToolTitle}>Asesorías</Text>
+                <Text style={styles.todayToolSubtitle}>Recomendados</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.todayToolCard, styles.todayToolCardHealth]} onPress={openHealthProfile}>
+                <Ionicons name="heart" size={22} color="#FFF" />
+                <Text style={styles.todayToolTitle}>Salud</Text>
+                <Text style={styles.todayToolSubtitle}>Citas y vacunas</Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.todayBannerContainer}>
+              <BannerCarousel
+                section="home"
+                style={styles.todayBanner}
+                imageResizeMode="cover"
+                bannerRadius={16}
+                bannerBackgroundColor="transparent"
+                scrollEnabled={false}
+              />
+            </View>
+
+            <View style={styles.todayDouliSection}>
+              <Text style={styles.todaySectionTitle}>Douli te ayuda</Text>
+              <Text style={styles.todayDouliSubtitle}>
+                Preguntas frecuentes de {childFirstName}
+              </Text>
+              {(loadingTodayFaq ? ['Cargando preguntas...'] : todayFaqQuestions).slice(0, 4).map((q) => (
+                <TouchableOpacity
+                  key={q}
+                  style={styles.todayDouliQuestion}
+                  onPress={() => navigateToDouli(q)}
+                >
+                  <Ionicons name="help-circle-outline" size={18} color="#6B5CA5" />
+                  <Text style={styles.todayDouliQuestionText}>{q}</Text>
+                  <Ionicons name="chevron-forward" size={16} color="#6B7280" />
+                </TouchableOpacity>
+              ))}
+              <TouchableOpacity
+                style={styles.todayDouliInputRow}
+                onPress={() => navigateToDouli('')}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="chatbubble-ellipses" size={18} color="#6B5CA5" />
+                <Text style={styles.todayDouliInput}>
+                  Escribe tu propia pregunta a Douli...
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+
+            <Text style={styles.todaySectionTitle}>Explora Munpa</Text>
+
+            {todayRecommendations.length > 0 && (
+              <View style={styles.todayNearbySection}>
+                <View style={styles.todayNearbyHeader}>
+                  <Text style={styles.todayNearbyTitle}>Recomendaciones cerca de ti</Text>
+                  <TouchableOpacity onPress={() => navigation.navigate('Recommendations' as never)}>
+                    <Text style={styles.todayNearbyLink}>Ver todas</Text>
+                  </TouchableOpacity>
+                </View>
+
+                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                  {todayRecommendations.map((rec) => (
+                    <TouchableOpacity
+                      key={rec.id}
+                      style={styles.todayNearbyCard}
+                      onPress={() =>
+                        navigation.navigate(
+                          'Recommendations' as never,
+                          { screen: 'RecommendationDetail', params: { recommendationId: rec.id } } as never
+                        )
+                      }
+                    >
+                      {rec.imageUrl ? (
+                        <Image source={{ uri: rec.imageUrl }} style={styles.todayNearbyImage} />
+                      ) : (
+                        <View style={styles.todayNearbyImagePlaceholder}>
+                          <Ionicons name="sparkles" size={20} color="#FFF" />
+                        </View>
+                      )}
+                      <Text style={styles.todayNearbyName} numberOfLines={2}>
+                        {rec.name}
+                      </Text>
+                      <View style={styles.todayNearbyMeta}>
+                        <Ionicons name="location" size={12} color="#59C6C0" />
+                        <Text style={styles.todayNearbyDistance}>
+                          {rec.distance != null ? `${Number(rec.distance).toFixed(2)} km` : 'Cerca de ti'}
+                        </Text>
+                        <Text style={styles.todayNearbyRating}>
+                          {rec.stats?.averageRating
+                            ? `⭐ ${rec.stats.averageRating.toFixed(1)}`
+                            : rec.averageRating
+                            ? `⭐ ${Number(rec.averageRating).toFixed(1)}`
+                            : rec.rating
+                            ? `⭐ ${Number(rec.rating).toFixed(1)}`
+                            : '⭐ N/A'}
+                        </Text>
+                      </View>
+                      {(rec.cityName || rec.city || rec.countryName || rec.country) && (
+                        <Text style={styles.todayNearbyLocation} numberOfLines={1}>
+                          {(rec.cityName || rec.city || 'Ciudad')} · {rec.countryName || rec.country || 'País'}
+                        </Text>
+                      )}
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+            )}
+
+            <View style={styles.todayNearbySection}>
+              <View style={styles.todayNearbyHeader}>
+                <Text style={styles.todayNearbyTitle}>Munpa Market cerca de ti</Text>
+                <TouchableOpacity onPress={() => navigation.navigate('MunpaMarket' as never)}>
+                  <Text style={styles.todayNearbyLink}>Ver todo</Text>
+                </TouchableOpacity>
+              </View>
+
+              {todayLocationLoading && (
+                <ActivityIndicator color="#FFF" />
+              )}
+
+              {!todayLocationLoading && !todayLocationGranted && (
+                <Text style={styles.todayNearbyEmpty}>Activa tu ubicación para ver productos cercanos.</Text>
+              )}
+
+              {todayLocationGranted && loadingTodayMarket && (
+                <ActivityIndicator color="#FFF" />
+              )}
+
+              {todayLocationGranted && !loadingTodayMarket && todayMarketProducts.length === 0 && (
+                <Text style={styles.todayNearbyEmpty}>
+                  {todayMarketError || 'No hay productos cercanos por ahora.'}
+                </Text>
+              )}
+
+              {todayMarketProducts.length > 0 && (
+                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                  {todayMarketProducts.map((product) => {
+                    const image =
+                      product.images?.[0] ||
+                      (product as any)?.photos?.[0] ||
+                      product.imageUrl ||
+                      (product as any)?.image ||
+                      (product as any)?.photoUrl;
+                    const title = product.title || product.name || 'Producto';
+                    return (
+                      <TouchableOpacity
+                        key={product.id}
+                        style={styles.todayNearbyCard}
+                        onPress={() => {
+                          analyticsService.logEvent('market_product_view', {
+                            product_id: product.id,
+                            title,
+                            type: (product as any)?.type || null,
+                            price: (product as any)?.price ?? null,
+                            category: (product as any)?.category || null,
+                            city: (product as any)?.location?.city || null,
+                            country: (product as any)?.location?.country || null,
+                          });
+                          navigation.navigate('ProductDetail' as never, { productId: product.id } as never);
+                        }}
+                      >
+                        {image ? (
+                          <Image source={{ uri: image }} style={styles.todayNearbyImage} />
+                        ) : (
+                          <View style={styles.todayNearbyImagePlaceholder}>
+                            <Ionicons name="bag-handle" size={20} color="#FFF" />
+                          </View>
+                        )}
+                        <Text style={styles.todayNearbyName} numberOfLines={2}>
+                          {title}
+                        </Text>
+                        <View style={styles.todayNearbyMeta}>
+                          <Ionicons name="location" size={12} color="#59C6C0" />
+                          <Text style={styles.todayNearbyDistance}>
+                          {product.distance != null ? `${Number(product.distance).toFixed(2)} km` : 'Cerca de ti'}
+                          </Text>
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+              )}
+            </View>
+
+            <View style={styles.todayNearbySection}>
+              <View style={styles.todayNearbyHeader}>
+                <Text style={styles.todayNearbyTitle}>Posts populares</Text>
+                <TouchableOpacity onPress={() => navigation.navigate('Communities' as never)}>
+                  <Text style={styles.todayNearbyLink}>Ver todo</Text>
+                </TouchableOpacity>
+              </View>
+
+              {loadingTodayCommunityPosts && (
+                <ActivityIndicator color="#FFF" />
+              )}
+
+              {!loadingTodayCommunityPosts && todayCommunityPosts.length === 0 && (
+                <Text style={styles.todayNearbyEmpty}>
+                  {todayCommunityError || 'No hay posts populares por ahora.'}
+                </Text>
+              )}
+
+              {todayCommunityPosts.length > 0 && (
+                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                  {todayCommunityPosts.map((post) => (
+                    <TouchableOpacity
+                      key={post.id}
+                      style={styles.todayNearbyCard}
+                      onPress={() => navigation.navigate('PostDetail' as never, { post } as never)}
+                    >
+                      {post.imageUrl ? (
+                        <Image source={{ uri: post.imageUrl }} style={styles.todayNearbyImage} />
+                      ) : (
+                        <View style={styles.todayNearbyImagePlaceholder}>
+                          <Ionicons name="chatbubble-ellipses" size={20} color="#FFF" />
+                        </View>
+                      )}
+                      <Text style={styles.todayNearbyName} numberOfLines={2}>
+                        {post.content || 'Post de la comunidad'}
+                      </Text>
+                      <View style={styles.todayNearbyMeta}>
+                        <Ionicons name="heart" size={12} color="#FF7AA2" />
+                        <Text style={styles.todayNearbyDistance}>
+                          {post.likeCount != null ? `${post.likeCount} likes` : '0 likes'}
+                        </Text>
+                        {post.commentCount ? (
+                          <Text style={styles.todayNearbyRating}>
+                            {`${post.commentCount} comentarios`}
+                          </Text>
+                        ) : null}
+                      </View>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              )}
+            </View>
+
           </View>
         )}
 
@@ -2694,6 +3728,160 @@ const HomeScreen: React.FC = () => {
         </View>
       </Modal>
 
+      {/* Modal de detalle de actividad */}
+      <Modal
+        visible={showActivityDetailModal}
+        animationType="fade"
+        transparent
+        onRequestClose={() => setShowActivityDetailModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.activityModalContent}>
+            <Text style={styles.activityModalTitle}>
+              {selectedActivityDetail?.title || 'Actividad'}
+            </Text>
+            <Text style={styles.activityModalSubtitle}>Detalle de la actividad</Text>
+            <ScrollView style={styles.activityModalScroll} showsVerticalScrollIndicator={false}>
+              {selectedActivityDetail &&
+                Object.entries(selectedActivityDetail).map(([key, value]) => {
+                  if (key === 'title' || value == null || value === '') return null;
+                  const formattedValue = formatActivityFieldValue(value);
+                  if (!formattedValue) return null;
+                  return (
+                    <View key={key} style={styles.activityModalRow}>
+                      <Text style={styles.activityModalLabel}>
+                        {formatActivityFieldLabel(key)}
+                      </Text>
+                      <Text style={styles.activityModalValue}>{formattedValue}</Text>
+                    </View>
+                  );
+                })}
+            </ScrollView>
+            <TouchableOpacity
+              style={styles.activityModalCloseButton}
+              onPress={() => setShowActivityDetailModal(false)}
+            >
+              <Text style={styles.activityModalCloseText}>Cerrar</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Modal de ruido blanco */}
+      <Modal
+        visible={showWhiteNoiseModal}
+        animationType="slide"
+        transparent
+        onRequestClose={closeWhiteNoiseModal}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.whiteNoiseModal}>
+            <View style={styles.whiteNoiseHeader}>
+              <Ionicons name="musical-notes" size={24} color="#6B5CA5" />
+              <Text style={styles.whiteNoiseTitle}>Ruido blanco</Text>
+            </View>
+            <Text style={styles.whiteNoiseSubtitle}>Ideal para dormir y calmar a tu bebé</Text>
+            <View style={styles.whiteNoiseOptions}>
+              <Text style={styles.whiteNoiseOptionLabel}>Duración</Text>
+              <View style={styles.whiteNoiseOptionRow}>
+                {[15, 30, 60].map((minutes) => (
+                  <TouchableOpacity
+                    key={minutes}
+                    style={[
+                      styles.whiteNoiseOptionChip,
+                      whiteNoiseDurationMinutes === minutes && styles.whiteNoiseOptionChipActive,
+                    ]}
+                    onPress={() => applyWhiteNoiseDuration(minutes)}
+                  >
+                    <Text
+                      style={[
+                        styles.whiteNoiseOptionText,
+                        whiteNoiseDurationMinutes === minutes && styles.whiteNoiseOptionTextActive,
+                      ]}
+                    >
+                      {minutes} min
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+                <TouchableOpacity
+                  style={[
+                    styles.whiteNoiseOptionChip,
+                    whiteNoiseDurationMinutes === null && styles.whiteNoiseOptionChipActive,
+                  ]}
+                  onPress={() => applyWhiteNoiseDuration(null)}
+                >
+                  <Text
+                    style={[
+                      styles.whiteNoiseOptionText,
+                      whiteNoiseDurationMinutes === null && styles.whiteNoiseOptionTextActive,
+                    ]}
+                  >
+                    Sin límite
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+            {whiteNoiseError && (
+              <Text style={styles.whiteNoiseError}>{whiteNoiseError}</Text>
+            )}
+            <TouchableOpacity
+              style={styles.whiteNoiseButton}
+              onPress={toggleWhiteNoise}
+              disabled={whiteNoiseLoading}
+            >
+              {whiteNoiseLoading ? (
+                <ActivityIndicator color="#FFF" />
+              ) : (
+                <Text style={styles.whiteNoiseButtonText}>
+                  {whiteNoisePlaying ? 'Pausar' : whiteNoiseError ? 'Reintentar' : 'Reproducir'}
+                </Text>
+              )}
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.whiteNoiseClose} onPress={closeWhiteNoiseModal}>
+              <Text style={styles.whiteNoiseCloseText}>Cerrar</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Selector de hijos */}
+      <Modal
+        visible={showChildSelector}
+        animationType="fade"
+        transparent
+        onRequestClose={() => setShowChildSelector(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.childSelectorModal}>
+            <Text style={styles.childSelectorTitle}>Selecciona a tu bebé</Text>
+            <ScrollView style={styles.childSelectorList} showsVerticalScrollIndicator={false}>
+              {children.map((child, index) => (
+                <TouchableOpacity
+                  key={child.id}
+                  style={styles.childSelectorItem}
+                  onPress={() => handleSelectChild(child)}
+                >
+                  <Image source={getChildAvatar(child, index)} style={styles.childSelectorAvatar} />
+                  <View style={styles.childSelectorInfo}>
+                    <Text style={styles.childSelectorItemName}>{child.name}</Text>
+                    {child.ageInMonths != null && (
+                      <Text style={styles.childSelectorItemMeta}>{child.ageInMonths} meses</Text>
+                    )}
+                  </View>
+                  {selectedChild?.id === child.id && (
+                    <Ionicons name="checkmark-circle" size={18} color="#59C6C0" />
+                  )}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            <TouchableOpacity style={styles.childSelectorAdd} onPress={handleAddChild}>
+              <Ionicons name="add-circle" size={18} color="#6B5CA5" />
+              <Text style={styles.childSelectorAddText}>Agregar bebé</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
       {/* Modal de inicio rápido de siesta */}
       <Modal
         visible={showStartNapModal}
@@ -2715,20 +3903,13 @@ const HomeScreen: React.FC = () => {
             <View style={styles.modalTimeSection}>
               {Platform.OS === 'ios' ? (
                 <DateTimePicker
+                  key={`nap-time-${napPickerKey}`}
                   value={selectedNapStartTime}
                   mode="time"
                   display="spinner"
                   onChange={(event, date) => {
                     if (date) {
-                      const today = new Date();
-                      const newTime = new Date(
-                        today.getFullYear(),
-                        today.getMonth(),
-                        today.getDate(),
-                        date.getHours(),
-                        date.getMinutes()
-                      );
-                      setSelectedNapStartTime(newTime);
+                      setSelectedNapStartTime(date);
                     }
                   }}
                   style={styles.dateTimePicker}
@@ -2757,15 +3938,7 @@ const HomeScreen: React.FC = () => {
                       onChange={(event, date) => {
                         setShowNapStartTimePicker(false);
                         if (date) {
-                          const today = new Date();
-                          const newTime = new Date(
-                            today.getFullYear(),
-                            today.getMonth(),
-                            today.getDate(),
-                            date.getHours(),
-                            date.getMinutes()
-                          );
-                          setSelectedNapStartTime(newTime);
+                          setSelectedNapStartTime(date);
                         }
                       }}
                     />
@@ -3261,7 +4434,7 @@ const HomeScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#33737d",
+    backgroundColor: "#59C6C0",
     position: "relative",
   },
 
@@ -3269,6 +4442,69 @@ const styles = StyleSheet.create({
   // Scroll principal
   scrollView: {
     flex: 1,
+  },
+
+  // Header principal Home
+  homeHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 20,
+    paddingTop: 12,
+  },
+  childSelector: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#F0FBFA",
+    borderRadius: 18,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderWidth: 1,
+    borderColor: "#59C6C0",
+  },
+  childAvatar: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    marginRight: 8,
+  },
+  childAvatarPlaceholder: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: "#E2E8F0",
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 8,
+  },
+  childSelectorName: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#2D3748",
+    marginRight: 6,
+  },
+  homeHeaderActions: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  headerIconButton: {
+    marginLeft: 10,
+    backgroundColor: "#F3E9FB",
+    padding: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#887CBC",
+  },
+  greetingBlock: {
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    paddingBottom: 8,
+  },
+  greetingTitle: {
+    fontSize: 22,
+    fontWeight: "700",
+    color: "#FFF",
+    marginBottom: 6,
   },
 
   // Sección de saludo
@@ -3297,6 +4533,67 @@ const styles = StyleSheet.create({
     color: "#FFF",
     lineHeight: 36,
     fontFamily: "Montserrat",
+  },
+  greetingSupport: {
+    marginTop: 6,
+    fontSize: 14,
+    color: "#FFF",
+    opacity: 0.85,
+    fontWeight: "500",
+  },
+  childSelectorModal: {
+    backgroundColor: "#FFF",
+    borderRadius: 18,
+    padding: 18,
+    width: "88%",
+    maxHeight: "70%",
+  },
+  childSelectorTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#2D3748",
+    marginBottom: 12,
+  },
+  childSelectorList: {
+    marginBottom: 12,
+  },
+  childSelectorItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: "#E2E8F0",
+  },
+  childSelectorAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    marginRight: 10,
+  },
+  childSelectorInfo: {
+    flex: 1,
+  },
+  childSelectorItemName: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#2D3748",
+  },
+  childSelectorItemMeta: {
+    fontSize: 12,
+    color: "#6B7280",
+    marginTop: 2,
+  },
+  childSelectorAdd: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 10,
+    justifyContent: "center",
+  },
+  childSelectorAddText: {
+    marginLeft: 6,
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#6B5CA5",
   },
   sleepTitleContainer: {
     marginTop: 15,
@@ -5633,7 +6930,7 @@ const styles = StyleSheet.create({
   // ============= ESTILOS DE PESTAÑAS =============
   tabsContainer: {
     flexDirection: 'row',
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    backgroundColor: 'rgba(136, 124, 188, 0.35)',
     borderRadius: 25,
     marginHorizontal: 20,
     marginVertical: 15,
@@ -5650,7 +6947,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   activeTab: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#FFC211',
   },
   tabText: {
     fontSize: 14,
@@ -5664,6 +6961,549 @@ const styles = StyleSheet.create({
   tabBadge: {
     fontSize: 12,
     fontWeight: '700',
+  },
+
+  // ============= ESTILOS DE HOY =============
+  todaySection: {
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+  },
+  todayGuideCard: {
+    backgroundColor: "#FFF7D6",
+    borderRadius: 18,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: "#FFC211",
+  },
+  todayGuideLabel: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#6B7280",
+    textTransform: "uppercase",
+    letterSpacing: 0.8,
+  },
+  todayGuideWeek: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#2D3748",
+    marginTop: 6,
+  },
+  todayGuideText: {
+    fontSize: 13,
+    color: "#4A5568",
+    marginTop: 6,
+    lineHeight: 18,
+  },
+  todayGuideSubtitle: {
+    fontSize: 13,
+    color: "#6B7280",
+    marginTop: 4,
+    fontStyle: "italic",
+  },
+  todayGuideTipCard: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    backgroundColor: "#EAF6E5",
+    borderRadius: 14,
+    padding: 12,
+    marginTop: 10,
+  },
+  todayGuideTipIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: "#FFF",
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 8,
+  },
+  todayGuideTipText: {
+    flex: 1,
+    fontSize: 12,
+    color: "#4A5568",
+    lineHeight: 16,
+  },
+  todayGuideLoading: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#F7F5FB",
+    borderRadius: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    marginTop: 10,
+  },
+  todayGuideLoadingText: {
+    marginLeft: 8,
+    fontSize: 12,
+    color: "#6B7280",
+    fontWeight: "600",
+  },
+  todayGuideButton: {
+    alignSelf: "center",
+    backgroundColor: "#6B5CA5",
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 14,
+    marginTop: 12,
+  },
+  todayGuideButtonText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#FFF",
+  },
+  todayGuideActivities: {
+    marginTop: 12,
+    backgroundColor: "#F3ECFF",
+    borderRadius: 14,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+  },
+  todayGuideActivitiesTitle: {
+    fontSize: 12,
+    color: "#6B7280",
+    fontWeight: "600",
+    marginBottom: 2,
+  },
+  todayGuideActivitiesSubtitle: {
+    fontSize: 11,
+    color: "#9CA3AF",
+    marginBottom: 8,
+  },
+  todayGuideActivityCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 14,
+    padding: 12,
+    marginRight: 10,
+    width: 220,
+    borderWidth: 1,
+    borderColor: "#C9B7E8",
+  },
+  todayGuideActivityHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  todayGuideActivityText: {
+    marginLeft: 8,
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#2D3748",
+    flex: 1,
+  },
+  todayGuideActivityDesc: {
+    marginLeft: 24,
+    marginTop: 4,
+    fontSize: 12,
+    color: "#6B7280",
+  },
+  todayGuideActivityMeta: {
+    marginLeft: 24,
+    marginTop: 2,
+    fontSize: 10,
+    color: "#9CA3AF",
+  },
+  todaySectionTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#FFF",
+    marginBottom: 10,
+  },
+  todayToolsRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 16,
+    columnGap: 10,
+  },
+  todayToolCard: {
+    flex: 1,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 999,
+    paddingVertical: 12,
+    paddingHorizontal: 10,
+    alignItems: "center",
+    borderWidth: 0,
+  },
+  todayToolCardSounds: {
+    backgroundColor: "#FFC211",
+  },
+  todayToolCardAdvisories: {
+    backgroundColor: "#887CBC",
+  },
+  todayToolCardHealth: {
+    backgroundColor: "#F08EB7",
+  },
+  todayToolTitle: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#FFF",
+    marginTop: 6,
+  },
+  todayToolSubtitle: {
+    fontSize: 11,
+    color: "rgba(255, 255, 255, 0.9)",
+    marginTop: 2,
+  },
+  todayTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#FFF',
+    marginBottom: 6,
+  },
+  todaySubtitle: {
+    fontSize: 14,
+    color: '#FFF',
+    opacity: 0.8,
+    marginBottom: 14,
+  },
+  todayBannerContainer: {
+    marginBottom: 16,
+    alignItems: 'center',
+    width: '100%',
+    position: 'relative',
+  },
+  todayBanner: {
+    width: '110%',
+    
+  },
+  todayDouliSection: {
+    backgroundColor: "#FFF",
+    borderRadius: 18,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: "#F08EB7",
+  },
+  todayDouliSubtitle: {
+    fontSize: 13,
+    color: "#4A5568",
+    marginBottom: 10,
+  },
+  todayDouliQuestion: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#F7ECF5",
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    marginBottom: 8,
+  },
+  todayDouliQuestionText: {
+    flex: 1,
+    marginLeft: 8,
+    fontSize: 13,
+    color: "#2D3748",
+  },
+  todayDouliInputRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  todayDouliInput: {
+    flex: 1,
+    marginLeft: 6,
+    fontSize: 13,
+    color: "#2D3748",
+  },
+  whiteNoiseModal: {
+    backgroundColor: "#FFF",
+    borderRadius: 18,
+    padding: 18,
+    width: "88%",
+  },
+  whiteNoiseHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  whiteNoiseTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#2D3748",
+  },
+  whiteNoiseSubtitle: {
+    marginTop: 6,
+    fontSize: 12,
+    color: "#6B7280",
+  },
+  whiteNoiseOptions: {
+    marginTop: 12,
+  },
+  whiteNoiseOptionLabel: {
+    fontSize: 12,
+    color: "#6B7280",
+    marginBottom: 6,
+    fontWeight: "600",
+  },
+  whiteNoiseOptionRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  whiteNoiseOptionChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 12,
+    backgroundColor: "#EEF2FF",
+  },
+  whiteNoiseOptionChipActive: {
+    backgroundColor: "#6B5CA5",
+  },
+  whiteNoiseOptionText: {
+    fontSize: 12,
+    color: "#4A5568",
+    fontWeight: "600",
+  },
+  whiteNoiseOptionTextActive: {
+    color: "#FFF",
+  },
+  whiteNoiseError: {
+    marginTop: 8,
+    fontSize: 12,
+    color: "#B91C1C",
+    textAlign: "center",
+  },
+  whiteNoiseButton: {
+    marginTop: 14,
+    backgroundColor: "#6B5CA5",
+    paddingVertical: 10,
+    borderRadius: 12,
+    alignItems: "center",
+  },
+  whiteNoiseButtonText: {
+    color: "#FFF",
+    fontWeight: "600",
+    fontSize: 14,
+  },
+  whiteNoiseClose: {
+    marginTop: 10,
+    alignItems: "center",
+  },
+  whiteNoiseCloseText: {
+    color: "#6B5CA5",
+    fontWeight: "600",
+  },
+  todayActivityBanner: {
+    backgroundColor: '#FFF',
+    borderRadius: 16,
+    padding: 14,
+    marginBottom: 12,
+  },
+  todayActivityBannerText: {
+    fontSize: 14,
+    color: '#4A5568',
+    marginBottom: 10,
+  },
+  todayActivityBannerButton: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#EFEAF9',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+  },
+  todayActivityBannerButtonText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#6B5CA5',
+  },
+  todayActivityTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#2D3748',
+    flex: 1,
+  },
+  todayActivityHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 6,
+  },
+  todayActivityDesc: {
+    fontSize: 12,
+    color: '#4A5568',
+  },
+  todayActivityCard: {
+    backgroundColor: '#F5F3FF',
+    borderColor: '#D7D1F2',
+    borderWidth: 1,
+  },
+  activityModalContent: {
+    backgroundColor: '#FFF',
+    borderRadius: 18,
+    padding: 20,
+    width: '100%',
+    maxWidth: 420,
+    maxHeight: '80%',
+  },
+  activityModalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#2D3748',
+    marginBottom: 4,
+  },
+  activityModalSubtitle: {
+    fontSize: 13,
+    color: '#6B7280',
+    marginBottom: 12,
+  },
+  activityModalScroll: {
+    marginBottom: 16,
+  },
+  activityModalRow: {
+    marginBottom: 10,
+    padding: 10,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 10,
+  },
+  activityModalLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#6B7280',
+    marginBottom: 4,
+  },
+  activityModalValue: {
+    fontSize: 13,
+    color: '#2D3748',
+  },
+  activityModalCloseButton: {
+    alignSelf: 'center',
+    backgroundColor: '#6B5CA5',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 10,
+  },
+  activityModalCloseText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#FFF',
+  },
+  todayCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 14,
+    marginBottom: 12,
+  },
+  todayCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 6,
+  },
+  todayCardTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#2D3748',
+  },
+  todayCardText: {
+    fontSize: 13,
+    color: '#4A5568',
+    marginBottom: 6,
+  },
+  todayCardCta: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#6B5CA5',
+  },
+  todayChecklist: {
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 16,
+    padding: 14,
+    marginTop: 4,
+  },
+  todayChecklistTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#FFF',
+    marginBottom: 8,
+  },
+  todayChecklistItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 6,
+  },
+  todayChecklistText: {
+    fontSize: 13,
+    color: '#FFF',
+  },
+
+  todayNearbySection: {
+    marginBottom: 14,
+  },
+  todayNearbyHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  todayNearbyTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#FFF',
+  },
+  todayNearbyLink: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#FFF',
+    opacity: 0.9,
+  },
+  todayNearbyEmpty: {
+    fontSize: 12,
+    color: '#FFF',
+    opacity: 0.85,
+    marginBottom: 8,
+  },
+  todayNearbyCard: {
+    width: 140,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 10,
+    marginRight: 10,
+    borderWidth: 1,
+    borderColor: '#59C6C0',
+  },
+  todayNearbyImage: {
+    width: '100%',
+    height: 70,
+    borderRadius: 8,
+    marginBottom: 6,
+  },
+  todayNearbyImagePlaceholder: {
+    width: '100%',
+    height: 70,
+    borderRadius: 8,
+    marginBottom: 6,
+    backgroundColor: '#59C6C0',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  todayNearbyName: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#2D3748',
+    marginBottom: 4,
+  },
+  todayNearbyMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  todayNearbyDistance: {
+    fontSize: 11,
+    color: '#4A5568',
+  },
+  todayNearbyRating: {
+    fontSize: 11,
+    color: '#4A5568',
+    marginLeft: 6,
+  },
+  todayNearbyLocation: {
+    marginTop: 4,
+    fontSize: 11,
+    color: '#6B7280',
   },
 
   // ============= ESTILOS DE MEDICAMENTOS =============

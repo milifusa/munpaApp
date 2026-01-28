@@ -8,6 +8,8 @@ import { ChatProvider } from './src/contexts/ChatContext';
 import AppNavigator from './src/navigation/AppNavigator';
 import { trackingService } from './src/services/trackingService';
 import sentryService from './src/services/sentryService';
+import { ensureFirebaseApp } from './src/services/firebaseApp';
+import analyticsService from './src/services/analyticsService';
 
 // Evita error de tipado en RN 0.81+
 (Text as any).defaultProps = {
@@ -27,6 +29,14 @@ export default function App() {
     sentryService.initialize().catch((error) => {
       console.error('❌ [APP] Error inicializando Sentry:', error);
     });
+
+    // Inicializar Firebase + Analytics
+    try {
+      ensureFirebaseApp();
+      analyticsService.setEnabled(true);
+    } catch (error) {
+      console.warn('⚠️ [APP] Error inicializando Firebase:', error);
+    }
 
     // Configurar handler global de errores
     if (ErrorUtils && typeof ErrorUtils.getGlobalHandler === 'function') {

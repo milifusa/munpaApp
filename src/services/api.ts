@@ -252,6 +252,22 @@ export const authService = {
     }
   },
 
+  // Actualizar ubicación del usuario
+  updateLocation: async (data: {
+    latitude: number;
+    longitude: number;
+    countryId?: string;
+    cityId?: string;
+  }) => {
+    try {
+      const response = await api.put('/api/auth/location', data);
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ [AUTH] Error actualizando ubicación:', error.response?.data || error.message);
+      throw error;
+    }
+  },
+
   // Actualizar foto de perfil (usando el endpoint de actualización de perfil)
   updateProfilePhoto: async (photoURL: string) => {
     console.log('📸 Actualizando foto de perfil...');
@@ -448,6 +464,7 @@ export const authService = {
     
     return oobCode;
   }
+  ,
 };
 
 // Tipos de datos para hijos
@@ -921,7 +938,21 @@ export const communitiesService = {
       console.error('❌ [COMMUNITIES] Error saliendo de la comunidad:', error.response?.data || error.message);
       throw error;
     }
-  }
+  },
+
+  // Top posts con más likes
+  getTopPosts: async (limit: number = 3) => {
+    try {
+      const response = await api.get('/api/communities/posts/top', {
+        params: { limit },
+      });
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ [COMMUNITIES] Error obteniendo top posts:', error.response?.data || error.message);
+      throw error;
+    }
+  },
+
 };
 
 // Servicio para listas
@@ -1189,6 +1220,19 @@ export const recommendationsService = {
     }
   },
 
+  // Buscar recomendaciones por texto
+  searchRecommendations: async (query: string) => {
+    try {
+      const response = await api.get('/api/recommendations/search', {
+        params: { q: query },
+      });
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ [RECOMMENDATIONS] Error buscando recomendaciones:', error.response?.data || error.message);
+      throw error;
+    }
+  },
+
   // Obtener recomendaciones por categoría (alias más específico) con paginación
   getRecommendationsByCategory: async (categoryId: string, page: number = 1, limit: number = 20) => {
     console.log('⭐ [RECOMMENDATIONS] Obteniendo recomendaciones por categoría:', categoryId, `Página: ${page}, Límite: ${limit}`);
@@ -1209,6 +1253,25 @@ export const recommendationsService = {
     } catch (error: any) {
       console.error('❌ [RECOMMENDATIONS] Error obteniendo recomendación:', recommendationId);
       console.error('❌ [RECOMMENDATIONS] Error:', error.response?.data || error.message);
+      throw error;
+    }
+  },
+
+  // Obtener recomendaciones cercanas mejor calificadas
+  getNearbyTop: async (params: {
+    latitude: number;
+    longitude: number;
+    radius?: number;
+    categoryId?: string;
+    limit?: number;
+  }) => {
+    try {
+      const response = await api.get('/api/recommendations/nearby/top', {
+        params,
+      });
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ [RECOMMENDATIONS] Error obteniendo cercanas:', error.response?.data || error.message);
       throw error;
     }
   },
@@ -1513,6 +1576,10 @@ export const recommendationsService = {
     address?: string;
     latitude?: number;
     longitude?: number;
+    countryId?: string;
+    cityId?: string;
+    countryName?: string;
+    cityName?: string;
     phone?: string;
     email?: string;
     website?: string;
@@ -1687,6 +1754,86 @@ export const recommendationsService = {
     } catch (error: any) {
       console.error('❌ [RECOMMENDATIONS] Error obteniendo recomendaciones personalizadas');
       console.error('❌ [RECOMMENDATIONS] Error:', error.response?.data || error.message);
+      throw error;
+    }
+  },
+};
+
+// ============================================
+// LOCATIONS
+// ============================================
+export const locationsService = {
+  getCountries: async () => {
+    try {
+      const response = await api.get('/api/locations/countries');
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ [LOCATIONS] Error obteniendo países:', error.response?.data || error.message);
+      throw error;
+    }
+  },
+  getCities: async (countryId: string) => {
+    try {
+      const response = await api.get(`/api/locations/cities?countryId=${countryId}`);
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ [LOCATIONS] Error obteniendo ciudades:', error.response?.data || error.message);
+      throw error;
+    }
+  },
+  reverseGeocode: async (latitude: number, longitude: number) => {
+    try {
+      const response = await api.get(`/api/locations/reverse?latitude=${latitude}&longitude=${longitude}`);
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ [LOCATIONS] Error en reverse geocode:', error.response?.data || error.message);
+      throw error;
+    }
+  },
+};
+
+// ============================================
+// GUIA DE HOY
+// ============================================
+export const guideService = {
+  getTodayGuide: async (payload: {
+    birthDate?: string;
+    name?: string;
+    gestationWeeks?: number;
+    isPregnant?: boolean;
+    ageWeeks?: number;
+  }) => {
+    try {
+      const response = await api.post('/api/guide/today', payload);
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ [GUIDE] Error obteniendo guía de hoy:', error.response?.data || error.message);
+      throw error;
+    }
+  },
+};
+
+// ============================================
+// MARKETPLACE
+// ============================================
+
+export const marketplaceService = {
+  getNearbyTop: async (params: {
+    latitude: number;
+    longitude: number;
+    radius?: number;
+    limit?: number;
+    type?: string;
+    category?: string;
+    status?: string;
+  }) => {
+    try {
+      const response = await api.get('/api/marketplace/products/nearby/top', {
+        params,
+      });
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ [MARKET] Error obteniendo productos cercanos:', error.response?.data || error.message);
       throw error;
     }
   },
@@ -1992,6 +2139,21 @@ export const pregnancyService = {
   },
 };
 
+// ============================================
+// FAQ MOMS
+// ============================================
+export const faqService = {
+  getMomsFaq: async (childId: string) => {
+    try {
+      const response = await api.post('/api/faq/moms', { childId });
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ [FAQ] Error obteniendo preguntas:', error.response?.data || error.message);
+      throw error;
+    }
+  },
+};
+
 // Export de la instancia de axios para uso en otros servicios
 export { api as axiosInstance };
 
@@ -2004,8 +2166,11 @@ export default {
   ...listsService,
   ...categoriesService,
   ...recommendationsService,
+  ...locationsService,
+  ...guideService,
   ...adminService,
   ...sleepService,
   ...activitiesService,
   ...pregnancyService,
+  ...faqService,
 };

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -70,6 +70,8 @@ const CommunityPostsScreen: React.FC = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [likingPostId, setLikingPostId] = useState<string | null>(null);
   const [showMenu, setShowMenu] = useState(false);
+  const loadInFlightRef = useRef(false);
+  const lastLoadAtRef = useRef(0);
 
   // Cargar posts al montar el componente
   useEffect(() => {
@@ -96,7 +98,7 @@ const CommunityPostsScreen: React.FC = () => {
 
 
   // Función para cargar los posts
-  const loadPosts = async () => {
+  const loadPosts = async (force: boolean = false) => {
     // Verificar que el usuario esté autenticado antes de cargar datos
     if (!isAuthenticated) {
       setIsLoading(false);
@@ -104,14 +106,17 @@ const CommunityPostsScreen: React.FC = () => {
     }
 
     try {
+      if (loadInFlightRef.current) return;
+      if (!force && Date.now() - lastLoadAtRef.current < 3000) return;
+      loadInFlightRef.current = true;
       setIsLoading(true);
       const result = await communitiesService.getCommunityPosts(communityId);
-
+      
       if (result.success) {
         const postsData = result.data || [];
         
         const finalPosts = Array.isArray(postsData) ? postsData : [];
-
+        
         setPosts(finalPosts);
       } else {
         setPosts([]);
@@ -125,6 +130,8 @@ const CommunityPostsScreen: React.FC = () => {
       );
       setPosts([]);
     } finally {
+      lastLoadAtRef.current = Date.now();
+      loadInFlightRef.current = false;
       setIsLoading(false);
     }
   };
@@ -132,7 +139,7 @@ const CommunityPostsScreen: React.FC = () => {
   // Función para refrescar los posts
   const onRefresh = async () => {
     setRefreshing(true);
-    await loadPosts();
+    await loadPosts(true);
     setRefreshing(false);
   };
 

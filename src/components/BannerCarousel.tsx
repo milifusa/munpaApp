@@ -10,6 +10,7 @@ import {
   NativeSyntheticEvent,
   ActivityIndicator,
   Text,
+  ImageResizeMode,
 } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import bannerService, { Banner, BannerSection } from '../services/bannerService';
@@ -23,9 +24,22 @@ interface BannerCarouselProps {
   section?: BannerSection; // NUEVO: Sección para filtrar banners
   fallbackToHome?: boolean; // Si no hay banners de la sección, mostrar banners de home
   customBanner?: ReactNode; // Banner personalizado adicional (ej: economía circular)
+  imageResizeMode?: ImageResizeMode;
+  bannerRadius?: number;
+  scrollEnabled?: boolean;
+  bannerBackgroundColor?: string;
 }
 
-const BannerCarousel: React.FC<BannerCarouselProps> = ({ style, section, fallbackToHome = true, customBanner }) => {
+const BannerCarousel: React.FC<BannerCarouselProps> = ({
+  style,
+  section,
+  fallbackToHome = true,
+  customBanner,
+  imageResizeMode = 'cover',
+  bannerRadius = 12,
+  scrollEnabled = true,
+  bannerBackgroundColor = '#f0f0f0',
+}) => {
   const navigation = useNavigation<any>();
   const [banners, setBanners] = useState<Banner[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -353,19 +367,27 @@ const BannerCarousel: React.FC<BannerCarouselProps> = ({ style, section, fallbac
         snapToInterval={BANNER_WIDTH}
         snapToAlignment="center"
         contentContainerStyle={styles.scrollContent}
+        scrollEnabled={scrollEnabled}
       >
         {/* Banners del backend */}
         {banners.map((banner, index) => (
           <TouchableOpacity
             key={banner.id}
-            style={styles.bannerContainer}
+            style={[
+              styles.bannerContainer,
+              {
+                borderRadius: bannerRadius,
+                overflow: bannerRadius ? 'hidden' : 'visible',
+                backgroundColor: bannerBackgroundColor,
+              },
+            ]}
             onPress={() => handleBannerPress(banner)}
             activeOpacity={0.9}
           >
             <Image
               source={{ uri: banner.imageUrl }}
               style={styles.bannerImage}
-              resizeMode="cover"
+              resizeMode={imageResizeMode}
             />
           </TouchableOpacity>
         ))}

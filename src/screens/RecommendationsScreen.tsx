@@ -32,6 +32,10 @@ interface RecentRecommendation {
   description: string;
   address: string;
   imageUrl?: string;
+  cityName?: string;
+  countryName?: string;
+  city?: string;
+  country?: string;
   totalReviews: number;
   averageRating: number;
   commentsCount: number;
@@ -55,12 +59,46 @@ const RecommendationsScreen = ({ navigation }: any) => {
   const [recentRecommendations, setRecentRecommendations] = useState<RecentRecommendation[]>([]);
   const [isLoadingRecent, setIsLoadingRecent] = useState(true);
   const [recentError, setRecentError] = useState<string | null>(null);
+  const [searchResults, setSearchResults] = useState<RecentRecommendation[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
 
   // Cargar categorías y recomendaciones recientes al montar el componente
   useEffect(() => {
     loadCategories();
     loadRecentRecommendations();
   }, []);
+
+  useEffect(() => {
+    if (searchQuery.trim() === '') {
+      setSearchResults([]);
+      setSearchError(null);
+      setIsSearching(false);
+      return;
+    }
+
+    const timeoutId = setTimeout(async () => {
+      try {
+        setIsSearching(true);
+        setSearchError(null);
+        const response = await api.searchRecommendations(searchQuery.trim());
+        const items =
+          response?.data ||
+          response?.recommendations ||
+          response?.data?.data ||
+          [];
+        setSearchResults(Array.isArray(items) ? items : []);
+      } catch (error: any) {
+        console.error('❌ [RECOMMENDATIONS] Error búsqueda:', error);
+        setSearchResults([]);
+        setSearchError('No se pudieron cargar los resultados');
+      } finally {
+        setIsSearching(false);
+      }
+    }, 400);
+
+    return () => clearTimeout(timeoutId);
+  }, [searchQuery]);
 
   const loadCategories = async () => {
     console.log('🔄 [RECOMMENDATIONS] Cargando categorías...');
@@ -260,6 +298,11 @@ const RecommendationsScreen = ({ navigation }: any) => {
                 <Text style={styles.recentItemCategory} numberOfLines={1}>
                   {recommendation.category?.name || 'Sin categoría'}
                 </Text>
+                {(recommendation.cityName || recommendation.city || recommendation.countryName || recommendation.country) && (
+                  <Text style={styles.recentItemLocation} numberOfLines={1}>
+                    {(recommendation.cityName || recommendation.city || 'Ciudad')} · {recommendation.countryName || recommendation.country || 'País'}
+                  </Text>
+                )}
                 <View style={styles.recentItemRating}>
                   {/* Mostrar estrellas */}
                   {[1, 2, 3, 4, 5].map((star) => (
@@ -320,27 +363,85 @@ const RecommendationsScreen = ({ navigation }: any) => {
             )}
           </View>
           
-          {/* Acciones rápidas */}
-          {renderQuickActions()}
-          
-          {/* Botón grande para agregar recomendación */}
-          <TouchableOpacity
-            style={styles.addRecommendationButton}
-            onPress={() => navigation.navigate('AddRecommendation')}
-          >
-            <View style={styles.addRecommendationContent}>
-              <View style={styles.addRecommendationIcon}>
-                <Ionicons name="add-circle" size={28} color="white" />
-              </View>
-              <View style={styles.addRecommendationText}>
-                <Text style={styles.addRecommendationTitle}>Agregar Recomendación</Text>
-                <Text style={styles.addRecommendationSubtitle}>
-                  Comparte un lugar que te guste con la comunidad
+          {searchQuery.trim().length > 0 ? (
+            <View style={styles.recentContainer}>
+              <Text style={styles.sectionTitle}>Resultados de búsqueda</Text>
+              {isSearching && (
+                <View style={styles.loadingContainer}>
+                  <ActivityIndicator size="large" color="#59C6C0" />
+                </View>
+              )}
+              {!isSearching && searchResults.length === 0 && (
+                <Text style={styles.searchEmptyText}>
+                  {searchError || 'No se encontraron resultados'}
                 </Text>
-              </View>
-              <Ionicons name="chevron-forward" size={24} color="#59C6C0" />
+              )}
+              {!isSearching && searchResults.length > 0 && (
+                <View style={styles.recentItems}>
+                  {searchResults.map((recommendation) => (
+                    <TouchableOpacity 
+                      key={recommendation.id} 
+                      style={styles.recentItem}
+                      onPress={() => handleRecommendationPress(recommendation)}
+                    >
+                      {recommendation.imageUrl ? (
+                        <Image 
+                          source={{ uri: recommendation.imageUrl }} 
+                          style={styles.recentItemImage}
+                        />
+                      ) : (
+                        <View style={styles.recentItemIcon}>
+                          <Image 
+                            source={require('../../assets/icon.png')} 
+                            style={styles.defaultIcon}
+                            resizeMode="contain"
+                          />
+                        </View>
+                      )}
+                      <View style={styles.recentItemInfo}>
+                        <Text style={styles.recentItemTitle} numberOfLines={1}>
+                          {recommendation.name}
+                        </Text>
+                        <Text style={styles.recentItemCategory} numberOfLines={1}>
+                          {recommendation.category?.name || 'Sin categoría'}
+                        </Text>
+                        {(recommendation.cityName || recommendation.city || recommendation.countryName || recommendation.country) && (
+                          <Text style={styles.recentItemLocation} numberOfLines={1}>
+                            {(recommendation.cityName || recommendation.city || 'Ciudad')} · {recommendation.countryName || recommendation.country || 'País'}
+                          </Text>
+                        )}
+                      </View>
+                      <Ionicons name="chevron-forward" size={16} color="#CCC" />
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
             </View>
-          </TouchableOpacity>
+          ) : (
+            <>
+              {/* Acciones rápidas */}
+              {renderQuickActions()}
+              
+              {/* Botón grande para agregar recomendación */}
+              <TouchableOpacity
+                style={styles.addRecommendationButton}
+                onPress={() => navigation.navigate('AddRecommendation')}
+              >
+                <View style={styles.addRecommendationContent}>
+                  <View style={styles.addRecommendationIcon}>
+                    <Ionicons name="add-circle" size={28} color="white" />
+                  </View>
+                  <View style={styles.addRecommendationText}>
+                    <Text style={styles.addRecommendationTitle}>Agregar Recomendación</Text>
+                    <Text style={styles.addRecommendationSubtitle}>
+                      Comparte un lugar que te guste con la comunidad
+                    </Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={24} color="#59C6C0" />
+                </View>
+              </TouchableOpacity>
+            </>
+          )}
         </View>
 
         {/* Categorías principales */}
@@ -418,7 +519,7 @@ const RecommendationsScreen = ({ navigation }: any) => {
         
 
         {/* Recomendaciones recientes */}
-        {renderRecentRecommendations()}
+        {searchQuery.trim().length === 0 && renderRecentRecommendations()}
 
         {/* Espacio final */}
         <View style={styles.finalSpacing} />
@@ -686,6 +787,17 @@ const styles = StyleSheet.create({
     color: '#59C6C0',
     marginBottom: 4,
     fontWeight: '500',
+  },
+  recentItemLocation: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginBottom: 4,
+  },
+  searchEmptyText: {
+    fontSize: 13,
+    color: '#6B7280',
+    textAlign: 'center',
+    marginTop: 12,
   },
   recentItemRating: {
     flexDirection: 'row',

@@ -184,6 +184,8 @@ class MarketplaceService {
       if (filters.page) queryParams.append('page', filters.page.toString());
       if (filters.limit) queryParams.append('limit', filters.limit.toString());
       if (filters.orderBy) queryParams.append('orderBy', filters.orderBy);
+      if (filters.latitude) queryParams.append('latitude', filters.latitude.toString());
+      if (filters.longitude) queryParams.append('longitude', filters.longitude.toString());
 
       const response = await fetch(
         `${API_BASE_URL}/marketplace/products?${queryParams.toString()}`,

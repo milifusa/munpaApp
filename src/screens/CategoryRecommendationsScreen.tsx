@@ -26,6 +26,10 @@ interface Recommendation {
   name: string;
   description: string;
   address?: string;
+  cityName?: string;
+  countryName?: string;
+  city?: string;
+  country?: string;
   latitude?: number;
   longitude?: number;
   phone?: string;
@@ -634,6 +638,15 @@ const CategoryRecommendationsScreen = ({ route, navigation }: any) => {
             <Ionicons name="location" size={16} color="#59C6C0" />
             <Text style={styles.infoText} numberOfLines={2}>
               {recommendation.address}
+            </Text>
+          </View>
+        )}
+
+        {(recommendation.cityName || recommendation.city || recommendation.countryName || recommendation.country) && (
+          <View style={styles.infoRow}>
+            <Ionicons name="map-outline" size={16} color="#59C6C0" />
+            <Text style={styles.infoText} numberOfLines={1}>
+              {(recommendation.cityName || recommendation.city || 'Ciudad')} · {recommendation.countryName || recommendation.country || 'País'}
             </Text>
           </View>
         )}

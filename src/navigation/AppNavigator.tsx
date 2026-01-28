@@ -1,8 +1,8 @@
-import React, { useRef } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { NavigationContainer, NavigationContainerRef } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { View, ActivityIndicator, StyleSheet, TouchableOpacity, Platform, Image, Linking, Text } from 'react-native';
+import { View, ActivityIndicator, StyleSheet, TouchableOpacity, Platform, Image, Linking, Text, Modal, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '../contexts/AuthContext';
@@ -11,6 +11,8 @@ import { useNavigation } from '@react-navigation/native';
 import GlobalMenu from '../components/GlobalMenu';
 import DouliChatOverlay from '../components/DouliChatOverlay';
 import { useDeepLinking, setNavigationRef } from '../hooks/useDeepLinking';
+import { axiosInstance as api } from '../services/api';
+import analyticsService from '../services/analyticsService';
 
 // Importar pantallas
 import LoginScreen from '../screens/LoginScreen';
@@ -60,23 +62,71 @@ const Tab = createBottomTabNavigator();
 const ProfileButton = () => {
   const { user } = useAuth();
   const { openMenu } = useMenu();
+  const navigation = useNavigation<any>();
+  const [unreadCount, setUnreadCount] = React.useState(0);
+
+  useEffect(() => {
+    let mounted = true;
+
+    const loadUnread = async () => {
+      try {
+        const response = await api.get('/api/notifications');
+        if (!mounted) return;
+        if (response.data?.success) {
+          const notifs = response.data.data || response.data.notifications || [];
+          const unread = Array.isArray(notifs)
+            ? notifs.filter((n: any) => !n.read).length
+            : 0;
+          setUnreadCount(unread);
+        } else {
+          setUnreadCount(0);
+        }
+      } catch (error) {
+        if (mounted) setUnreadCount(0);
+      }
+    };
+
+    loadUnread();
+    const interval = setInterval(loadUnread, 30000);
+
+    return () => {
+      mounted = false;
+      clearInterval(interval);
+    };
+  }, []);
   
   return (
-    <TouchableOpacity
-      style={styles.profileButton}
-      onPress={openMenu}
-    >
-      {user?.photoURL ? (
-        <Image
-          source={{ uri: user.photoURL }}
-          style={styles.profileImage}
-        />
-      ) : (
-        <View style={styles.profilePlaceholder}>
-          <Ionicons name="person" size={20} color="white" />
-        </View>
-      )}
-    </TouchableOpacity>
+    <View style={styles.headerRightContainer}>
+      <TouchableOpacity
+        style={styles.notificationButton}
+        onPress={() => navigation.navigate('Notifications')}
+      >
+        <Ionicons name="notifications-outline" size={20} color="white" />
+        {unreadCount > 0 && (
+          <View style={styles.notificationBadge}>
+            <Text style={styles.notificationBadgeText}>
+              {unreadCount > 99 ? '99+' : unreadCount}
+            </Text>
+          </View>
+        )}
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={styles.profileButton}
+        onPress={openMenu}
+      >
+        {user?.photoURL ? (
+          <Image
+            source={{ uri: user.photoURL }}
+            style={styles.profileImage}
+          />
+        ) : (
+          <View style={styles.profilePlaceholder}>
+            <Ionicons name="person" size={20} color="white" />
+          </View>
+        )}
+      </TouchableOpacity>
+    </View>
   );
 };
 
@@ -85,6 +135,7 @@ const ChildrenHeaderTitle = () => {
   const [children, setChildren] = React.useState<any[]>([]);
   const [selectedChildId, setSelectedChildId] = React.useState<string | null>(null);
   const [loading, setLoading] = React.useState(true);
+  const [showSelector, setShowSelector] = React.useState(false);
   const navigation = useNavigation<any>();
 
   React.useEffect(() => {
@@ -137,12 +188,14 @@ const ChildrenHeaderTitle = () => {
   const handleSelectChild = async (child: any) => {
     setSelectedChildId(child.id);
     await AsyncStorage.setItem('selectedChildId', child.id);
+    setShowSelector(false);
     
     // Notificar al HomeScreen sobre el cambio
     navigation.setParams({ selectedChildId: child.id, refresh: Date.now() });
   };
 
   const handleAddChild = () => {
+    setShowSelector(false);
     navigation.navigate('ChildrenData', {
       childrenCount: 1,
       gender: 'F',
@@ -158,60 +211,78 @@ const ChildrenHeaderTitle = () => {
     ? children.filter(child => child && child.id && child.name)
     : [];
 
+  const selectedChild = validChildren.find((child) => child.id === selectedChildId) || validChildren[0];
+
   return (
-    <View style={styles.childrenHeaderContainer}>
-      {validChildren.slice(0, 3).map((child, index) => (
-        <TouchableOpacity
-          key={child.id}
-          style={[
-            styles.childHeaderItem,
-            index > 0 && styles.childHeaderItemOverlap,
-          ]}
-          onPress={() => handleSelectChild(child)}
-        >
-          <View
-            style={[
-              styles.childHeaderAvatar,
-              child.id === selectedChildId && styles.childHeaderAvatarSelected,
-            ]}
-          >
-            {child.photoUrl ? (
-              <Image
-                source={{ uri: child.photoUrl }}
-                style={styles.childHeaderImage}
-              />
-            ) : (
-              <View style={styles.childHeaderPlaceholder}>
-                <Text style={styles.childHeaderEmoji}>
-                  {child.isUnborn ? '🤰' : '👶'}
-                </Text>
-              </View>
-            )}
-          </View>
-          <Text style={styles.childHeaderName} numberOfLines={1}>
-            {child.name}
-          </Text>
-        </TouchableOpacity>
-      ))}
-      {validChildren.length > 3 && (
-        <View style={[styles.childHeaderItem, styles.childHeaderItemOverlap]}>
-          <View style={styles.childHeaderMoreBadge}>
-            <Text style={styles.childHeaderMoreText}>+{validChildren.length - 3}</Text>
-          </View>
-        </View>
-      )}
-      
-      {/* Botón Agregar Hijo */}
+    <>
       <TouchableOpacity
-        style={[styles.childHeaderItem, styles.addChildHeaderButton, validChildren.length > 0 && styles.childHeaderItemOverlap]}
-        onPress={handleAddChild}
+        style={styles.childHeaderPill}
+        onPress={() => setShowSelector(true)}
+        activeOpacity={0.8}
       >
-        <View style={styles.childHeaderAvatar}>
-          <Ionicons name="add" size={28} color="#96d2d3" />
-        </View>
-        <Text style={styles.childHeaderName}>Agregar</Text>
+        {selectedChild?.photoUrl ? (
+          <Image source={{ uri: selectedChild.photoUrl }} style={styles.childHeaderPillAvatar} />
+        ) : (
+          <View style={styles.childHeaderPillPlaceholder}>
+            <Text style={styles.childHeaderEmoji}>{selectedChild?.isUnborn ? '🤰' : '👶'}</Text>
+          </View>
+        )}
+        <Text style={styles.childHeaderPillName} numberOfLines={1}>
+          {selectedChild?.name || 'Tu bebé'}
+        </Text>
+        <Ionicons name="chevron-down" size={16} color="#4A5568" />
       </TouchableOpacity>
-    </View>
+
+      <Modal
+        visible={showSelector}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowSelector(false)}
+      >
+        <TouchableOpacity
+          style={styles.childHeaderModalOverlay}
+          activeOpacity={1}
+          onPressOut={() => setShowSelector(false)}
+        >
+          <TouchableOpacity
+            style={styles.childHeaderModalCard}
+            activeOpacity={1}
+          >
+            <Text style={styles.childHeaderModalTitle}>Selecciona a tu bebé</Text>
+            <ScrollView style={styles.childHeaderModalList} showsVerticalScrollIndicator={false}>
+              {validChildren.map((child) => (
+                <TouchableOpacity
+                  key={child.id}
+                  style={styles.childHeaderModalItem}
+                  onPress={() => handleSelectChild(child)}
+                >
+                  {child.photoUrl ? (
+                    <Image source={{ uri: child.photoUrl }} style={styles.childHeaderModalAvatar} />
+                  ) : (
+                    <View style={styles.childHeaderModalAvatar}>
+                      <Text style={styles.childHeaderEmoji}>{child.isUnborn ? '🤰' : '👶'}</Text>
+                    </View>
+                  )}
+                  <View style={styles.childHeaderModalInfo}>
+                    <Text style={styles.childHeaderModalName}>{child.name}</Text>
+                    {child.ageInMonths != null && (
+                      <Text style={styles.childHeaderModalMeta}>{child.ageInMonths} meses</Text>
+                    )}
+                  </View>
+                  {selectedChildId === child.id && (
+                    <Ionicons name="checkmark-circle" size={18} color="#59C6C0" />
+                  )}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            <TouchableOpacity style={styles.childHeaderModalAdd} onPress={handleAddChild}>
+              <Ionicons name="add-circle" size={18} color="#6B5CA5" />
+              <Text style={styles.childHeaderModalAddText}>Agregar bebé</Text>
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
+    </>
   );
 };
 
@@ -389,6 +460,8 @@ const AuthenticatedNavigator = () => {
         options={{
           title: 'Perfil del hijo',
           headerShown: true,
+          headerBackTitleVisible: false,
+          headerBackTitle: '',
         }}
       />
       <Stack.Screen
@@ -894,9 +967,12 @@ const MainTabNavigator = () => {
             const recommendationsTab = state.routes.find((r: any) => r.name === 'Recommendations');
             
             if (recommendationsTab) {
-              const recommendationsState = recommendationsTab.state;
-              // Si hay más de una pantalla en el stack, resetear
-              if (recommendationsState && typeof recommendationsState.index === 'number' && recommendationsState.index > 0) {
+              const recommendationsState = recommendationsTab.state as any;
+              const currentRoute =
+                recommendationsState?.routes?.[recommendationsState.index || 0]?.name;
+
+              // Si no estamos en el listado principal, resetear al main
+              if (currentRoute && currentRoute !== 'RecommendationsMain') {
                 e.preventDefault();
                 navigation.reset({
                   index: 0,
@@ -1003,6 +1079,7 @@ const AppNavigator = () => {
   const { isAuthenticated, isLoading } = useAuth();
   const { isMenuOpen, closeMenu } = useMenu();
   const navigationRef = useRef<NavigationContainerRef<any>>(null);
+  const routeNameRef = useRef<string | undefined>();
 
   // Activar deep linking
   useDeepLinking();
@@ -1114,6 +1191,21 @@ const AppNavigator = () => {
   return (
     <NavigationContainer
       ref={navigationRef}
+      onReady={() => {
+        const initialRoute = navigationRef.current?.getCurrentRoute();
+        routeNameRef.current = initialRoute?.name;
+        if (initialRoute?.name) {
+          analyticsService.logScreenView(initialRoute.name);
+        }
+      }}
+      onStateChange={() => {
+        const currentRoute = navigationRef.current?.getCurrentRoute();
+        const currentName = currentRoute?.name;
+        if (currentName && routeNameRef.current !== currentName) {
+          routeNameRef.current = currentName;
+          analyticsService.logScreenView(currentName);
+        }
+      }}
       theme={{
         dark: false,
         colors: {
@@ -1197,6 +1289,32 @@ const styles = StyleSheet.create({
   profileButton: {
     padding: 8,
     marginRight: 8,
+  },
+  headerRightContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  notificationButton: {
+    padding: 8,
+  },
+  notificationBadge: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    backgroundColor: '#EF4444',
+    borderRadius: 9,
+    minWidth: 18,
+    height: 18,
+    paddingHorizontal: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#96d2d3',
+  },
+  notificationBadgeText: {
+    color: '#FFF',
+    fontSize: 10,
+    fontWeight: '700',
   },
   profileImage: {
     width: 32,
@@ -1282,6 +1400,102 @@ const styles = StyleSheet.create({
   },
   childHeaderEmoji: {
     fontSize: 24,
+  },
+  childHeaderPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F7F5FB',
+    borderRadius: 18,
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    marginLeft: 8,
+    height: 36,
+    alignSelf: 'center',
+  },
+  childHeaderPillAvatar: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    marginRight: 8,
+  },
+  childHeaderPillPlaceholder: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: '#E2E8F0',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 8,
+  },
+  childHeaderPillName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#2D3748',
+    marginRight: 6,
+    maxWidth: 140,
+  },
+  childHeaderModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  childHeaderModalCard: {
+    backgroundColor: '#FFF',
+    borderRadius: 18,
+    padding: 18,
+    width: '88%',
+    maxHeight: '70%',
+  },
+  childHeaderModalTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#2D3748',
+    marginBottom: 12,
+  },
+  childHeaderModalList: {
+    marginBottom: 12,
+  },
+  childHeaderModalItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E2E8F0',
+  },
+  childHeaderModalAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    marginRight: 10,
+    backgroundColor: '#E2E8F0',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  childHeaderModalInfo: {
+    flex: 1,
+  },
+  childHeaderModalName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#2D3748',
+  },
+  childHeaderModalMeta: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginTop: 2,
+  },
+  childHeaderModalAdd: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    justifyContent: 'center',
+  },
+  childHeaderModalAddText: {
+    marginLeft: 6,
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#6B5CA5',
   },
   childHeaderMoreBadge: {
     width: 45,

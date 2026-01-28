@@ -56,57 +56,57 @@ const PostCard: React.FC<PostCardProps> = ({
           <Text style={styles.postDate}>{formatDate(post.createdAt)}</Text>
         </View>
       </View>
-
+      
       {/* Burbuja de mensaje */}
       <View style={[styles.bubble, isOwn ? styles.bubbleOwn : styles.bubbleOther]}>
         {post.title && <Text style={styles.postTitle}>{post.title}</Text>}
-
+      
         {post.imageUrl && imagePosition === 'start' && (
           <Image source={{ uri: post.imageUrl }} style={styles.postImage} />
         )}
-
+        
         <Text style={[styles.postText, isOwn && styles.postTextOwn]}>{displayContent}</Text>
-
+        
         {shouldTruncate && onViewFull && (
           <TouchableOpacity onPress={() => onViewFull(post)} style={styles.expandButton}>
             <Text style={styles.expandButtonText}>Ver más</Text>
             <Ionicons name="arrow-forward" size={14} color="#59C6C0" />
           </TouchableOpacity>
         )}
-
+        
         {post.imageUrl && imagePosition === 'end' && (
           <Image source={{ uri: post.imageUrl }} style={styles.postImage} />
         )}
-
+        
         {post.attachedLists && post.attachedLists.length > 0 && (
-          <AttachedLists 
-            lists={post.attachedLists}
-            onListPress={(listId) => {
-              navigation.getParent()?.navigate('Recommendations', {
-                screen: 'ListDetail',
-                params: { listId }
-              });
-            }}
-          />
+            <AttachedLists 
+              lists={post.attachedLists}
+              onListPress={(listId) => {
+                navigation.getParent()?.navigate('Recommendations', {
+                  screen: 'ListDetail',
+                  params: { listId }
+                });
+              }}
+            />
         )}
       </View>
 
       {/* Acciones */}
       <View style={[styles.postActions, isOwn && styles.postActionsOwn]}>
-        <LikeButton
-          isLiked={post.isLiked || false}
-          likeCount={post.likeCount || 0}
-          onPress={() => onLike(post)}
-          isLoading={likingPostId === post.id}
+          <LikeButton
+            isLiked={post.isLiked || false}
+            likeCount={post.likeCount || 0}
+            onPress={() => onLike(post)}
+            isLoading={likingPostId === post.id}
           size="small"
-          showCount={false}
-        />
+            showCount={false}
+          />
         <TouchableOpacity style={styles.actionButton} onPress={() => onComment(post)}>
           <Ionicons name="chatbubble-outline" size={18} color="#666" />
-        </TouchableOpacity>
+          </TouchableOpacity>
         <TouchableOpacity style={styles.actionButton} onPress={() => onShare(post.id)}>
           <Ionicons name="share-outline" size={18} color="#666" />
-        </TouchableOpacity>
+          </TouchableOpacity>
       </View>
     </View>
   );
@@ -116,7 +116,7 @@ const styles = StyleSheet.create({
   postCard: {
     marginBottom: 16,
     maxWidth: '88%',
-  },
+      },
   postCardOwn: {
     alignSelf: 'flex-end',
   },

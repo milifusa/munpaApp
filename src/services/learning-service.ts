@@ -1,7 +1,8 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { axiosInstance as coreApi } from './api';
 
-const API_BASE_URL = 'https://mumpabackend-dmu43qca8-mishu-lojans-projects.vercel.app';
+const API_BASE_URL = 'https://api.munpa.online';
 
 // Crear instancia de axios
 const api = axios.create({
@@ -160,6 +161,61 @@ const learningService = {
       return response.data;
     } catch (error: any) {
       console.error('❌ [MEMORY] Error borrando memoria:', error.response?.data || error.message);
+      throw error;
+    }
+  },
+
+  // ===== GUIA DE HOY =====
+  getTodayGuide: async (payload: {
+    birthDate?: string;
+    name?: string;
+    gestationWeeks?: number;
+    isPregnant?: boolean;
+    ageWeeks?: number;
+    childId?: string;
+  }) => {
+    try {
+      let finalPayload = { ...payload };
+
+      if (payload.childId) {
+        const response = await coreApi.get('/api/auth/children');
+        const children =
+          (Array.isArray(response?.data?.data) && response.data.data) ||
+          (Array.isArray(response?.data?.children) && response.data.children) ||
+          (Array.isArray(response?.data) && response.data) ||
+          [];
+        const child = children.find((item: any) => item?.id === payload.childId);
+
+        if (child) {
+          if (child.isUnborn) {
+            const gestationWeeks =
+              child.currentGestationWeeks ?? child.gestationWeeks ?? child.registeredGestationWeeks ?? null;
+            finalPayload = {
+              gestationWeeks: gestationWeeks || undefined,
+              isPregnant: true,
+              name: child.name || 'tu bebé',
+            };
+          } else if (child.birthDate) {
+            finalPayload = {
+              birthDate: child.birthDate,
+              name: child.name,
+            };
+          } else if (child.currentAgeInMonths || child.ageInMonths) {
+            const months = child.currentAgeInMonths ?? child.ageInMonths ?? 0;
+            const ageWeeks = Math.max(1, Math.round(months * 4.345));
+            finalPayload = {
+              ageWeeks,
+              name: child.name,
+            };
+          }
+        }
+      }
+
+      console.log('📘 [GUIDE] URL completa:', `${API_BASE_URL}/api/guide/today`);
+      const response = await api.post('/api/guide/today', finalPayload);
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ [GUIDE] Error obteniendo guía de hoy:', error.response?.data || error.message);
       throw error;
     }
   },

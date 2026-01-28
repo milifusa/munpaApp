@@ -44,15 +44,92 @@ const handleDeepLinkInternal = async (url: string, isAuthenticated: boolean) => 
 
       // Normalizar URL: quitar protocolo y obtener la ruta
       let route = url.replace(/.*?:\/\//g, ''); // Quitar munpa:// o https://
+      let queryString = '';
       
       // Si es una URL web, extraer solo la ruta después del dominio
       if (url.startsWith('http')) {
         const urlObj = new URL(url);
         route = urlObj.pathname.replace(/^\//, ''); // Quitar el / inicial
+        queryString = urlObj.search.replace(/^\?/, '');
+      } else {
+        const [pathOnly, qs] = route.split('?');
+        route = pathOnly;
+        queryString = qs || '';
       }
       
       const parts = route.split('/').filter(part => part.length > 0);
+      const queryParams = Object.fromEntries(new URLSearchParams(queryString));
       console.log('📌 [DEEP LINK] Partes parseadas:', parts);
+
+      // munpa://home
+      if (parts[0] === 'home') {
+        if (isAuthenticated) {
+          globalNavigationRef.navigate('MainTabs', { screen: 'Home' });
+        }
+        return;
+      }
+
+      // munpa://recommendations
+      if (parts[0] === 'recommendations' && parts.length === 1) {
+        if (isAuthenticated) {
+          globalNavigationRef.navigate('MainTabs', { screen: 'Recommendations' });
+        }
+        return;
+      }
+
+      // munpa://communities
+      if (parts[0] === 'communities' && parts.length === 1) {
+        if (isAuthenticated) {
+          globalNavigationRef.navigate('MainTabs', { screen: 'Communities' });
+        }
+        return;
+      }
+
+      // munpa://children
+      if (parts[0] === 'children') {
+        if (isAuthenticated) {
+          globalNavigationRef.navigate('ChildrenList');
+        }
+        return;
+      }
+
+      // munpa://marketplace
+      if (parts[0] === 'marketplace' && parts.length === 1) {
+        if (isAuthenticated) {
+          globalNavigationRef.navigate('MainTabs', { screen: 'MunpaMarket' });
+        }
+        return;
+      }
+
+      // munpa://recommendations/detail?recommendationId=RECOMMENDATION_ID
+      if (parts[0] === 'recommendations' && parts[1] === 'detail') {
+        const recommendationId = parts[2] || (queryParams as any).recommendationId;
+        if (recommendationId && isAuthenticated) {
+          globalNavigationRef.navigate('MainTabs', {
+            screen: 'Recommendations',
+            params: {
+              screen: 'RecommendationDetail',
+              params: { recommendationId },
+            },
+          });
+        }
+        return;
+      }
+
+      // munpa://communities/detail?communityId=COMMUNITY_ID
+      if (parts[0] === 'communities' && parts[1] === 'detail') {
+        const communityId = parts[2] || (queryParams as any).communityId;
+        if (communityId && isAuthenticated) {
+          globalNavigationRef.navigate('MainTabs', {
+            screen: 'Communities',
+            params: {
+              screen: 'CommunityPosts',
+              params: { communityId },
+            },
+          });
+        }
+        return;
+      }
 
       // munpa://share-child/{token} o https://munpa.online/share-child/{token}
       if (parts[0] === 'share-child' && parts[1]) {
@@ -269,11 +346,11 @@ const handleDeepLinkInternal = async (url: string, isAuthenticated: boolean) => 
         return;
       }
 
-      // munpa://marketplace/product/{productId} o https://munpa.online/marketplace/product/{productId}
-      if (parts[0] === 'marketplace' && parts[1] === 'product' && parts[2]) {
-        const productId = parts[2];
+      // munpa://marketplace/product/{productId} o munpa://marketplace/product?productId=PRODUCT_ID
+      if (parts[0] === 'marketplace' && parts[1] === 'product') {
+        const productId = parts[2] || (queryParams as any).productId;
         
-        if (isAuthenticated) {
+        if (productId && isAuthenticated) {
           console.log('🚀 [DEEP LINK] Navegando a ProductDetail...');
           try {
             if (globalNavigationRef.isReady()) {

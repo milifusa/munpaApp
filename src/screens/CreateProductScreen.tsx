@@ -19,10 +19,10 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
-// Importar expo-maps según la documentación oficial
-import { AppleMaps, GoogleMaps } from 'expo-maps';
 import marketplaceService, { CONDITIONS, CreateProductData, MarketplaceCategory, DEFAULT_CATEGORIES } from '../services/marketplaceService';
 import { imageUploadService } from '../services/imageUploadService';
+import analyticsService from '../services/analyticsService';
+import { locationsService } from '../services/api';
 
 const CreateProductScreen = () => {
   const navigation = useNavigation<any>();
@@ -35,11 +35,6 @@ const CreateProductScreen = () => {
   const [uploadingImages, setUploadingImages] = useState(false);
   const [categories, setCategories] = useState<MarketplaceCategory[]>(DEFAULT_CATEGORIES);
   const [locationLoading, setLocationLoading] = useState(true);
-  const [showMapModal, setShowMapModal] = useState(false);
-  const [mapLocation, setMapLocation] = useState<{ latitude: number; longitude: number } | null>(null);
-  const [mapLoaded, setMapLoaded] = useState(false);
-  const [mapZoom, setMapZoom] = useState(15);
-  const [mapKey, setMapKey] = useState(0); // Key para forzar re-render del mapa
   
   // Datos del formulario
   const [title, setTitle] = useState('');
@@ -50,6 +45,18 @@ const CreateProductScreen = () => {
   const [price, setPrice] = useState('');
   const [tradeFor, setTradeFor] = useState('');
   const [photos, setPhotos] = useState<string[]>([]);
+  const [countries, setCountries] = useState<{ id: string; name: string }[]>([]);
+  const [cities, setCities] = useState<{ id: string; name: string }[]>([]);
+  const [countryId, setCountryId] = useState('');
+  const [cityId, setCityId] = useState('');
+  const [countryName, setCountryName] = useState('');
+  const [cityName, setCityName] = useState('');
+  const [isLoadingCountries, setIsLoadingCountries] = useState(true);
+  const [isLoadingCities, setIsLoadingCities] = useState(false);
+  const [showCategoryModal, setShowCategoryModal] = useState(false);
+  const [showConditionModal, setShowConditionModal] = useState(false);
+  const [showCountryModal, setShowCountryModal] = useState(false);
+  const [showCityModal, setShowCityModal] = useState(false);
   
   // Ubicación con coordenadas
   const [location, setLocation] = useState<{
@@ -60,6 +67,13 @@ const CreateProductScreen = () => {
     state?: string;
     country?: string;
   } | null>(null);
+
+  const normalizeLocationName = (value: string) =>
+    value
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .trim();
 
   const getCurrentLocation = async () => {
     try {
@@ -134,63 +148,75 @@ const CreateProductScreen = () => {
   };
 
   const processLocation = async (latitude: number, longitude: number) => {
-    try {
-      // Intentar obtener dirección (geocodificación inversa)
-      console.log('🔄 [CREATE PRODUCT] Obteniendo dirección...');
-      const [addressResult] = await Location.reverseGeocodeAsync({
-        latitude,
-        longitude,
-      });
-
-      if (addressResult) {
-        const address = [
-          addressResult.street,
-          addressResult.streetNumber,
-          addressResult.district,
-          addressResult.name,
-        ]
-          .filter(Boolean)
-          .join(', ');
-
-        const country = addressResult.country || 'México';
-        console.log('✅ [CREATE PRODUCT] Dirección obtenida:', {
-          address,
-          city: addressResult.city || addressResult.district,
-          state: addressResult.region,
-          country,
-        });
-
-        setLocation({
-          latitude,
-          longitude,
-          address: address || undefined,
-          city: addressResult.city || addressResult.district || undefined,
-          state: addressResult.region || undefined,
-          country: country,
-        });
-      } else {
-        console.warn('⚠️ [CREATE PRODUCT] No se pudo obtener dirección, usando solo coordenadas');
-        setLocation({
-          latitude,
-          longitude,
-          country: 'México',
-        });
-      }
-    } catch (geocodeError) {
-      console.warn('⚠️ [CREATE PRODUCT] Error en geocodificación inversa:', geocodeError);
-      setLocation({
-        latitude,
-        longitude,
-        country: 'México',
-      });
-    }
+    setLocation({
+      latitude,
+      longitude,
+      city: cityName || undefined,
+      country: countryName || undefined,
+    });
   };
 
 
   useEffect(() => {
     loadCategories();
+    loadCountries();
     getCurrentLocation();
   }, []);
+
+  useEffect(() => {
+    if (!countryId) {
+      setCities([]);
+      setCityId('');
+      setCountryName('');
+      setCityName('');
+      return;
+    }
+    const selected = countries.find((item) => item.id === countryId);
+    setCountryName(selected?.name || '');
+    loadCities(countryId);
+  }, [countryId, countries]);
+
+  useEffect(() => {
+    const selected = cities.find((item) => item.id === cityId);
+    setCityName(selected?.name || '');
+  }, [cityId, cities]);
+
+  useEffect(() => {
+    if (!countryId && countryName && countries.length > 0) {
+      const normalized = normalizeLocationName(countryName);
+      const match = countries.find(
+        (item) => normalizeLocationName(item.name) === normalized
+      );
+      if (match?.id) {
+        setCountryId(match.id);
+      }
+    }
+  }, [countryId, countryName, countries]);
+
+  useEffect(() => {
+    if (!cityId && cityName && cities.length > 0) {
+      const normalized = normalizeLocationName(cityName);
+      const match = cities.find(
+        (item) => normalizeLocationName(item.name) === normalized
+      );
+      if (match?.id) {
+        setCityId(match.id);
+      }
+    }
+  }, [cityId, cityName, cities]);
+
+  useEffect(() => {
+    if (!location) return;
+    setLocation((prev) =>
+      prev
+        ? {
+            ...prev,
+            city: cityName || undefined,
+            country: countryName || undefined,
+          }
+        : prev
+    );
+  }, [cityName, countryName]);
 
   useEffect(() => {
     if (isEditing && product) {
@@ -214,29 +240,14 @@ const CreateProductScreen = () => {
           state: product.location.state,
           country: product.location.country || 'México',
         });
+        setCountryName(product.location.country || '');
+        setCityName(product.location.city || '');
       } else {
         // Si el producto antiguo no tiene coordenadas, obtener ubicación actual
         getCurrentLocation();
       }
     }
   }, [isEditing, product]);
-
-  // Ocultar loading cuando el modal se abre y el mapa se renderiza
-  useEffect(() => {
-    if (showMapModal && mapLocation) {
-      console.log('⏱️ [MAP] Modal abierto, ocultando loading después de 1 segundo');
-      // En iOS no hay onMapLoaded, así que ocultamos el loading después de un breve delay
-      const timeoutId = setTimeout(() => {
-        console.log('✅ [MAP] Ocultando loading (iOS no tiene onMapLoaded)');
-        setMapLoaded(true);
-      }, 1000); // 1 segundo es suficiente para que el mapa comience a renderizarse
-
-      return () => {
-        console.log('🧹 [MAP] Limpiando timeout');
-        clearTimeout(timeoutId);
-      };
-    }
-  }, [showMapModal, mapLocation]);
 
   const loadCategories = async () => {
     try {
@@ -250,6 +261,44 @@ const CreateProductScreen = () => {
     } catch (error) {
       console.error('❌ [CREATE PRODUCT] Error cargando categorías:', error);
       // Mantener las categorías por defecto en caso de error
+    }
+  };
+
+  const loadCountries = async () => {
+    try {
+      setIsLoadingCountries(true);
+      const response = await locationsService.getCountries();
+      const items =
+        response?.data ||
+        response?.countries ||
+        response?.data?.data ||
+        [];
+      setCountries(Array.isArray(items) ? items : []);
+    } catch (error) {
+      console.error('❌ [CREATE PRODUCT] Error cargando países:', error);
+      Alert.alert('Error', 'No se pudieron cargar los países');
+    } finally {
+      setIsLoadingCountries(false);
+    }
+  };
+
+  const loadCities = async (selectedCountryId: string) => {
+    try {
+      setIsLoadingCities(true);
+      const response = await locationsService.getCities(selectedCountryId);
+      const items =
+        response?.data ||
+        response?.cities ||
+        response?.data?.data ||
+        [];
+      setCities(Array.isArray(items) ? items : []);
+      setCityId('');
+      setCityName('');
+    } catch (error) {
+      console.error('❌ [CREATE PRODUCT] Error cargando ciudades:', error);
+      Alert.alert('Error', 'No se pudieron cargar las ciudades');
+    } finally {
+      setIsLoadingCities(false);
     }
   };
 
@@ -335,6 +384,14 @@ const CreateProductScreen = () => {
       Alert.alert('Error', 'Agrega al menos una foto');
       return false;
     }
+    if (!countryId) {
+      Alert.alert('Error', 'Selecciona un país');
+      return false;
+    }
+    if (!cityId) {
+      Alert.alert('Error', 'Selecciona una ciudad');
+      return false;
+    }
     if (!location || !location.latitude || !location.longitude) {
       Alert.alert('Error', 'No se pudo obtener tu ubicación. Por favor, verifica que el GPS esté activado.');
       return false;
@@ -415,10 +472,10 @@ const CreateProductScreen = () => {
         location: {
           latitude: location.latitude,
           longitude: location.longitude,
-          address: location.address,
-          city: location.city,
+          address: address.trim() || undefined,
+          city: cityName || location.city,
           state: location.state,
-          country: location.country || 'México',
+          country: countryName || location.country || 'Ecuador',
         },
       };
 
@@ -435,9 +492,29 @@ const CreateProductScreen = () => {
 
       if (isEditing) {
         await marketplaceService.updateProduct(productId, productData);
+        analyticsService.logEvent('market_product_update', {
+          product_id: productId,
+          title: productData.title,
+          type: productData.type,
+          price: productData.price ?? null,
+          category: productData.category,
+          condition: productData.condition,
+          city: productData.location?.city || null,
+          country: productData.location?.country || null,
+        });
         Alert.alert('Éxito', 'Producto actualizado correctamente');
       } else {
         const result = await marketplaceService.createProduct(productData);
+        analyticsService.logEvent('market_product_publish', {
+          product_id: result?.id || null,
+          title: productData.title,
+          type: productData.type,
+          price: productData.price ?? null,
+          category: productData.category,
+          condition: productData.condition,
+          city: productData.location?.city || null,
+          country: productData.location?.country || null,
+        });
         console.log('✅ [CREATE PRODUCT] Producto creado:', result);
         Alert.alert('Éxito', 'Producto publicado correctamente');
       }
@@ -585,65 +662,33 @@ const CreateProductScreen = () => {
         {/* Categoría */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Categoría *</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            <View style={styles.categoriesContainer}>
-              {categories.map((cat) => {
-                return (
-                <TouchableOpacity
-                  key={cat.id}
-                  style={[
-                    styles.categoryButton,
-                    category === cat.slug && styles.categoryButtonActive,
-                  ]}
-                  onPress={() => setCategory(cat.slug)}
-                >
-                  {cat.imageUrl ? (
-                    <Image
-                      source={{ uri: cat.imageUrl }}
-                      style={styles.categoryIcon}
-                    />
-                  ) : (
-                    <Text style={styles.categoryEmoji}>{cat.icon}</Text>
-                  )}
-                  <Text
-                    style={[
-                      styles.categoryButtonText,
-                      category === cat.slug && styles.categoryButtonTextActive,
-                    ]}
-                  >
-                    {cat.name}
-                  </Text>
-                </TouchableOpacity>
-                );
-              })}
-            </View>
-          </ScrollView>
+          <TouchableOpacity
+            style={styles.selectInput}
+            onPress={() => setShowCategoryModal(true)}
+          >
+            <Text style={category ? styles.selectText : styles.selectPlaceholder}>
+              {category
+                ? categories.find((cat) => cat.slug === category || cat.id === category)?.name || 'Selecciona una categoría'
+                : 'Selecciona una categoría'}
+            </Text>
+            <Ionicons name="chevron-down" size={18} color="#6B7280" />
+          </TouchableOpacity>
         </View>
 
         {/* Estado/Condición */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Estado *</Text>
-          <View style={styles.conditionsContainer}>
-            {CONDITIONS.map((cond) => (
-              <TouchableOpacity
-                key={cond.id}
-                style={[
-                  styles.conditionButton,
-                  condition === cond.id && styles.conditionButtonActive,
-                ]}
-                onPress={() => setCondition(cond.id)}
-              >
-                <Text
-                  style={[
-                    styles.conditionButtonText,
-                    condition === cond.id && styles.conditionButtonTextActive,
-                  ]}
-                >
-                  {cond.name}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
+          <TouchableOpacity
+            style={styles.selectInput}
+            onPress={() => setShowConditionModal(true)}
+          >
+            <Text style={condition ? styles.selectText : styles.selectPlaceholder}>
+              {condition
+                ? CONDITIONS.find((cond) => cond.id === condition)?.name || 'Selecciona un estado'
+                : 'Selecciona un estado'}
+            </Text>
+            <Ionicons name="chevron-down" size={18} color="#6B7280" />
+          </TouchableOpacity>
         </View>
 
         {/* Precio o Trueque */}
@@ -695,89 +740,45 @@ const CreateProductScreen = () => {
               <View style={styles.locationInfoRow}>
                 <Ionicons name="location" size={20} color="#59C6C0" />
                 <View style={styles.locationInfoText}>
-                  {location.address && (
-                    <Text style={styles.locationAddress}>{location.address}</Text>
-                  )}
                   <Text style={styles.locationDetails}>
-                    {[location.city, location.state, location.country]
-                      .filter(Boolean)
-                      .join(', ')}
-                  </Text>
-                  <Text style={styles.locationCoordinates}>
-                    {location.latitude.toFixed(6)}, {location.longitude.toFixed(6)}
+                    {cityName && countryName
+                      ? `${cityName}, ${countryName}`
+                      : 'Selecciona país y ciudad'}
                   </Text>
                 </View>
               </View>
+
+              <Text style={styles.locationLabel}>País</Text>
               <TouchableOpacity
-                style={styles.updateLocationButton}
-                onPress={async () => {
-                  console.log('🗺️ [MAP] ========== ABRIENDO MODAL DE MAPA ==========');
-                  
-                  // Obtener ubicación actual si no hay una guardada o si es inválida
-                  let initialLocation = location;
-                  
-                  if (!initialLocation || !initialLocation.latitude || !initialLocation.longitude) {
-                    console.log('📍 [MAP] No hay ubicación guardada, obteniendo ubicación actual...');
-                    try {
-                      const { status } = await Location.requestForegroundPermissionsAsync();
-                      if (status === 'granted') {
-                        const currentLocation = await Location.getCurrentPositionAsync({
-                          accuracy: Location.Accuracy.High,
-                        });
-                        initialLocation = {
-                          latitude: currentLocation.coords.latitude,
-                          longitude: currentLocation.coords.longitude,
-                        };
-                        console.log('✅ [MAP] Ubicación actual obtenida:', initialLocation);
-                      } else {
-                        // Si no hay permiso, usar ubicación por defecto (Ciudad de México)
-                        initialLocation = {
-                          latitude: 19.4326,
-                          longitude: -99.1332,
-                        };
-                        console.log('⚠️ [MAP] Sin permiso de ubicación, usando ubicación por defecto');
-                      }
-                    } catch (error) {
-                      console.error('❌ [MAP] Error obteniendo ubicación:', error);
-                      // Usar ubicación por defecto si falla
-                      initialLocation = {
-                        latitude: 19.4326,
-                        longitude: -99.1332,
-                      };
-                    }
-                  }
-                  
-                  console.log('🗺️ [MAP] Ubicación inicial para el mapa:', initialLocation);
-                  console.log('🗺️ [MAP] Validando coordenadas:', {
-                    latitude: initialLocation.latitude,
-                    longitude: initialLocation.longitude,
-                    isValidLat: initialLocation.latitude >= -90 && initialLocation.latitude <= 90,
-                    isValidLon: initialLocation.longitude >= -180 && initialLocation.longitude <= 180,
-                  });
-                  
-                  // Validar coordenadas antes de establecerlas
-                  if (initialLocation.latitude >= -90 && initialLocation.latitude <= 90 &&
-                      initialLocation.longitude >= -180 && initialLocation.longitude <= 180) {
-                    setMapLocation({
-                      latitude: initialLocation.latitude,
-                      longitude: initialLocation.longitude,
-                    });
-                    setMapZoom(15); // Resetear zoom a 15
-                    setMapLoaded(false); // Resetear estado de carga
-                    // Pequeño delay para asegurar que el estado se actualice antes de abrir el modal
-                    setTimeout(() => {
-                      setShowMapModal(true);
-                      console.log('🗺️ [MAP] Modal abierto con coordenadas:', initialLocation);
-                    }, 100);
-                  } else {
-                    console.error('❌ [MAP] Coordenadas inválidas:', initialLocation);
-                    Alert.alert('Error', 'Las coordenadas de ubicación no son válidas. Por favor, intenta de nuevo.');
-                  }
-                }}
+                style={styles.selectInput}
+                onPress={() => setShowCountryModal(true)}
+                disabled={isLoadingCountries}
               >
-                <Ionicons name="map" size={16} color="#59C6C0" />
-                <Text style={styles.updateLocationText}>Modificar</Text>
+                <Text style={countryId ? styles.selectText : styles.selectPlaceholder}>
+                  {countryId
+                    ? countries.find((c) => c.id === countryId)?.name || 'Selecciona un país'
+                    : 'Selecciona un país'}
+                </Text>
+                <Ionicons name="chevron-down" size={18} color="#6B7280" />
               </TouchableOpacity>
+
+              <Text style={styles.locationLabel}>Ciudad</Text>
+              {!countryId ? (
+                <Text style={styles.locationHelperText}>Selecciona un país para ver las ciudades.</Text>
+              ) : (
+                <TouchableOpacity
+                  style={styles.selectInput}
+                  onPress={() => setShowCityModal(true)}
+                  disabled={isLoadingCities || cities.length === 0}
+                >
+                  <Text style={cityId ? styles.selectText : styles.selectPlaceholder}>
+                    {cityId
+                      ? cities.find((c) => c.id === cityId)?.name || 'Selecciona una ciudad'
+                      : 'Selecciona una ciudad'}
+                  </Text>
+                  <Ionicons name="chevron-down" size={18} color="#6B7280" />
+                </TouchableOpacity>
+              )}
             </View>
           ) : (
             <View style={styles.locationErrorContainer}>
@@ -813,449 +814,185 @@ const CreateProductScreen = () => {
         <View style={{ height: 40 }} />
       </ScrollView>
 
-      {/* Modal del Mapa */}
       <Modal
-        visible={showMapModal}
-        animationType="slide"
-        transparent={false}
-        onRequestClose={() => setShowMapModal(false)}
+        visible={showCategoryModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowCategoryModal(false)}
       >
-        <View style={styles.mapModalContainer}>
-          <StatusBar barStyle="light-content" backgroundColor="#96d2d3" />
-          <View style={[styles.mapModalHeader, { paddingTop: insets.top + 10 }]}>
-            <Text style={styles.mapModalTitle}>Selecciona tu ubicación</Text>
+        <View style={styles.selectModalOverlay}>
+          <View style={styles.selectModalCard}>
+            <Text style={styles.selectModalTitle}>Selecciona una categoría</Text>
+            <ScrollView>
+              {categories.map((cat) => (
+                <TouchableOpacity
+                  key={cat.id}
+                  style={[
+                    styles.selectOption,
+                    (category === cat.slug || category === cat.id) && styles.selectOptionActive,
+                  ]}
+                  onPress={() => {
+                    setCategory(cat.slug || cat.id);
+                    setShowCategoryModal(false);
+                  }}
+                >
+                  <View style={styles.selectOptionRow}>
+                    {cat.imageUrl ? (
+                      <Image source={{ uri: cat.imageUrl }} style={styles.selectOptionImage} />
+                    ) : (
+                      <Text style={styles.selectOptionEmoji}>{cat.icon || '📦'}</Text>
+                    )}
+                    <Text
+                      style={[
+                        styles.selectOptionText,
+                        (category === cat.slug || category === cat.id) && styles.selectOptionTextActive,
+                      ]}
+                    >
+                      {cat.name}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
             <TouchableOpacity
-              onPress={() => setShowMapModal(false)}
-              style={styles.mapModalCloseButton}
+              style={styles.selectModalClose}
+              onPress={() => setShowCategoryModal(false)}
             >
-              <Ionicons name="close" size={24} color="white" />
+              <Text style={styles.selectModalCloseText}>Cerrar</Text>
             </TouchableOpacity>
-          </View>
-
-          {mapLocation ? (
-            <View style={styles.mapContainer}>
-              {(() => {
-                console.log('🔍 [MAP] ========== RENDERIZANDO MAPA ==========');
-                console.log('🔍 [MAP] mapLocation:', mapLocation);
-                console.log('🔍 [MAP] mapLocation.latitude:', mapLocation?.latitude);
-                console.log('🔍 [MAP] mapLocation.longitude:', mapLocation?.longitude);
-                console.log('🔍 [MAP] mapLoaded:', mapLoaded);
-                console.log('🔍 [MAP] Platform.OS:', Platform.OS);
-                console.log('🔍 [MAP] GoogleMaps disponible:', typeof GoogleMaps !== 'undefined');
-                console.log('🔍 [MAP] AppleMaps disponible:', typeof AppleMaps !== 'undefined');
-                
-                // Verificar disponibilidad de componentes según la plataforma
-                const hasAppleMaps = Platform.OS === 'ios' && AppleMaps && AppleMaps.View;
-                const hasGoogleMaps = Platform.OS === 'android' && GoogleMaps && GoogleMaps.View;
-                
-                if (hasAppleMaps || hasGoogleMaps) {
-                  console.log('✅ [MAP] Renderizando', Platform.OS === 'ios' ? 'AppleMaps.View' : 'GoogleMaps.View');
-                  console.log('📍 [MAP] Marcador con coordenadas:', {
-                    latitude: mapLocation.latitude,
-                    longitude: mapLocation.longitude,
-                  });
-                  
-                  return (
-                    <>
-                      {!mapLoaded && (
-                        <View style={styles.mapLoadingOverlay}>
-                          <ActivityIndicator size="large" color="#59C6C0" />
-                          <Text style={styles.mapLoadingText}>Cargando mapa...</Text>
-                        </View>
-                      )}
-                      {Platform.OS === 'ios' ? (
-                        <View style={{ flex: 1, width: '100%', height: '100%', backgroundColor: 'transparent' }}>
-                          <AppleMaps.View
-                            key={`map-${mapLocation.latitude}-${mapLocation.longitude}-${mapKey}`}
-                            style={styles.map}
-                            cameraPosition={{
-                              latitude: mapLocation.latitude,
-                              longitude: mapLocation.longitude,
-                              zoom: mapZoom,
-                            } as any}
-                            annotations={[{
-                              id: 'location-marker',
-                              coordinates: {
-                                latitude: mapLocation.latitude,
-                                longitude: mapLocation.longitude,
-                              },
-                              title: 'Ubicación del producto',
-                            }]}
-                            onCameraMove={(event: any) => {
-                              // Cuando la cámara se mueve, el mapa está cargado
-                              console.log('📹 [MAP] onCameraMove ejecutado (iOS):', event);
-                              if (!mapLoaded) {
-                                console.log('✅ [MAP] Mapa está cargado (detectado por onCameraMove)');
-                                setMapLoaded(true);
-                              }
-                            }}
-                            onMapClick={(event: any) => {
-                              console.log('📍 [MAP] onMapClick ejecutado (iOS):', event);
-                              const coordinate = event.coordinates;
-                              console.log('📍 [MAP] Coordinate extraído:', coordinate);
-                              if (coordinate && coordinate.latitude && coordinate.longitude) {
-                                console.log('📍 [MAP] Nueva ubicación seleccionada:', coordinate);
-                                // Actualizar marcador cuando se hace click en el mapa
-                                setMapLocation({ 
-                                  latitude: coordinate.latitude, 
-                                  longitude: coordinate.longitude 
-                                });
-                              } else {
-                                console.warn('⚠️ [MAP] Evento onMapClick sin coordenadas válidas:', event);
-                              }
-                            }}
-                            onMarkerClick={(event: any) => {
-                              console.log('📍 [MAP] onMarkerClick ejecutado (iOS):', event);
-                              const coordinate = event.coordinates || event.coordinate;
-                              console.log('📍 [MAP] Coordinate del evento:', coordinate);
-                              if (coordinate && coordinate.latitude && coordinate.longitude) {
-                                console.log('📍 [MAP] Marcador clickeado en:', coordinate);
-                              } else {
-                                console.warn('⚠️ [MAP] onMarkerClick sin coordenadas válidas:', event);
-                              }
-                            }}
-                          />
-                          {/* Botones de zoom */}
-                          <View style={styles.zoomControls}>
-                            <TouchableOpacity
-                              style={[styles.zoomButton, { borderBottomWidth: 1, borderBottomColor: '#E0E0E0' }]}
-                              onPress={() => {
-                                const newZoom = Math.min(mapZoom + 1, 20);
-                                setMapZoom(newZoom);
-                                console.log('🔍 [MAP] Zoom aumentado a:', newZoom);
-                              }}
-                            >
-                              <Ionicons name="add" size={24} color="#333" />
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                              style={styles.zoomButton}
-                              onPress={() => {
-                                const newZoom = Math.max(mapZoom - 1, 1);
-                                setMapZoom(newZoom);
-                                console.log('🔍 [MAP] Zoom disminuido a:', newZoom);
-                              }}
-                            >
-                              <Ionicons name="remove" size={24} color="#333" />
-                            </TouchableOpacity>
-                          </View>
-                          {/* Botón de ubicarme */}
-                          <TouchableOpacity
-                            style={styles.myLocationButton}
-                            onPress={async () => {
-                              try {
-                                console.log('📍 [MAP] ========== BOTÓN UBICARME PRESIONADO ==========');
-                                console.log('📍 [MAP] Ubicación actual del mapa:', mapLocation);
-                                
-                                const { status } = await Location.requestForegroundPermissionsAsync();
-                                console.log('📍 [MAP] Estado de permisos:', status);
-                                
-                                if (status === 'granted') {
-                                  console.log('📍 [MAP] Permisos concedidos, obteniendo ubicación...');
-                                  const currentLocation = await Location.getCurrentPositionAsync({
-                                    accuracy: Location.Accuracy.High,
-                                  });
-                                  
-                                  const newLocation = {
-                                    latitude: currentLocation.coords.latitude,
-                                    longitude: currentLocation.coords.longitude,
-                                  };
-                                  
-                                  console.log('✅ [MAP] Ubicación GPS obtenida:', newLocation);
-                                  console.log('✅ [MAP] Coordenadas GPS:', {
-                                    lat: newLocation.latitude,
-                                    lon: newLocation.longitude,
-                                    isValidLat: newLocation.latitude >= -90 && newLocation.latitude <= 90,
-                                    isValidLon: newLocation.longitude >= -180 && newLocation.longitude <= 180,
-                                  });
-                                  
-                                  // Validar coordenadas antes de establecerlas
-                                  if (newLocation.latitude >= -90 && newLocation.latitude <= 90 &&
-                                      newLocation.longitude >= -180 && newLocation.longitude <= 180) {
-                                    // Forzar actualización del mapa
-                                    setMapLoaded(false);
-                                    setMapZoom(15);
-                                    setMapLocation({
-                                      latitude: newLocation.latitude,
-                                      longitude: newLocation.longitude,
-                                    });
-                                    setMapKey(prev => prev + 1); // Forzar re-render del mapa
-                                    
-                                    // Pequeño delay para asegurar que el estado se actualice
-                                    setTimeout(() => {
-                                      setMapLoaded(true);
-                                      console.log('✅ [MAP] Mapa actualizado con nueva ubicación');
-                                    }, 100);
-                                  } else {
-                                    console.error('❌ [MAP] Coordenadas inválidas:', newLocation);
-                                    Alert.alert('Error', 'Las coordenadas obtenidas no son válidas');
-                                  }
-                                } else {
-                                  console.warn('⚠️ [MAP] Permisos denegados');
-                                  Alert.alert(
-                                    'Permiso de ubicación requerido',
-                                    'Necesitamos tu ubicación para centrar el mapa. Por favor, permite el acceso a la ubicación en la configuración de la app.'
-                                  );
-                                }
-                              } catch (error) {
-                                console.error('❌ [MAP] Error obteniendo ubicación:', error);
-                                console.error('❌ [MAP] Error completo:', JSON.stringify(error, null, 2));
-                                Alert.alert('Error', 'No se pudo obtener tu ubicación actual. Por favor, intenta de nuevo.');
-                              }
-                            }}
-                          >
-                            <Ionicons name="locate" size={24} color="#59C6C0" />
-                          </TouchableOpacity>
-                        </View>
-                      ) : (
-                        <View style={{ flex: 1, width: '100%', height: '100%', position: 'relative' }}>
-                        <GoogleMaps.View
-                          key={`map-${mapLocation.latitude}-${mapLocation.longitude}-${mapKey}`}
-                          style={[styles.map, { width: '100%', height: '100%' }]}
-                          cameraPosition={{
-                            latitude: mapLocation.latitude,
-                            longitude: mapLocation.longitude,
-                            zoom: mapZoom,
-                          } as any}
-                          markers={[{
-                            id: 'location-marker',
-                            coordinates: {
-                              latitude: mapLocation.latitude,
-                              longitude: mapLocation.longitude,
-                            },
-                            draggable: true,
-                            title: 'Ubicación del producto',
-                          }]}
-                          onMapLoaded={() => {
-                            console.log('✅ [MAP] ========== onMapLoaded EJECUTADO (Android) ==========');
-                            console.log('✅ [MAP] Mapa cargado correctamente');
-                            setMapLoaded(true);
-                          }}
-                          onMapClick={(event: any) => {
-                            console.log('📍 [MAP] onMapClick ejecutado (Android):', event);
-                            const coordinate = event.coordinates || event.coordinate;
-                            console.log('📍 [MAP] Coordinate extraído:', coordinate);
-                            if (coordinate && coordinate.latitude && coordinate.longitude) {
-                              console.log('📍 [MAP] Nueva ubicación seleccionada:', coordinate);
-                              setMapLocation({ 
-                                latitude: coordinate.latitude, 
-                                longitude: coordinate.longitude 
-                              });
-                            } else {
-                              console.warn('⚠️ [MAP] Evento onMapClick sin coordenadas válidas:', event);
-                            }
-                          }}
-                          onMarkerClick={(event: any) => {
-                            console.log('📍 [MAP] onMarkerClick ejecutado (Android):', event);
-                            const coordinate = event.coordinate || event.coordinates;
-                            if (coordinate && coordinate.latitude && coordinate.longitude) {
-                              console.log('📍 [MAP] Marcador clickeado en:', coordinate);
-                            }
-                          }}
-                        />
-                        {/* Botones de zoom */}
-                        <View style={styles.zoomControls}>
-                          <TouchableOpacity
-                            style={[styles.zoomButton, { borderBottomWidth: 1, borderBottomColor: '#E0E0E0' }]}
-                            onPress={() => {
-                              const newZoom = Math.min(mapZoom + 1, 20);
-                              setMapZoom(newZoom);
-                              console.log('🔍 [MAP] Zoom aumentado a:', newZoom);
-                            }}
-                          >
-                            <Ionicons name="add" size={24} color="#333" />
-                          </TouchableOpacity>
-                          <TouchableOpacity
-                            style={styles.zoomButton}
-                            onPress={() => {
-                              const newZoom = Math.max(mapZoom - 1, 1);
-                              setMapZoom(newZoom);
-                              console.log('🔍 [MAP] Zoom disminuido a:', newZoom);
-                            }}
-                          >
-                            <Ionicons name="remove" size={24} color="#333" />
-                          </TouchableOpacity>
-                        </View>
-                        {/* Botón de ubicarme */}
-                        <TouchableOpacity
-                          style={styles.myLocationButton}
-                          onPress={async () => {
-                            try {
-                              console.log('📍 [MAP] ========== BOTÓN UBICARME PRESIONADO (Android) ==========');
-                              console.log('📍 [MAP] Ubicación actual del mapa:', mapLocation);
-                              
-                              const { status } = await Location.requestForegroundPermissionsAsync();
-                              console.log('📍 [MAP] Estado de permisos:', status);
-                              
-                              if (status === 'granted') {
-                                console.log('📍 [MAP] Permisos concedidos, obteniendo ubicación...');
-                                const currentLocation = await Location.getCurrentPositionAsync({
-                                  accuracy: Location.Accuracy.High,
-                                });
-                                
-                                const newLocation = {
-                                  latitude: currentLocation.coords.latitude,
-                                  longitude: currentLocation.coords.longitude,
-                                };
-                                
-                                console.log('✅ [MAP] Ubicación GPS obtenida:', newLocation);
-                                console.log('✅ [MAP] Coordenadas GPS:', {
-                                  lat: newLocation.latitude,
-                                  lon: newLocation.longitude,
-                                  isValidLat: newLocation.latitude >= -90 && newLocation.latitude <= 90,
-                                  isValidLon: newLocation.longitude >= -180 && newLocation.longitude <= 180,
-                                });
-                                
-                                // Validar coordenadas antes de establecerlas
-                                if (newLocation.latitude >= -90 && newLocation.latitude <= 90 &&
-                                    newLocation.longitude >= -180 && newLocation.longitude <= 180) {
-                                  // Forzar actualización del mapa
-                                  setMapLoaded(false);
-                                  setMapZoom(15);
-                                  setMapLocation({
-                                    latitude: newLocation.latitude,
-                                    longitude: newLocation.longitude,
-                                  });
-                                  setMapKey(prev => prev + 1); // Forzar re-render del mapa
-                                  
-                                  // Pequeño delay para asegurar que el estado se actualice
-                                  setTimeout(() => {
-                                    setMapLoaded(true);
-                                    console.log('✅ [MAP] Mapa actualizado con nueva ubicación');
-                                  }, 100);
-                                } else {
-                                  console.error('❌ [MAP] Coordenadas inválidas:', newLocation);
-                                  Alert.alert('Error', 'Las coordenadas obtenidas no son válidas');
-                                }
-                              } else {
-                                console.warn('⚠️ [MAP] Permisos denegados');
-                                Alert.alert(
-                                  'Permiso de ubicación requerido',
-                                  'Necesitamos tu ubicación para centrar el mapa. Por favor, permite el acceso a la ubicación en la configuración de la app.'
-                                );
-                              }
-                            } catch (error) {
-                              console.error('❌ [MAP] Error obteniendo ubicación:', error);
-                              console.error('❌ [MAP] Error completo:', JSON.stringify(error, null, 2));
-                              Alert.alert('Error', 'No se pudo obtener tu ubicación actual. Por favor, intenta de nuevo.');
-                            }
-                          }}
-                        >
-                          <Ionicons name="locate" size={24} color="#59C6C0" />
-                        </TouchableOpacity>
-                        </View>
-                      )}
-                    </>
-                  );
-                } else {
-                  console.warn('⚠️ [MAP] MapComponent no disponible');
-                  console.warn('⚠️ [MAP] Platform.OS:', Platform.OS);
-                  console.warn('⚠️ [MAP] GoogleMaps:', GoogleMaps);
-                  console.warn('⚠️ [MAP] AppleMaps:', AppleMaps);
-                  return (
-                    <View style={styles.mapErrorContainer}>
-                      <Ionicons name="map-outline" size={48} color="#999" style={{ marginBottom: 16 }} />
-                      <Text style={styles.mapErrorText}>
-                        El mapa no está disponible.{'\n\n'}
-                        Por favor, ejecuta:{'\n'}
-                        <Text style={{ fontFamily: 'monospace', fontSize: 12 }}>npx expo run:android</Text>
-                        {'\n'}o{'\n'}
-                        <Text style={{ fontFamily: 'monospace', fontSize: 12 }}>npx expo run:ios</Text>
-                        {'\n\n'}
-                        Coordenadas actuales:{'\n'}
-                        <Text style={{ fontFamily: 'monospace', fontSize: 11, color: '#999' }}>
-                          {mapLocation.latitude.toFixed(6)}, {mapLocation.longitude.toFixed(6)}
-                        </Text>
-                      </Text>
-                      <TouchableOpacity
-                        style={styles.mapConfirmButton}
-                        onPress={() => {
-                          // Confirmar usando la ubicación actual
-                          setShowMapModal(false);
-                        }}
-                      >
-                        <Text style={styles.mapConfirmButtonText}>Usar esta ubicación</Text>
-                      </TouchableOpacity>
-                    </View>
-                  );
-                }
-              })()}
-            </View>
-          ) : (
-            <View style={styles.mapErrorContainer}>
-              <Ionicons name="location-outline" size={48} color="#999" />
-              <Text style={styles.mapErrorText}>
-                No se pudo obtener la ubicación inicial
-              </Text>
-            </View>
-          )}
-
-          <View style={styles.mapModalFooter}>
-            <View style={styles.mapLocationInfo}>
-              {mapLocation && (
-                <>
-                  <Text style={styles.mapLocationText}>
-                    {mapLocation.latitude.toFixed(6)}, {mapLocation.longitude.toFixed(6)}
-                  </Text>
-                  <TouchableOpacity
-                    style={styles.mapGetAddressButton}
-                    onPress={async () => {
-                      if (mapLocation) {
-                        try {
-                          const [addressResult] = await Location.reverseGeocodeAsync({
-                            latitude: mapLocation.latitude,
-                            longitude: mapLocation.longitude,
-                          });
-
-                          if (addressResult) {
-                            const address = [
-                              addressResult.street,
-                              addressResult.streetNumber,
-                              addressResult.district,
-                              addressResult.name,
-                            ]
-                              .filter(Boolean)
-                              .join(', ');
-
-                            Alert.alert(
-                              'Dirección',
-                              address || 'No se pudo obtener la dirección',
-                              [{ text: 'OK' }]
-                            );
-                          }
-                        } catch (error) {
-                          console.error('Error obteniendo dirección:', error);
-                        }
-                      }
-                    }}
-                  >
-                    <Ionicons name="location" size={16} color="#59C6C0" />
-                    <Text style={styles.mapGetAddressText}>Ver dirección</Text>
-                  </TouchableOpacity>
-                </>
-              )}
-            </View>
-            <View style={styles.mapModalButtons}>
-              <TouchableOpacity
-                style={styles.mapCancelButton}
-                onPress={() => setShowMapModal(false)}
-              >
-                <Text style={styles.mapCancelButtonText}>Cancelar</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.mapConfirmButton}
-                onPress={async () => {
-                  if (mapLocation) {
-                    await processLocation(mapLocation.latitude, mapLocation.longitude);
-                    setShowMapModal(false);
-                  }
-                }}
-              >
-                <Text style={styles.mapConfirmButtonText}>Confirmar</Text>
-              </TouchableOpacity>
-            </View>
           </View>
         </View>
       </Modal>
+
+      <Modal
+        visible={showConditionModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowConditionModal(false)}
+      >
+        <View style={styles.selectModalOverlay}>
+          <View style={styles.selectModalCard}>
+            <Text style={styles.selectModalTitle}>Selecciona un estado</Text>
+            <ScrollView>
+              {CONDITIONS.map((cond) => (
+                <TouchableOpacity
+                  key={cond.id}
+                  style={[
+                    styles.selectOption,
+                    condition === cond.id && styles.selectOptionActive,
+                  ]}
+                  onPress={() => {
+                    setCondition(cond.id);
+                    setShowConditionModal(false);
+                  }}
+                >
+                  <Text
+                    style={[
+                      styles.selectOptionText,
+                      condition === cond.id && styles.selectOptionTextActive,
+                    ]}
+                  >
+                    {cond.name}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            <TouchableOpacity
+              style={styles.selectModalClose}
+              onPress={() => setShowConditionModal(false)}
+            >
+              <Text style={styles.selectModalCloseText}>Cerrar</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={showCountryModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowCountryModal(false)}
+      >
+        <View style={styles.selectModalOverlay}>
+          <View style={styles.selectModalCard}>
+            <Text style={styles.selectModalTitle}>Selecciona un país</Text>
+            <ScrollView>
+              {countries.map((country) => (
+                <TouchableOpacity
+                  key={country.id}
+                  style={[
+                    styles.selectOption,
+                    countryId === country.id && styles.selectOptionActive,
+                  ]}
+                  onPress={() => {
+                    setCountryId(country.id);
+                    setShowCountryModal(false);
+                  }}
+                >
+                  <Text
+                    style={[
+                      styles.selectOptionText,
+                      countryId === country.id && styles.selectOptionTextActive,
+                    ]}
+                  >
+                    {country.name}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            <TouchableOpacity
+              style={styles.selectModalClose}
+              onPress={() => setShowCountryModal(false)}
+            >
+              <Text style={styles.selectModalCloseText}>Cerrar</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={showCityModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowCityModal(false)}
+      >
+        <View style={styles.selectModalOverlay}>
+          <View style={styles.selectModalCard}>
+            <Text style={styles.selectModalTitle}>Selecciona una ciudad</Text>
+            <ScrollView>
+              {cities.map((city) => (
+                <TouchableOpacity
+                  key={city.id}
+                  style={[
+                    styles.selectOption,
+                    cityId === city.id && styles.selectOptionActive,
+                  ]}
+                  onPress={() => {
+                    setCityId(city.id);
+                    setShowCityModal(false);
+                  }}
+                >
+                  <Text
+                    style={[
+                      styles.selectOptionText,
+                      cityId === city.id && styles.selectOptionTextActive,
+                    ]}
+                  >
+                    {city.name}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            <TouchableOpacity
+              style={styles.selectModalClose}
+              onPress={() => setShowCityModal(false)}
+            >
+              <Text style={styles.selectModalCloseText}>Cerrar</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
     </SafeAreaView>
   );
 };
@@ -1365,6 +1102,88 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: 'Montserrat',
     color: '#333',
+  },
+  selectInput: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    borderRadius: 8,
+    padding: 12,
+    backgroundColor: '#FFFFFF',
+  },
+  selectText: {
+    fontSize: 14,
+    color: '#333',
+    fontFamily: 'Montserrat',
+  },
+  selectPlaceholder: {
+    fontSize: 14,
+    color: '#999',
+    fontFamily: 'Montserrat',
+  },
+  selectModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  selectModalCard: {
+    width: '85%',
+    maxHeight: '70%',
+    backgroundColor: '#FFF',
+    borderRadius: 12,
+    padding: 16,
+  },
+  selectModalTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#2C3E50',
+    marginBottom: 12,
+    fontFamily: 'Montserrat',
+  },
+  selectOption: {
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
+  },
+  selectOptionActive: {
+    backgroundColor: '#E0F7F6',
+  },
+  selectOptionText: {
+    fontSize: 14,
+    color: '#333',
+    fontFamily: 'Montserrat',
+  },
+  selectOptionTextActive: {
+    color: '#1B8077',
+    fontWeight: '700',
+  },
+  selectOptionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  selectOptionImage: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#F3F4F6',
+  },
+  selectOptionEmoji: {
+    fontSize: 18,
+  },
+  selectModalClose: {
+    marginTop: 12,
+    alignItems: 'center',
+  },
+  selectModalCloseText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#59C6C0',
+    fontFamily: 'Montserrat',
   },
   textArea: {
     height: 120,
@@ -1515,6 +1334,43 @@ const styles = StyleSheet.create({
     color: '#999',
     fontFamily: 'Montserrat',
     fontStyle: 'italic',
+  },
+  locationLabel: {
+    marginTop: 10,
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#2C3E50',
+    fontFamily: 'Montserrat',
+  },
+  locationChips: {
+    marginTop: 8,
+  },
+  locationChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 16,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    marginRight: 8,
+  },
+  locationChipSelected: {
+    backgroundColor: '#59C6C0',
+    borderColor: '#59C6C0',
+  },
+  locationChipText: {
+    fontSize: 12,
+    color: '#6B7280',
+    fontWeight: '600',
+  },
+  locationChipTextSelected: {
+    color: '#FFFFFF',
+  },
+  locationHelperText: {
+    marginTop: 6,
+    fontSize: 12,
+    color: '#6B7280',
+    fontFamily: 'Montserrat',
   },
   updateLocationButton: {
     flexDirection: 'row',

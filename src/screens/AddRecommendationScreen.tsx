@@ -11,18 +11,32 @@ import {
   KeyboardAvoidingView,
   Platform,
   StatusBar,
+  Modal,
+  Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRoute } from '@react-navigation/native';
 import api from '../services/api';
 import { colors } from '../styles/globalStyles';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as ImagePicker from 'expo-image-picker';
+import { imageUploadService } from '../services/imageUploadService';
 
 interface Category {
   id: string;
   name: string;
   description: string;
   icon?: string;
+}
+
+interface Country {
+  id: string;
+  name: string;
+}
+
+interface City {
+  id: string;
+  name: string;
 }
 
 const AddRecommendationScreen = ({ navigation }: any) => {
@@ -34,6 +48,10 @@ const AddRecommendationScreen = ({ navigation }: any) => {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [address, setAddress] = useState('');
+  const [countryId, setCountryId] = useState('');
+  const [cityId, setCityId] = useState('');
+  const [countryName, setCountryName] = useState('');
+  const [cityName, setCityName] = useState('');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
   const [website, setWebsite] = useState('');
@@ -45,10 +63,21 @@ const AddRecommendationScreen = ({ navigation }: any) => {
   // Estados de control
   const [categories, setCategories] = useState<Category[]>([]);
   const [isLoadingCategories, setIsLoadingCategories] = useState(true);
+  const [countries, setCountries] = useState<Country[]>([]);
+  const [cities, setCities] = useState<City[]>([]);
+  const [isLoadingCountries, setIsLoadingCountries] = useState(true);
+  const [isLoadingCities, setIsLoadingCities] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showCategoryModal, setShowCategoryModal] = useState(false);
+  const [showCountryModal, setShowCountryModal] = useState(false);
+  const [showCityModal, setShowCityModal] = useState(false);
+  const [imageUri, setImageUri] = useState<string | null>(null);
+  const [imageMimeType, setImageMimeType] = useState<string | null>(null);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
 
   useEffect(() => {
     loadCategories();
+    loadCountries();
   }, []);
 
   useEffect(() => {
@@ -56,6 +85,24 @@ const AddRecommendationScreen = ({ navigation }: any) => {
       setCategoryId(preselectedCategoryId);
     }
   }, [preselectedCategoryId]);
+
+  useEffect(() => {
+    if (!countryId) {
+      setCities([]);
+      setCityId('');
+      setCountryName('');
+      setCityName('');
+      return;
+    }
+    const selected = countries.find((item) => item.id === countryId);
+    setCountryName(selected?.name || '');
+    loadCities(countryId);
+  }, [countryId, countries]);
+
+  useEffect(() => {
+    const selected = cities.find((item) => item.id === cityId);
+    setCityName(selected?.name || '');
+  }, [cityId, cities]);
 
   const loadCategories = async () => {
     try {
@@ -71,6 +118,100 @@ const AddRecommendationScreen = ({ navigation }: any) => {
     }
   };
 
+  const loadCountries = async () => {
+    try {
+      setIsLoadingCountries(true);
+      const response = await api.getCountries();
+      const items =
+        response?.data ||
+        response?.countries ||
+        response?.data?.data ||
+        [];
+      setCountries(Array.isArray(items) ? items : []);
+    } catch (error) {
+      console.error('Error cargando países:', error);
+      Alert.alert('Error', 'No se pudieron cargar los países');
+    } finally {
+      setIsLoadingCountries(false);
+    }
+  };
+
+  const loadCities = async (selectedCountryId: string) => {
+    try {
+      setIsLoadingCities(true);
+      const response = await api.getCities(selectedCountryId);
+      const items =
+        response?.data ||
+        response?.cities ||
+        response?.data?.data ||
+        [];
+      setCities(Array.isArray(items) ? items : []);
+      setCityId('');
+      setCityName('');
+    } catch (error) {
+      console.error('Error cargando ciudades:', error);
+      Alert.alert('Error', 'No se pudieron cargar las ciudades');
+    } finally {
+      setIsLoadingCities(false);
+    }
+  };
+
+  const handlePickImage = async () => {
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permiso requerido', 'Necesitamos acceso a tu galería');
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        quality: 0.8,
+      });
+
+      if (result.canceled) return;
+      const asset = result.assets?.[0];
+      if (asset?.uri) {
+        setImageUri(asset.uri);
+        setImageMimeType(asset.mimeType || null);
+      }
+    } catch (error) {
+      console.error('❌ [RECOMMENDATION] Error seleccionando imagen:', error);
+      Alert.alert('Error', 'No se pudo seleccionar la imagen');
+    }
+  };
+
+  const handleTakePhoto = async () => {
+    try {
+      const { status } = await ImagePicker.requestCameraPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permiso requerido', 'Necesitamos acceso a tu cámara');
+        return;
+      }
+
+      const result = await ImagePicker.launchCameraAsync({
+        allowsEditing: true,
+        quality: 0.8,
+      });
+
+      if (result.canceled) return;
+      const asset = result.assets?.[0];
+      if (asset?.uri) {
+        setImageUri(asset.uri);
+        setImageMimeType(asset.mimeType || null);
+      }
+    } catch (error) {
+      console.error('❌ [RECOMMENDATION] Error tomando foto:', error);
+      Alert.alert('Error', 'No se pudo tomar la foto');
+    }
+  };
+
+  const handleRemoveImage = () => {
+    setImageUri(null);
+    setImageMimeType(null);
+  };
+
   const handleSubmit = async () => {
     // Validaciones
     if (!categoryId) {
@@ -82,16 +223,39 @@ const AddRecommendationScreen = ({ navigation }: any) => {
       Alert.alert('Error', 'Por favor ingresa el nombre del lugar');
       return;
     }
+    if (!countryId) {
+      Alert.alert('Error', 'Por favor selecciona un país');
+      return;
+    }
+    if (!cityId) {
+      Alert.alert('Error', 'Por favor selecciona una ciudad');
+      return;
+    }
 
     setIsSubmitting(true);
 
     try {
-      const selectedCategory = categories.find((category) => category.id === categoryId);
+      let imageUrl: string | undefined;
+      if (imageUri) {
+        setIsUploadingImage(true);
+        const uploadResult = await imageUploadService.uploadImage(
+          imageUri,
+          'recommendation',
+          imageMimeType || undefined
+        );
+        imageUrl = uploadResult?.data?.url || uploadResult?.url;
+      }
+
       const response = await api.createRecommendation({
         categoryId,
         name: name.trim(),
         description: description.trim(),
         address: address.trim(),
+        countryId,
+        cityId,
+        countryName,
+        cityName,
+        imageUrl,
         phone: phone.trim(),
         email: email.trim(),
         website: website.trim(),
@@ -119,6 +283,7 @@ const AddRecommendationScreen = ({ navigation }: any) => {
       console.error('Error creando recomendación:', error);
       Alert.alert('Error', error.message || 'No se pudo crear la recomendación');
     } finally {
+      setIsUploadingImage(false);
       setIsSubmitting(false);
     }
   };
@@ -163,27 +328,15 @@ const AddRecommendationScreen = ({ navigation }: any) => {
             {isLoadingCategories ? (
               <ActivityIndicator size="small" color="#59C6C0" />
             ) : (
-              <View style={styles.categoryGrid}>
-                {categories.map((category) => (
-                  <TouchableOpacity
-                    key={category.id}
-                    style={[
-                      styles.categoryChip,
-                      categoryId === category.id && styles.categoryChipSelected,
-                    ]}
-                    onPress={() => setCategoryId(category.id)}
-                  >
-                    <Text
-                      style={[
-                        styles.categoryChipText,
-                        categoryId === category.id && styles.categoryChipTextSelected,
-                      ]}
-                    >
-                      {category.name}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
+              <TouchableOpacity
+                style={styles.selectInput}
+                onPress={() => setShowCategoryModal(true)}
+              >
+                <Text style={categoryId ? styles.selectText : styles.selectPlaceholder}>
+                  {categoryId ? categories.find((c) => c.id === categoryId)?.name || 'Selecciona una categoría' : 'Selecciona una categoría'}
+                </Text>
+                <Ionicons name="chevron-down" size={18} color="#6B7280" />
+              </TouchableOpacity>
             )}
           </View>
 
@@ -225,6 +378,75 @@ const AddRecommendationScreen = ({ navigation }: any) => {
               onChangeText={setAddress}
               placeholderTextColor="#999"
             />
+          </View>
+
+          {/* Imagen */}
+          <View style={styles.section}>
+            <Text style={styles.label}>Imagen (opcional)</Text>
+            <View style={styles.imageActions}>
+              <TouchableOpacity style={styles.imageActionButton} onPress={handlePickImage}>
+                <Ionicons name="images-outline" size={18} color="#59C6C0" />
+                <Text style={styles.imageActionText}>Galería</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.imageActionButton} onPress={handleTakePhoto}>
+                <Ionicons name="camera-outline" size={18} color="#59C6C0" />
+                <Text style={styles.imageActionText}>Cámara</Text>
+              </TouchableOpacity>
+              {imageUri && (
+                <TouchableOpacity style={styles.imageActionButton} onPress={handleRemoveImage}>
+                  <Ionicons name="trash-outline" size={18} color="#EF4444" />
+                  <Text style={styles.imageActionRemoveText}>Quitar</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+            <TouchableOpacity style={styles.imagePicker} onPress={handlePickImage}>
+              {imageUri ? (
+                <Image source={{ uri: imageUri }} style={styles.imagePreview} />
+              ) : (
+                <Text style={styles.imagePlaceholder}>Agregar imagen</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+
+          {/* Ubicación */}
+          <View style={styles.section}>
+            <Text style={styles.label}>
+              País <Text style={styles.required}>*</Text>
+            </Text>
+            {isLoadingCountries ? (
+              <ActivityIndicator size="small" color="#59C6C0" />
+            ) : (
+              <TouchableOpacity
+                style={styles.selectInput}
+                onPress={() => setShowCountryModal(true)}
+              >
+                <Text style={countryId ? styles.selectText : styles.selectPlaceholder}>
+                  {countryId ? countries.find((c) => c.id === countryId)?.name || 'Selecciona un país' : 'Selecciona un país'}
+                </Text>
+                <Ionicons name="chevron-down" size={18} color="#6B7280" />
+              </TouchableOpacity>
+            )}
+          </View>
+
+          <View style={styles.section}>
+            <Text style={styles.label}>
+              Ciudad <Text style={styles.required}>*</Text>
+            </Text>
+            {!countryId ? (
+              <Text style={styles.helperText}>Selecciona un país para ver las ciudades.</Text>
+            ) : isLoadingCities ? (
+              <ActivityIndicator size="small" color="#59C6C0" />
+            ) : (
+              <TouchableOpacity
+                style={styles.selectInput}
+                onPress={() => setShowCityModal(true)}
+              >
+                <Text style={cityId ? styles.selectText : styles.selectPlaceholder}>
+                  {cityId ? cities.find((c) => c.id === cityId)?.name || 'Selecciona una ciudad' : 'Selecciona una ciudad'}
+                </Text>
+                <Ionicons name="chevron-down" size={18} color="#6B7280" />
+              </TouchableOpacity>
+            )}
           </View>
 
           {/* Contacto */}
@@ -315,11 +537,11 @@ const AddRecommendationScreen = ({ navigation }: any) => {
 
           {/* Botón de enviar */}
           <TouchableOpacity
-            style={[styles.submitButton, isSubmitting && styles.submitButtonDisabled]}
+            style={[styles.submitButton, (isSubmitting || isUploadingImage) && styles.submitButtonDisabled]}
             onPress={handleSubmit}
-            disabled={isSubmitting}
+            disabled={isSubmitting || isUploadingImage}
           >
-            {isSubmitting ? (
+            {isSubmitting || isUploadingImage ? (
               <ActivityIndicator color="white" />
             ) : (
               <>
@@ -333,6 +555,87 @@ const AddRecommendationScreen = ({ navigation }: any) => {
           <View style={{ height: 40 }} />
         </ScrollView>
       </KeyboardAvoidingView>
+
+      <Modal visible={showCategoryModal} transparent animationType="fade" onRequestClose={() => setShowCategoryModal(false)}>
+        <View style={styles.selectModalOverlay}>
+          <View style={styles.selectModalCard}>
+            <Text style={styles.selectModalTitle}>Selecciona una categoría</Text>
+            <ScrollView>
+              {categories.map((category) => (
+                <TouchableOpacity
+                  key={category.id}
+                  style={[styles.selectOption, categoryId === category.id && styles.selectOptionActive]}
+                  onPress={() => {
+                    setCategoryId(category.id);
+                    setShowCategoryModal(false);
+                  }}
+                >
+                  <Text style={[styles.selectOptionText, categoryId === category.id && styles.selectOptionTextActive]}>
+                    {category.name}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            <TouchableOpacity style={styles.selectModalClose} onPress={() => setShowCategoryModal(false)}>
+              <Text style={styles.selectModalCloseText}>Cerrar</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={showCountryModal} transparent animationType="fade" onRequestClose={() => setShowCountryModal(false)}>
+        <View style={styles.selectModalOverlay}>
+          <View style={styles.selectModalCard}>
+            <Text style={styles.selectModalTitle}>Selecciona un país</Text>
+            <ScrollView>
+              {countries.map((country) => (
+                <TouchableOpacity
+                  key={country.id}
+                  style={[styles.selectOption, countryId === country.id && styles.selectOptionActive]}
+                  onPress={() => {
+                    setCountryId(country.id);
+                    setShowCountryModal(false);
+                  }}
+                >
+                  <Text style={[styles.selectOptionText, countryId === country.id && styles.selectOptionTextActive]}>
+                    {country.name}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            <TouchableOpacity style={styles.selectModalClose} onPress={() => setShowCountryModal(false)}>
+              <Text style={styles.selectModalCloseText}>Cerrar</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={showCityModal} transparent animationType="fade" onRequestClose={() => setShowCityModal(false)}>
+        <View style={styles.selectModalOverlay}>
+          <View style={styles.selectModalCard}>
+            <Text style={styles.selectModalTitle}>Selecciona una ciudad</Text>
+            <ScrollView>
+              {cities.map((city) => (
+                <TouchableOpacity
+                  key={city.id}
+                  style={[styles.selectOption, cityId === city.id && styles.selectOptionActive]}
+                  onPress={() => {
+                    setCityId(city.id);
+                    setShowCityModal(false);
+                  }}
+                >
+                  <Text style={[styles.selectOptionText, cityId === city.id && styles.selectOptionTextActive]}>
+                    {city.name}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            <TouchableOpacity style={styles.selectModalClose} onPress={() => setShowCityModal(false)}>
+              <Text style={styles.selectModalCloseText}>Cerrar</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -402,6 +705,10 @@ const styles = StyleSheet.create({
     color: '#374151',
     marginBottom: 8,
   },
+  helperText: {
+    fontSize: 12,
+    color: '#6B7280',
+  },
   required: {
     color: '#EF4444',
   },
@@ -414,6 +721,112 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#2C3E50',
     marginBottom: 12,
+  },
+  selectInput: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: 'white',
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    borderRadius: 8,
+    padding: 12,
+  },
+  selectText: {
+    fontSize: 14,
+    color: '#2C3E50',
+  },
+  selectPlaceholder: {
+    fontSize: 14,
+    color: '#9CA3AF',
+  },
+  selectModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  selectModalCard: {
+    width: '85%',
+    maxHeight: '70%',
+    backgroundColor: '#FFF',
+    borderRadius: 12,
+    padding: 16,
+  },
+  selectModalTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#2C3E50',
+    marginBottom: 12,
+  },
+  selectOption: {
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
+  },
+  selectOptionActive: {
+    backgroundColor: '#E0F7F6',
+  },
+  selectOptionText: {
+    fontSize: 14,
+    color: '#2C3E50',
+  },
+  selectOptionTextActive: {
+    color: '#1B8077',
+    fontWeight: '700',
+  },
+  selectModalClose: {
+    marginTop: 12,
+    alignItems: 'center',
+  },
+  selectModalCloseText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#59C6C0',
+  },
+  imagePicker: {
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    borderRadius: 8,
+    backgroundColor: '#F9FAFB',
+    height: 120,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
+  imagePlaceholder: {
+    color: '#6B7280',
+    fontSize: 14,
+  },
+  imagePreview: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 8,
+  },
+  imageActions: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 12,
+  },
+  imageActionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    backgroundColor: '#FFFFFF',
+  },
+  imageActionText: {
+    fontSize: 13,
+    color: '#2C3E50',
+  },
+  imageActionRemoveText: {
+    fontSize: 13,
+    color: '#EF4444',
   },
   textArea: {
     height: 100,

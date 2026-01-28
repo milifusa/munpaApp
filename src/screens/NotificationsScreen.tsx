@@ -10,6 +10,7 @@ import {
   StatusBar,
   Platform,
   SafeAreaView,
+  Modal,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
@@ -44,6 +45,9 @@ const NotificationsScreen = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [showMedicationModal, setShowMedicationModal] = useState(false);
+  const [medicationPrompt, setMedicationPrompt] = useState<{ title: string; body: string } | null>(null);
+  const [medicationReminderId, setMedicationReminderId] = useState<string | null>(null);
 
   useEffect(() => {
     loadNotifications();
@@ -87,6 +91,19 @@ const NotificationsScreen = () => {
     loadNotifications();
   }, []);
 
+  const isMedicationNotification = (notification: Notification) => {
+    const data: any = notification.data || {};
+    const title = notification.title || '';
+    return (
+      notification.type === 'medication_reminder' ||
+      data?.type === 'medication_reminder' ||
+      data?.kind === 'medication' ||
+      data?.medicationId ||
+      data?.reminderId ||
+      /medicamento|vitamina|biogaia/i.test(title)
+    );
+  };
+
   const handleNotificationPress = async (notification: Notification) => {
     // Marcar como leída
     if (!notification.read) {
@@ -107,6 +124,17 @@ const NotificationsScreen = () => {
         setUnreadCount(newUnreadCount);
         await notificationService.setBadgeCount(newUnreadCount);
       }
+    }
+
+    // Modal para notificaciones de medicamentos
+    if (isMedicationNotification(notification)) {
+      setMedicationPrompt({
+        title: notification.title || '¿Tomó el medicamento?',
+        body: notification.body || 'Confirma si ya lo tomó.',
+      });
+      setMedicationReminderId((notification.data as any)?.reminderId || null);
+      setShowMedicationModal(true);
+      return;
     }
 
     // Navegar según el tipo
@@ -379,6 +407,71 @@ const NotificationsScreen = () => {
             }
           />
         )}
+
+        <Modal
+          visible={showMedicationModal}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setShowMedicationModal(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.medicationModal}>
+              <Ionicons name="medkit" size={28} color="#59C6C0" />
+              <Text style={styles.medicationModalTitle}>
+                {medicationPrompt?.title || '¿Tomó el medicamento?'}
+              </Text>
+              <Text style={styles.medicationModalBody}>
+                {medicationPrompt?.body || 'Confirma si ya lo tomó.'}
+              </Text>
+              <View style={styles.medicationModalButtons}>
+                <TouchableOpacity
+                  style={[styles.medicationModalButton, styles.medicationModalButtonSecondary]}
+                  onPress={async () => {
+                    try {
+                      if (!medicationReminderId) {
+                        console.warn('⚠️ [MED] reminderId no disponible');
+                        setShowMedicationModal(false);
+                        return;
+                      }
+                      await api.post(`/api/medications/reminders/${medicationReminderId}/taken`, {
+                        status: 'skipped',
+                      });
+                      console.log('🟡 [MED] Marcado como no tomado (skipped)');
+                    } catch (error) {
+                      console.error('❌ [MED] Error registrando skipped:', error);
+                    } finally {
+                      setShowMedicationModal(false);
+                    }
+                  }}
+                >
+                  <Text style={styles.medicationModalButtonSecondaryText}>No la tomé</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.medicationModalButton, styles.medicationModalButtonPrimary]}
+                  onPress={async () => {
+                    try {
+                      if (!medicationReminderId) {
+                        console.warn('⚠️ [MED] reminderId no disponible');
+                        setShowMedicationModal(false);
+                        return;
+                      }
+                      await api.post(`/api/medications/reminders/${medicationReminderId}/taken`, {
+                        status: 'taken',
+                      });
+                      console.log('✅ [MED] Tomado registrado');
+                    } catch (error) {
+                      console.error('❌ [MED] Error registrando tomado:', error);
+                    } finally {
+                      setShowMedicationModal(false);
+                    }
+                  }}
+                >
+                  <Text style={styles.medicationModalButtonPrimaryText}>La tomé</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
       </View>
     </SafeAreaView>
   );
@@ -417,6 +510,57 @@ const styles = StyleSheet.create({
   },
   headerRight: {
     width: 40,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.45)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  medicationModal: {
+    width: '86%',
+    backgroundColor: '#FFF',
+    borderRadius: 18,
+    padding: 20,
+    alignItems: 'center',
+  },
+  medicationModalTitle: {
+    marginTop: 10,
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#2D3748',
+    textAlign: 'center',
+  },
+  medicationModalBody: {
+    marginTop: 6,
+    fontSize: 13,
+    color: '#6B7280',
+    textAlign: 'center',
+  },
+  medicationModalButtons: {
+    marginTop: 16,
+    flexDirection: 'row',
+    gap: 10,
+  },
+  medicationModalButton: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  medicationModalButtonSecondary: {
+    backgroundColor: '#F3F4F6',
+  },
+  medicationModalButtonSecondaryText: {
+    color: '#374151',
+    fontWeight: '700',
+  },
+  medicationModalButtonPrimary: {
+    backgroundColor: '#59C6C0',
+  },
+  medicationModalButtonPrimaryText: {
+    color: '#FFF',
+    fontWeight: '700',
   },
   markAllContainer: {
     backgroundColor: '#96d2d3',

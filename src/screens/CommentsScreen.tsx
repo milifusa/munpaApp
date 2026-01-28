@@ -71,7 +71,7 @@ const CommentsScreen: React.FC = () => {
     try {
       setIsLoading(true);
       const result = await communitiesService.getPostComments(postId);
-
+      
       if (result.success) {
         const commentsData = result.data || [];
         const finalComments = Array.isArray(commentsData) ? commentsData : [];
@@ -244,17 +244,17 @@ const CommentsScreen: React.FC = () => {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top + 100 : 0}
       >
-        {/* Header */}
+      {/* Header */}
         <View style={styles.header}>
-          <TouchableOpacity 
-            style={styles.backButton}
-            onPress={() => navigation.goBack()}
-          >
-            <Ionicons name="arrow-back" size={24} color="#333" />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Comentarios</Text>
-          <View style={styles.placeholder} />
-        </View>
+        <TouchableOpacity 
+          style={styles.backButton}
+          onPress={() => navigation.goBack()}
+        >
+          <Ionicons name="arrow-back" size={24} color="#333" />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Comentarios</Text>
+        <View style={styles.placeholder} />
+      </View>
 
         {/* Lista de comentarios con header del post */}
         <FlatList
@@ -262,52 +262,52 @@ const CommentsScreen: React.FC = () => {
           keyExtractor={(item) => item.id}
           renderItem={({ item: comment }) => (
             <View style={styles.commentCard}>
-              {/* Header del comentario */}
-              <View style={styles.commentHeader}>
-                <View style={styles.authorInfo}>
-                  <View style={styles.authorAvatar}>
-                    {comment.authorPhoto ? (
-                      <Image source={{ uri: comment.authorPhoto }} style={styles.authorAvatarImage} />
-                    ) : (
-                      <Ionicons name="person" size={20} color="#666" />
-                    )}
+                  {/* Header del comentario */}
+                  <View style={styles.commentHeader}>
+                    <View style={styles.authorInfo}>
+                      <View style={styles.authorAvatar}>
+                        {comment.authorPhoto ? (
+                          <Image source={{ uri: comment.authorPhoto }} style={styles.authorAvatarImage} />
+                        ) : (
+                          <Ionicons name="person" size={20} color="#666" />
+                        )}
+                      </View>
+                      <View style={styles.authorDetails}>
+                        <Text style={styles.authorName}>{comment.authorName}</Text>
+                        <Text style={styles.commentDate}>
+                          {formatDate(comment.createdAt)}
+                        </Text>
+                      </View>
+                    </View>
                   </View>
-                  <View style={styles.authorDetails}>
-                    <Text style={styles.authorName}>{comment.authorName}</Text>
-                    <Text style={styles.commentDate}>
-                      {formatDate(comment.createdAt)}
-                    </Text>
-                  </View>
-                </View>
-              </View>
 
-              {/* Contenido del comentario */}
-              <View style={styles.commentContent}>
-                <Text style={styles.commentText}>{comment.content}</Text>
-              </View>
+                  {/* Contenido del comentario */}
+                  <View style={styles.commentContent}>
+                    <Text style={styles.commentText}>{comment.content}</Text>
+                  </View>
 
-              {/* Footer del comentario con estadísticas */}
-              <View style={styles.commentFooter}>
-                <View style={styles.commentStats}>
-                  <View style={styles.statItem}>
-                    <Ionicons name="heart" size={14} color="#FF6B6B" />
-                    <Text style={styles.statText}>{comment.likeCount || 0}</Text>
+                  {/* Footer del comentario con estadísticas */}
+                  <View style={styles.commentFooter}>
+                    <View style={styles.commentStats}>
+                      <View style={styles.statItem}>
+                        <Ionicons name="heart" size={14} color="#FF6B6B" />
+                        <Text style={styles.statText}>{comment.likeCount || 0}</Text>
+                      </View>
+                    </View>
+                    
+                    {/* Botones de acción */}
+                    <View style={styles.commentActions}>
+                      <LikeButton
+                        isLiked={comment.isLiked || false}
+                        likeCount={comment.likeCount || 0}
+                        onPress={() => handleLikeComment(comment)}
+                        isLoading={likingCommentId === comment.id}
+                        size="small"
+                        showCount={false}
+                      />
+                    </View>
                   </View>
                 </View>
-                
-                {/* Botones de acción */}
-                <View style={styles.commentActions}>
-                  <LikeButton
-                    isLiked={comment.isLiked || false}
-                    likeCount={comment.likeCount || 0}
-                    onPress={() => handleLikeComment(comment)}
-                    isLoading={likingCommentId === comment.id}
-                    size="small"
-                    showCount={false}
-                  />
-                </View>
-              </View>
-            </View>
           )}
           ListHeaderComponent={
             <View style={styles.listHeader}>

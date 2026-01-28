@@ -6,6 +6,7 @@ import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import appleAuth from '@invertase/react-native-apple-authentication';
 import notificationService from '../services/notificationService';
 import sentryService from '../services/sentryService';
+import analyticsService from '../services/analyticsService';
 
 interface AuthContextType {
   user: User | null;
@@ -59,6 +60,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     
     checkAuthStatus();
   }, []);
+
+  useEffect(() => {
+    if (user?.id) {
+      analyticsService.setUser(user.id, {
+        email: user.email,
+        name: user.name,
+      });
+    } else {
+      analyticsService.setUser(null);
+    }
+  }, [user?.id]);
 
   const checkAuthStatus = async () => {
     try {
@@ -245,8 +257,30 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         });
       }
       
-      console.log('📤 Enviando Google OAuth Token al backend...');
-      const response = await authService.googleLogin(googleOAuthToken);
+      // Intercambiar token de Google por Firebase ID token
+      const firebaseWebApiKey = 'AIzaSyDDX0_GPvfxwnmC4H0Rs1cUEyz44IAY1S4';
+      console.log('🔁 [GOOGLE SIGN-IN] Intercambiando token con Firebase...');
+      const firebaseTokenResponse = await fetch(
+        `https://identitytoolkit.googleapis.com/v1/accounts:signInWithIdp?key=${firebaseWebApiKey}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            postBody: `id_token=${googleOAuthToken}&providerId=google.com`,
+            requestUri: 'http://localhost',
+            returnIdpCredential: true,
+            returnSecureToken: true,
+          }),
+        }
+      );
+      const firebaseTokenData = await firebaseTokenResponse.json();
+      if (!firebaseTokenResponse.ok || !firebaseTokenData?.idToken) {
+        console.error('❌ [GOOGLE SIGN-IN] Error Firebase token:', firebaseTokenData);
+        throw new Error(firebaseTokenData?.error?.message || 'No se pudo obtener Firebase ID token');
+      }
+
+      console.log('📤 Enviando Firebase ID Token al backend...');
+      const response = await authService.googleLogin(firebaseTokenData.idToken);
       console.log('📋 Respuesta completa del login con Google:', response);
       
       // El backend retorna: { success, message, data: { uid, email, displayName, photoUrl, customToken }, isNewUser }

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -24,6 +24,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { communitiesService } from '../services/api';
 import { imageUploadService } from '../services/imageUploadService';
 import BannerCarousel from '../components/BannerCarousel';
+import analyticsService from '../services/analyticsService';
 
 interface Community {
   id: string;
@@ -62,6 +63,8 @@ const CommunitiesScreen = () => {
   const [isCreating, setIsCreating] = useState(false);
   const [joiningCommunityId, setJoiningCommunityId] = useState<string | null>(null);
   const [pendingRequests, setPendingRequests] = useState<string[]>([]); // IDs de comunidades con solicitudes pendientes
+  const loadInFlightRef = useRef(false);
+  const lastLoadAtRef = useRef(0);
   const [newCommunity, setNewCommunity] = useState({
     name: '',
     keywords: '',
@@ -106,7 +109,7 @@ const CommunitiesScreen = () => {
   // Función para pull-to-refresh
   const onRefresh = async () => {
     setRefreshing(true);
-    await loadCommunities();
+    await loadCommunities(true);
     setRefreshing(false);
   };
 
@@ -193,7 +196,7 @@ const CommunitiesScreen = () => {
   };
 
   // Función para cargar todas las comunidades
-  const loadCommunities = async () => {
+  const loadCommunities = async (force: boolean = false) => {
     // Verificar que el usuario esté autenticado antes de cargar datos
     if (!isAuthenticated) {
       console.log('🚫 [COMMUNITIES] Usuario no autenticado, no cargando comunidades');
@@ -201,10 +204,14 @@ const CommunitiesScreen = () => {
       return;
     }
 
+    if (loadInFlightRef.current) return;
+    if (!force && Date.now() - lastLoadAtRef.current < 3000) return;
+
     if (!refreshing) {
       setIsLoading(true);
     }
     try {
+      loadInFlightRef.current = true;
       // Cargar comunidades del usuario primero
       const userComms = await communitiesService.getUserCommunities();
       const userCommunitiesData = userComms?.data || userComms || [];
@@ -243,6 +250,8 @@ const CommunitiesScreen = () => {
       setCommunities(fallbackCommunities);
       setFilteredCommunities(fallbackCommunities);
     } finally {
+      lastLoadAtRef.current = Date.now();
+      loadInFlightRef.current = false;
       setIsLoading(false);
     }
   };
@@ -487,6 +496,13 @@ const CommunitiesScreen = () => {
       if (isUserCommunity(community)) {
         // Si es mi comunidad, navegar a los posts
         console.log('🏠 [COMMUNITIES] Es mi comunidad, navegando a posts:', community.name);
+        analyticsService.logEvent('community_open', {
+          community_id: community.id,
+          name: community.name,
+          is_public: community.isPublic ?? !community.isPrivate,
+          member_count: community.memberCount,
+          category: community.category,
+        });
         navigation.navigate('CommunityPosts', {
           communityId: community.id,
           communityName: community.name
@@ -496,6 +512,13 @@ const CommunitiesScreen = () => {
 
       // Verificar si la comunidad es privada
       if (!community.isPublic) {
+        analyticsService.logEvent('community_join_request', {
+          community_id: community.id,
+          name: community.name,
+          is_public: false,
+          member_count: community.memberCount,
+          category: community.category,
+        });
         // Para comunidades privadas, mostrar confirmación de solicitud
         Alert.alert(
           '🔒 Comunidad Privada',
@@ -513,6 +536,13 @@ const CommunitiesScreen = () => {
 
       // Si es comunidad pública, unirse directamente
       console.log('🤝 [COMMUNITIES] Uniéndose a comunidad pública:', community.name);
+      analyticsService.logEvent('community_join', {
+        community_id: community.id,
+        name: community.name,
+        is_public: true,
+        member_count: community.memberCount,
+        category: community.category,
+      });
       setJoiningCommunityId(community.id);
       
       const result = await communitiesService.joinCommunity(community.id);
@@ -1170,8 +1200,8 @@ const CommunitiesScreen = () => {
                     </Text>
                     <Text style={styles.privacyDescription}>
                       {newCommunity.isPrivate 
-                        ? 'Solo miembros invitados pueden unirse' 
-                        : 'Cualquier persona puede unirse'
+                        ? 'Solo tú aceptas quién entra. La comunidad no aparece en búsquedas públicas.' 
+                        : 'Cualquiera puede unirse sin aprobación. Aparece en búsquedas.'
                       }
                     </Text>
                   </View>

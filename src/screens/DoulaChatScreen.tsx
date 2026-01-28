@@ -17,6 +17,7 @@ import { Ionicons } from '@expo/vector-icons';
 import learningService from '../services/learning-service';
 import { useAuth } from '../contexts/AuthContext';
 import { useChat } from '../contexts/ChatContext';
+import { useRoute } from '@react-navigation/native';
 
 interface Message {
   id: number;
@@ -35,6 +36,12 @@ const DouliChat = () => {
   const [inputText, setInputText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const flatListRef = useRef<FlatList<Message>>(null);
+  const route = useRoute<any>();
+  const initialQuestion =
+    (route?.params?.question as string | undefined) ||
+    (route?.params?.params?.question as string | undefined);
+  const initialQuestionSentRef = useRef(false);
+  const [pendingQuestion, setPendingQuestion] = useState<string | null>(null);
 
   // Inicializar chat solo la primera vez y mostrar mensaje de bienvenida
   useEffect(() => {
@@ -57,6 +64,14 @@ const DouliChat = () => {
     console.log('💬 [DOULI CHAT] Mensajes actualizados:', messages.length);
     console.log('💬 [DOULI CHAT] Contenido de mensajes:', messages.map(m => ({ id: m.id, sender: m.sender, text: m.text.substring(0, 50) })));
   }, [messages]);
+
+  useEffect(() => {
+    if (initialQuestion) {
+      initialQuestionSentRef.current = false;
+      setPendingQuestion(initialQuestion);
+      console.log('🟣 [DOULI] Pregunta recibida:', initialQuestion);
+    }
+  }, [initialQuestion]);
 
   // Función para enviar mensaje
   const sendMessage = async () => {
@@ -104,6 +119,65 @@ const DouliChat = () => {
       setIsLoading(false);
     }
   };
+
+  const sendMessageWithText = async (text: string) => {
+    if (!text.trim() || isLoading || !conversationId) return;
+
+    const userMessage: Message = {
+      id: Date.now(),
+      text: text.trim(),
+      sender: 'user',
+      timestamp: new Date(),
+      showFeedback: false
+    };
+
+    setMessages(prev => [...prev, userMessage]);
+    setInputText('');
+    setIsLoading(true);
+
+    try {
+      const response = await learningService.chatWithDouli(text.trim(), conversationId);
+      console.log('📋 Respuesta completa del chat:', response);
+
+      const responseText = response.data?.response || response.response || 'No se pudo obtener la respuesta';
+      const source = response.data?.source || response.source;
+      const usedFallback = response.data?.usedFallback || response.usedFallback;
+
+      const douliMessage: Message = {
+        id: Date.now() + 1,
+        text: responseText,
+        sender: 'douli',
+        timestamp: new Date(),
+        showFeedback: true,
+        usedFallback: usedFallback,
+        source: source
+      };
+
+      setMessages(prev => [...prev, douliMessage]);
+    } catch (error) {
+      console.error('Error enviando mensaje:', error);
+      Alert.alert('Error', 'No se pudo enviar el mensaje. Inténtalo de nuevo.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    console.log('🟣 [DOULI] Estado auto-envio:', {
+      pendingQuestion,
+      conversationId,
+      isLoading,
+      alreadySent: initialQuestionSentRef.current,
+    });
+    if (!pendingQuestion) return;
+    if (!conversationId) {
+      initializeChat();
+      return;
+    }
+    if (isLoading || initialQuestionSentRef.current) return;
+    initialQuestionSentRef.current = true;
+    setTimeout(() => sendMessageWithText(pendingQuestion), 150);
+  }, [pendingQuestion, conversationId, isLoading]);
 
   // Función para enviar feedback
   const sendFeedback = async (messageId: number, feedback: 'positive' | 'negative') => {

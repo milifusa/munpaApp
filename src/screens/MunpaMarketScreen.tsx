@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -16,8 +16,10 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
+import * as Location from 'expo-location';
 import marketplaceService, { MarketplaceProduct, MarketplaceCategory, CATEGORIES } from '../services/marketplaceService';
 import BannerCarousel from '../components/BannerCarousel';
+import analyticsService from '../services/analyticsService';
 
 const MunpaMarketScreen = () => {
   const navigation = useNavigation<any>();
@@ -31,9 +33,13 @@ const MunpaMarketScreen = () => {
   const [minPrice, setMinPrice] = useState<string>('');
   const [maxPrice, setMaxPrice] = useState<string>('');
   const [selectedCondition, setSelectedCondition] = useState<string | undefined>(undefined);
-  const [orderBy, setOrderBy] = useState<'reciente' | 'precio_asc' | 'precio_desc' | 'vistas'>('reciente');
+  const [orderBy, setOrderBy] = useState<'reciente' | 'precio_asc' | 'precio_desc' | 'vistas' | 'distancia'>('reciente');
   const [categories, setCategories] = useState<MarketplaceCategory[]>([]);
   const [loadingCategories, setLoadingCategories] = useState(false);
+  const [userCoords, setUserCoords] = useState<{ latitude: number; longitude: number } | null>(null);
+  const locationRequestedRef = useRef(false);
+  const loadInFlightRef = useRef(false);
+  const lastLoadKeyRef = useRef<string | null>(null);
 
   useEffect(() => {
     loadProducts();
@@ -70,10 +76,16 @@ const MunpaMarketScreen = () => {
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  const loadProducts = async () => {
+  const loadProducts = async (force: boolean = false) => {
     try {
+      const coordsKey = userCoords ? `${userCoords.latitude.toFixed(4)}|${userCoords.longitude.toFixed(4)}` : 'na';
+      const loadKey = `${selectedType}|${selectedCategory || ''}|${searchQuery}|${minPrice}|${maxPrice}|${selectedCondition || ''}|${orderBy}|${coordsKey}`;
+      if (loadInFlightRef.current) return;
+      if (!force && lastLoadKeyRef.current === loadKey) return;
+      loadInFlightRef.current = true;
+      lastLoadKeyRef.current = loadKey;
       setLoading(true);
-      
+
       const filters: any = {
         type: selectedType,
         category: selectedCategory,
@@ -98,18 +110,45 @@ const MunpaMarketScreen = () => {
         filters.condition = selectedCondition as 'nuevo' | 'como_nuevo' | 'buen_estado' | 'usado';
       }
 
-      // Mapear ordenamiento
-      const orderByMap: Record<string, string> = {
-        'reciente': 'reciente',
-        'precio_asc': 'precio_asc',
-        'precio_desc': 'precio_desc',
-        'vistas': 'vistas',
-      };
-      filters.orderBy = orderByMap[orderBy] as any || 'reciente';
+      let coords = userCoords;
+      if (!coords && !locationRequestedRef.current) {
+        locationRequestedRef.current = true;
+        try {
+          const { status } = await Location.requestForegroundPermissionsAsync();
+          if (status === 'granted') {
+            const currentLocation = await Location.getCurrentPositionAsync({
+              accuracy: Location.Accuracy.Balanced,
+            });
+            coords = {
+              latitude: currentLocation.coords.latitude,
+              longitude: currentLocation.coords.longitude,
+            };
+            setUserCoords(coords);
+          }
+        } catch (error) {
+          console.warn('⚠️ [MARKET] No se pudo obtener ubicación para ordenar por distancia');
+        }
+      }
+
+      if (coords) {
+        filters.latitude = coords.latitude;
+        filters.longitude = coords.longitude;
+        filters.orderBy = 'distancia';
+      } else {
+        // Mapear ordenamiento
+        const orderByMap: Record<string, string> = {
+          'reciente': 'reciente',
+          'precio_asc': 'precio_asc',
+          'precio_desc': 'precio_desc',
+          'vistas': 'vistas',
+          'distancia': 'distancia',
+        };
+        filters.orderBy = orderByMap[orderBy] as any || 'reciente';
+      }
 
       const response = await marketplaceService.getProducts(filters);
       
-      const fetchedProducts = response.products || response.data?.products || response.data || [];
+      const fetchedProducts = response.products || [];
       
       
       setProducts(Array.isArray(fetchedProducts) ? fetchedProducts : []);
@@ -117,17 +156,28 @@ const MunpaMarketScreen = () => {
       console.error('❌ [MARKET] Error cargando productos:', error);
       setProducts([]);
     } finally {
+      loadInFlightRef.current = false;
       setLoading(false);
     }
   };
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    await loadProducts();
+    await loadProducts(true);
     setRefreshing(false);
   };
 
   const handleProductPress = (product: MarketplaceProduct) => {
+    analyticsService.logEvent('market_product_view', {
+      product_id: product.id,
+      title: product.title,
+      type: product.type,
+      price: product.price ?? null,
+      category: product.category,
+      city: product.location?.city || null,
+      country: product.location?.country || null,
+      views: product.views ?? 0,
+    });
     navigation.navigate('ProductDetail', { productId: product.id });
   };
 
@@ -161,7 +211,7 @@ const MunpaMarketScreen = () => {
             />
           ) : (
             <View style={styles.productImagePlaceholder}>
-              <Ionicons name={getCategoryIcon(item.category)} size={40} color="#ccc" />
+              <Ionicons name={getCategoryIcon(item.category) as any} size={40} color="#ccc" />
             </View>
           )}
           
@@ -199,11 +249,13 @@ const MunpaMarketScreen = () => {
           <View style={styles.productMeta}>
             <View style={styles.metaItem}>
               <Ionicons name="location" size={12} color="#666" />
-              <Text style={styles.metaText}>{item.location.city}</Text>
+              <Text style={styles.metaText}>
+                {item.location.city || 'Ciudad no disponible'}
+              </Text>
             </View>
             <View style={styles.metaItem}>
               <Ionicons name="eye" size={12} color="#666" />
-              <Text style={styles.metaText}>{item.views}</Text>
+              <Text style={styles.metaText}>{item.views ?? 0}</Text>
             </View>
           </View>
         </View>

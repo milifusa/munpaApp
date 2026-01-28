@@ -55,19 +55,20 @@ interface Child {
 interface RouteParams {
   childId: string;
   child: Child;
+  initialTab?: 'info' | 'development' | 'health' | 'measurements' | 'milestones' | 'photos';
 }
 
 const ChildProfileScreen: React.FC = () => {
   const navigation = useNavigation();
   const route = useRoute();
-  const { childId, child: initialChild } = route.params as RouteParams;
+  const { childId, child: initialChild, initialTab } = route.params as RouteParams;
   const [fontsLoaded, setFontsLoaded] = useState(false);
   const [child, setChild] = useState(initialChild || null);
   const [profileImage, setProfileImage] = useState<string | null>(initialChild?.photoUrl || null);
   const [loading, setLoading] = useState(false);
   const [developmentInfo, setDevelopmentInfo] = useState<any>(null);
   const [developmentLoading, setDevelopmentLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<'info' | 'development' | 'health' | 'measurements' | 'milestones' | 'photos'>('info');
+  const [activeTab, setActiveTab] = useState<'info' | 'development' | 'health' | 'measurements' | 'milestones' | 'photos'>(initialTab || 'info');
   const [refreshing, setRefreshing] = useState(false);
   const [measurements, setMeasurements] = useState<any[]>([]);
   const [vaccines, setVaccines] = useState<any[]>([]);
@@ -79,11 +80,20 @@ const ChildProfileScreen: React.FC = () => {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [pendingVaccine, setPendingVaccine] = useState<{name: string, id?: string, isScheduling?: boolean} | null>(null);
+  const [showAppointmentDatePicker, setShowAppointmentDatePicker] = useState(false);
+  const [selectedAppointmentDate, setSelectedAppointmentDate] = useState(new Date());
+  const [pendingAppointment, setPendingAppointment] = useState<{type: 'checkup' | 'specialist' | 'emergency' | 'vaccine', label: string} | null>(null);
 
   useEffect(() => {
     loadFonts();
     loadDevelopmentInfo();
   }, []);
+
+  useEffect(() => {
+    if (initialTab) {
+      setActiveTab(initialTab);
+    }
+  }, [initialTab]);
 
   // Recargar datos del hijo cuando la pantalla recibe el foco
   useEffect(() => {
@@ -317,6 +327,41 @@ const ChildProfileScreen: React.FC = () => {
     } catch (error) {
       console.error('Error guardando vacuna:', error);
       Alert.alert('Error', 'No se pudo guardar la vacuna.');
+    }
+  };
+
+  const handleAppointmentDateChange = (event: any, date?: Date) => {
+    if (Platform.OS === 'android') {
+      setShowAppointmentDatePicker(false);
+    }
+
+    if (date && pendingAppointment) {
+      setSelectedAppointmentDate(date);
+      if (Platform.OS === 'android' || event.type === 'set') {
+        saveAppointmentWithDate(date);
+      }
+    }
+  };
+
+  const saveAppointmentWithDate = async (date: Date) => {
+    if (!pendingAppointment) return;
+    try {
+      const dateStr = date.toISOString().split('T')[0];
+      await childProfileService.appointments.addAppointment(childId, {
+        type: pendingAppointment.type,
+        date: dateStr,
+        doctor: 'Por definir',
+        reason: pendingAppointment.label,
+        status: 'scheduled',
+      });
+      Alert.alert('Éxito', `Cita médica programada para ${new Date(date).toLocaleDateString('es-ES')}`);
+      loadHealthData();
+    } catch (error) {
+      console.error('Error agregando cita:', error);
+      Alert.alert('Error', 'No se pudo agregar la cita. Verifica que el backend esté funcionando.');
+    } finally {
+      setShowAppointmentDatePicker(false);
+      setPendingAppointment(null);
     }
   };
 
@@ -604,22 +649,12 @@ const ChildProfileScreen: React.FC = () => {
 
     const buttons = appointmentTypes.map(apt => ({
       text: apt.label,
-      onPress: async () => {
-        try {
-          const today = new Date().toISOString().split('T')[0];
-          await childProfileService.appointments.addAppointment(childId, {
-            type: apt.type as any,
-            date: today,
-            doctor: 'Por definir',
-            reason: apt.label,
-            status: 'scheduled',
-          });
-          Alert.alert('Éxito', 'Cita médica agregada correctamente');
-          loadHealthData();
-        } catch (error) {
-          console.error('Error agregando cita:', error);
-          Alert.alert('Error', 'No se pudo agregar la cita. Verifica que el backend esté funcionando.');
-        }
+      onPress: () => {
+        setPendingAppointment({ type: apt.type as any, label: apt.label });
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        setSelectedAppointmentDate(tomorrow);
+        setShowAppointmentDatePicker(true);
       },
     }));
 
@@ -1048,13 +1083,6 @@ const ChildProfileScreen: React.FC = () => {
       {/* Header con imagen de fondo */}
       <View style={styles.header}>
         <View style={styles.headerContent}>
-          <TouchableOpacity 
-            style={styles.backButton}
-            onPress={() => navigation.goBack()}
-          >
-            <Text style={styles.backButtonText}>← Volver</Text>
-          </TouchableOpacity>
-          
           <View style={styles.childInfoHeader}>
             <View style={styles.avatarContainer}>
               <Image 
@@ -1771,6 +1799,66 @@ const ChildProfileScreen: React.FC = () => {
           onChange={handleDateChange}
           maximumDate={pendingVaccine.isScheduling ? undefined : new Date()}
           minimumDate={pendingVaccine.isScheduling ? new Date() : undefined}
+        />
+      )
+    )}
+
+    {/* Date Picker Modal para citas médicas */}
+    {showAppointmentDatePicker && pendingAppointment && (
+      Platform.OS === 'ios' ? (
+        <Modal
+          transparent={true}
+          animationType="slide"
+          visible={showAppointmentDatePicker}
+          onRequestClose={() => {
+            setShowAppointmentDatePicker(false);
+            setPendingAppointment(null);
+          }}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.datePickerContainer}>
+              <View style={styles.datePickerHeader}>
+                <Text style={styles.datePickerTitle}>📅 ¿Cuándo será la cita médica?</Text>
+              </View>
+              <DateTimePicker
+                value={selectedAppointmentDate}
+                mode="date"
+                display="spinner"
+                onChange={handleAppointmentDateChange}
+                minimumDate={new Date()}
+                locale="es-ES"
+              />
+              <View style={styles.datePickerButtons}>
+                <TouchableOpacity
+                  style={[styles.datePickerButton, styles.cancelButton]}
+                  onPress={() => {
+                    setShowAppointmentDatePicker(false);
+                    setPendingAppointment(null);
+                  }}
+                >
+                  <Text style={styles.cancelButtonText}>Cancelar</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.datePickerButton, styles.confirmButton]}
+                  onPress={() => {
+                    if (pendingAppointment) {
+                      saveAppointmentWithDate(selectedAppointmentDate);
+                    }
+                  }}
+                >
+                  <Text style={styles.confirmButtonText}>Confirmar</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+      ) : (
+        <DateTimePicker
+          value={selectedAppointmentDate}
+          mode="date"
+          display="default"
+          onChange={handleAppointmentDateChange}
+          minimumDate={new Date()}
         />
       )
     )}

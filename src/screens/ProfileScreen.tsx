@@ -255,7 +255,7 @@ const ProfileScreen: React.FC = () => {
             </Text>
           </View>
           
-          <View style={[styles.infoRow, !profile?.isPregnant && styles.lastInfoRow]}>
+          <View style={styles.infoRow}>
             <View style={styles.infoLeft}>
               <Ionicons name={profile?.isPregnant ? 'heart' : 'heart-outline'} size={20} color={profile?.isPregnant ? '#E91E63' : '#887CBC'} />
               <Text style={styles.infoLabel}>Estado</Text>
@@ -264,6 +264,18 @@ const ProfileScreen: React.FC = () => {
               {profile?.isPregnant ? 
                 (profile?.gender === 'F' ? '🤰 Embarazada' : '👶 Esperando bebé') : 
                 'Sin embarazo'}
+            </Text>
+          </View>
+
+          <View style={[styles.infoRow, styles.lastInfoRow]}>
+            <View style={styles.infoLeft}>
+              <Ionicons name="location-outline" size={20} color="#887CBC" />
+              <Text style={styles.infoLabel}>Ubicación</Text>
+            </View>
+            <Text style={styles.infoValue}>
+              {profile?.cityName || profile?.city || profile?.countryName || profile?.country
+                ? `${profile?.cityName || profile?.city || 'Ciudad no disponible'}, ${profile?.countryName || profile?.country || 'País no disponible'}`
+                : 'No disponible'}
             </Text>
           </View>
           
