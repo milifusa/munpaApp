@@ -55,6 +55,7 @@ const SleepTrackerScreen = ({ navigation, route }: any) => {
   const { user } = useAuth();
   const childId = route.params?.childId || ''; // ID del hijo seleccionado
   const childName = route.params?.childName || 'tu bebé'; // Nombre del hijo
+  const sleepFeatureEnabled = false;
   const [activeSleep, setActiveSleep] = useState<SleepEntry | null>(null);
   const [prediction, setPrediction] = useState<SleepPrediction | null>(null);
   const [sleepHistory, setSleepHistory] = useState<SleepEntry[]>([]);
@@ -87,6 +88,7 @@ const SleepTrackerScreen = ({ navigation, route }: any) => {
   const pulseAnim = new Animated.Value(1);
 
   useEffect(() => {
+    if (!sleepFeatureEnabled) return;
     if (childId) {
       loadData();
     }
@@ -140,6 +142,7 @@ const SleepTrackerScreen = ({ navigation, route }: any) => {
   // Recargar datos cuando la pantalla vuelve a estar en foco
   useFocusEffect(
     React.useCallback(() => {
+      if (!sleepFeatureEnabled) return;
       if (childId) {
         console.log('🔄 [SLEEP] Recargando datos al volver a la pantalla');
         loadData();
@@ -165,6 +168,10 @@ const SleepTrackerScreen = ({ navigation, route }: any) => {
   };
 
   const loadData = async () => {
+    if (!sleepFeatureEnabled) {
+      setLoading(false);
+      return;
+    }
     try {
       setLoading(true);
       
@@ -549,6 +556,14 @@ const SleepTrackerScreen = ({ navigation, route }: any) => {
       <View style={[styles.container, styles.centerContent]}>
         <ActivityIndicator size="large" color="#887CBC" />
         <Text style={styles.loadingText}>Cargando...</Text>
+      </View>
+    );
+  }
+
+  if (!sleepFeatureEnabled) {
+    return (
+      <View style={[styles.container, styles.centerContent]}>
+        <Text style={styles.loadingText}>Sección de sueño deshabilitada</Text>
       </View>
     );
   }

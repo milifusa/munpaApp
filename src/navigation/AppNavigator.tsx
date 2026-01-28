@@ -11,7 +11,6 @@ import { useNavigation } from '@react-navigation/native';
 import GlobalMenu from '../components/GlobalMenu';
 import DouliChatOverlay from '../components/DouliChatOverlay';
 import { useDeepLinking, setNavigationRef } from '../hooks/useDeepLinking';
-import { axiosInstance as api } from '../services/api';
 import analyticsService from '../services/analyticsService';
 
 // Importar pantallas
@@ -62,55 +61,9 @@ const Tab = createBottomTabNavigator();
 const ProfileButton = () => {
   const { user } = useAuth();
   const { openMenu } = useMenu();
-  const navigation = useNavigation<any>();
-  const [unreadCount, setUnreadCount] = React.useState(0);
-
-  useEffect(() => {
-    let mounted = true;
-
-    const loadUnread = async () => {
-      try {
-        const response = await api.get('/api/notifications');
-        if (!mounted) return;
-        if (response.data?.success) {
-          const notifs = response.data.data || response.data.notifications || [];
-          const unread = Array.isArray(notifs)
-            ? notifs.filter((n: any) => !n.read).length
-            : 0;
-          setUnreadCount(unread);
-        } else {
-          setUnreadCount(0);
-        }
-      } catch (error) {
-        if (mounted) setUnreadCount(0);
-      }
-    };
-
-    loadUnread();
-    const interval = setInterval(loadUnread, 30000);
-
-    return () => {
-      mounted = false;
-      clearInterval(interval);
-    };
-  }, []);
   
   return (
     <View style={styles.headerRightContainer}>
-      <TouchableOpacity
-        style={styles.notificationButton}
-        onPress={() => navigation.navigate('Notifications')}
-      >
-        <Ionicons name="notifications-outline" size={20} color="white" />
-        {unreadCount > 0 && (
-          <View style={styles.notificationBadge}>
-            <Text style={styles.notificationBadgeText}>
-              {unreadCount > 99 ? '99+' : unreadCount}
-            </Text>
-          </View>
-        )}
-      </TouchableOpacity>
-
       <TouchableOpacity
         style={styles.profileButton}
         onPress={openMenu}
@@ -460,7 +413,6 @@ const AuthenticatedNavigator = () => {
         options={{
           title: 'Perfil del hijo',
           headerShown: true,
-          headerBackTitleVisible: false,
           headerBackTitle: '',
         }}
       />
@@ -888,6 +840,14 @@ const MainTabNavigator = () => {
             />
           ),
         }}
+        listeners={({ navigation }) => ({
+          tabPress: () => {
+            (navigation as any).navigate('Home', {
+              screen: 'HomeMain',
+              params: { homeTab: 'today', refresh: Date.now() },
+            });
+          },
+        })}
       />
       <Tab.Screen
         name="Communities"
@@ -1079,7 +1039,7 @@ const AppNavigator = () => {
   const { isAuthenticated, isLoading } = useAuth();
   const { isMenuOpen, closeMenu } = useMenu();
   const navigationRef = useRef<NavigationContainerRef<any>>(null);
-  const routeNameRef = useRef<string | undefined>();
+  const routeNameRef = useRef<string | undefined>(undefined);
 
   // Activar deep linking
   useDeepLinking();

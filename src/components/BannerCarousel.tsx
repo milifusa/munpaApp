@@ -52,17 +52,7 @@ const BannerCarousel: React.FC<BannerCarouselProps> = ({
   const totalItems = banners.length + (customBanner ? 1 : 0);
   const viewedBannersRef = useRef<Set<string>>(new Set());
 
-  // Cargar banners cuando cambie la sección o el fallback
-  useEffect(() => {
-    loadBanners();
-
-    return () => {
-      // Limpiar timer al desmontar
-      if (autoScrollTimerRef.current) {
-        clearInterval(autoScrollTimerRef.current);
-      }
-    };
-  }, [section, fallbackToHome]); // Recargar cuando cambie la sección o el fallback
+  const lastReloadAtRef = useRef(0);
 
   // Recargar banners cada vez que la pantalla reciba el foco
   // Esto permite verificar si se activaron o desactivaron banners
@@ -71,6 +61,9 @@ const BannerCarousel: React.FC<BannerCarouselProps> = ({
       
       // Función para recargar banners
       const reloadBanners = async () => {
+        const now = Date.now();
+        if (now - lastReloadAtRef.current < 5000) return;
+        lastReloadAtRef.current = now;
         try {
           setLoading(true);
           let fetchedBanners = await bannerService.getActiveBanners(section);
@@ -128,36 +121,6 @@ const BannerCarousel: React.FC<BannerCarouselProps> = ({
       }
     };
   }, [banners, customBanner, totalItems]);
-
-  const loadBanners = async () => {
-    try {
-      setLoading(true);
-       let fetchedBanners = await bannerService.getActiveBanners(section);
-      
-      // Si no hay banners y hay fallback a home, intentar cargar banners de home
-      if (fetchedBanners.length === 0 && fallbackToHome && section && section !== 'home') {
-        const homeBanners = await bannerService.getActiveBanners('home');
-        if (homeBanners.length > 0) {
-          fetchedBanners = homeBanners;
-        }
-      } else if (fetchedBanners.length === 0 && !fallbackToHome) {
-        console.log('⚠️ [BANNER CAROUSEL] No hay banners para', section, 'y fallbackToHome está desactivado, no se mostrará nada');
-      }
-      
-      setBanners(fetchedBanners);
-      
-      // Registrar vista del primer banner
-      if (fetchedBanners.length > 0) {
-        registerView(fetchedBanners[0].id);
-      } else {
-        console.log('⚠️ [BANNER CAROUSEL] No hay banners para mostrar en la sección:', section || 'todas');
-      }
-    } catch (error) {
-      console.error('❌ [BANNER CAROUSEL] Error cargando banners:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const startAutoRotation = () => {
     // Solo auto-rotar si hay más de un item y no estamos en el banner personalizado
