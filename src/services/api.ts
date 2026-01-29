@@ -2140,6 +2140,89 @@ export const pregnancyService = {
 };
 
 // ============================================
+// GROWTH / CRECIMIENTO
+// ============================================
+export const growthService = {
+  getWeightMeasurements: async (childId: string) => {
+    const response = await api.get(`/api/children/${childId}/measurements/weight`);
+    return response.data;
+  },
+  createWeightMeasurement: async (
+    childId: string,
+    data: { valueKg: number; measuredAt: string; notes?: string; source?: string }
+  ) => {
+    const response = await api.post(`/api/children/${childId}/measurements/weight`, data);
+    return response.data;
+  },
+  updateWeightMeasurement: async (
+    childId: string,
+    id: string,
+    data: { valueKg?: number; measuredAt?: string; notes?: string }
+  ) => {
+    const response = await api.put(`/api/children/${childId}/measurements/weight/${id}`, data);
+    return response.data;
+  },
+  deleteWeightMeasurement: async (childId: string, id: string) => {
+    const response = await api.delete(`/api/children/${childId}/measurements/weight/${id}`);
+    return response.data;
+  },
+  getHeightMeasurements: async (childId: string) => {
+    const response = await api.get(`/api/children/${childId}/measurements/height`);
+    return response.data;
+  },
+  createHeightMeasurement: async (
+    childId: string,
+    data: { valueCm: number; measuredAt: string; notes?: string; source?: string }
+  ) => {
+    const response = await api.post(`/api/children/${childId}/measurements/height`, data);
+    return response.data;
+  },
+  updateHeightMeasurement: async (
+    childId: string,
+    id: string,
+    data: { valueCm?: number; measuredAt?: string; notes?: string }
+  ) => {
+    const response = await api.put(`/api/children/${childId}/measurements/height/${id}`, data);
+    return response.data;
+  },
+  deleteHeightMeasurement: async (childId: string, id: string) => {
+    const response = await api.delete(`/api/children/${childId}/measurements/height/${id}`);
+    return response.data;
+  },
+  getHeadMeasurements: async (childId: string) => {
+    const response = await api.get(`/api/children/${childId}/measurements/head`);
+    return response.data;
+  },
+  createHeadMeasurement: async (
+    childId: string,
+    data: { valueCm: number; measuredAt: string; notes?: string; source?: string }
+  ) => {
+    const response = await api.post(`/api/children/${childId}/measurements/head`, data);
+    return response.data;
+  },
+  updateHeadMeasurement: async (
+    childId: string,
+    id: string,
+    data: { valueCm?: number; measuredAt?: string; notes?: string }
+  ) => {
+    const response = await api.put(`/api/children/${childId}/measurements/head/${id}`, data);
+    return response.data;
+  },
+  deleteHeadMeasurement: async (childId: string, id: string) => {
+    const response = await api.delete(`/api/children/${childId}/measurements/head/${id}`);
+    return response.data;
+  },
+  getSummary: async (childId: string) => {
+    const response = await api.get(`/api/children/${childId}/measurements/summary`);
+    return response.data;
+  },
+  getPercentiles: async (params: { sex: 'M' | 'F'; type: 'weight' | 'height' | 'head'; ageWeeks?: number }) => {
+    const response = await api.get('/api/growth/percentiles', { params });
+    return response.data;
+  },
+};
+
+// ============================================
 // FAQ MOMS
 // ============================================
 export const faqService = {
@@ -2172,5 +2255,6 @@ export default {
   ...sleepService,
   ...activitiesService,
   ...pregnancyService,
+  ...growthService,
   ...faqService,
 };

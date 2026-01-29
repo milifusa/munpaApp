@@ -39,6 +39,8 @@ import CommunityPostsScreen from '../screens/CommunityPostsScreen';
 import CreatePostScreen from '../screens/CreatePostScreen';
 import CommentsScreen from '../screens/CommentsScreen';
 import PostDetailScreen from '../screens/PostDetailScreen';
+import GrowthScreen from '../screens/GrowthScreen';
+import MedicationsScreen from '../screens/MedicationsScreen';
 import ListsScreen from '../screens/ListsScreen';
 import ListDetailScreen from '../screens/ListDetailScreen';
 import ItemCommentsScreen from '../screens/ItemCommentsScreen';
@@ -156,7 +158,17 @@ const ChildrenHeaderTitle = () => {
   };
 
   if (loading) {
-    return null;
+    return (
+      <View style={styles.childHeaderPill}>
+        <View style={styles.childHeaderPillPlaceholder}>
+          <Text style={styles.childHeaderEmoji}>👶</Text>
+        </View>
+        <Text style={styles.childHeaderPillName} numberOfLines={1}>
+          Tu bebé
+        </Text>
+        <Ionicons name="chevron-down" size={16} color="#4A5568" />
+      </View>
+    );
   }
 
   // Filtrar hijos válidos antes de renderizar
@@ -165,6 +177,19 @@ const ChildrenHeaderTitle = () => {
     : [];
 
   const selectedChild = validChildren.find((child) => child.id === selectedChildId) || validChildren[0];
+  if (!selectedChild) {
+    return (
+      <View style={styles.childHeaderPill}>
+        <View style={styles.childHeaderPillPlaceholder}>
+          <Text style={styles.childHeaderEmoji}>👶</Text>
+        </View>
+        <Text style={styles.childHeaderPillName} numberOfLines={1}>
+          Tu bebé
+        </Text>
+        <Ionicons name="chevron-down" size={16} color="#4A5568" />
+      </View>
+    );
+  }
 
   return (
     <>
@@ -476,6 +501,24 @@ const AuthenticatedNavigator = () => {
         }}
       />
       <Stack.Screen
+        name="Growth"
+        component={GrowthScreen}
+        options={{
+          title: 'Crecimiento',
+          headerShown: true,
+          headerBackTitle: '',
+        }}
+      />
+      <Stack.Screen
+        name="Medications"
+        component={MedicationsScreen}
+        options={{
+          title: 'Medicación',
+          headerShown: true,
+          headerBackTitle: '',
+        }}
+      />
+      <Stack.Screen
         name="Doula"
         component={DoulaChatScreen}
         options={({ navigation }) => ({
@@ -551,14 +594,17 @@ const HomeStackNavigator = () => {
           fontWeight: 'bold',
         },
         headerRight: () => <ProfileButton />,
+        headerBackTitle: '',
+        headerShown: true,
+        headerTitle: () => <ChildrenHeaderTitle />,
+        headerTitleAlign: 'left',
+        headerLeft: () => null,
       }}
     >
       <Stack.Screen
         name="HomeMain"
         component={HomeScreen}
         options={{
-          headerTitle: () => <ChildrenHeaderTitle />,
-          headerShown: true,
           headerTitleAlign: 'left', // Alineado a la izquierda en iOS
         }}
       />
