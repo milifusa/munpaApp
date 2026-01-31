@@ -178,6 +178,8 @@ const learningService = {
       let finalPayload = { ...payload };
 
       if (payload.childId) {
+        console.log('📘 [GUIDE] Obteniendo guía para childId:', payload.childId);
+        
         const response = await coreApi.get('/api/auth/children');
         const children =
           (Array.isArray(response?.data?.data) && response.data.data) ||
@@ -187,16 +189,26 @@ const learningService = {
         const child = children.find((item: any) => item?.id === payload.childId);
 
         if (child) {
+          console.log('📘 [GUIDE] Datos del niño encontrado:', {
+            id: child.id,
+            name: child.name,
+            birthDate: child.birthDate,
+            isUnborn: child.isUnborn,
+          });
+
+          // IMPORTANTE: Siempre mantener el childId en el payload
           if (child.isUnborn) {
             const gestationWeeks =
               child.currentGestationWeeks ?? child.gestationWeeks ?? child.registeredGestationWeeks ?? null;
             finalPayload = {
+              childId: payload.childId, // ✅ MANTENER childId
               gestationWeeks: gestationWeeks || undefined,
               isPregnant: true,
               name: child.name || 'tu bebé',
             };
           } else if (child.birthDate) {
             finalPayload = {
+              childId: payload.childId, // ✅ MANTENER childId
               birthDate: child.birthDate,
               name: child.name,
             };
@@ -204,13 +216,17 @@ const learningService = {
             const months = child.currentAgeInMonths ?? child.ageInMonths ?? 0;
             const ageWeeks = Math.max(1, Math.round(months * 4.345));
             finalPayload = {
+              childId: payload.childId, // ✅ MANTENER childId
               ageWeeks,
               name: child.name,
             };
           }
+        } else {
+          console.warn('⚠️ [GUIDE] No se encontró el niño con childId:', payload.childId);
         }
       }
 
+      console.log('📘 [GUIDE] Payload final enviado:', finalPayload);
       console.log('📘 [GUIDE] URL completa:', `${API_BASE_URL}/api/guide/today`);
       const response = await api.post('/api/guide/today', finalPayload);
       return response.data;

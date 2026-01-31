@@ -21,6 +21,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import Svg, { Line, Path, Circle, Text as SvgText } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { childrenService, growthService } from '../services/api';
+import analyticsService from '../services/analyticsService';
 
 type GrowthTab = 'weight' | 'height' | 'head' | 'summary';
 
@@ -501,6 +502,10 @@ const GrowthScreen: React.FC = () => {
   };
 
   const openAddModal = () => {
+    analyticsService.logEvent('growth_add_measurement_opened', {
+      child_id: selectedChild?.id,
+      active_tab: activeTab,
+    });
     setWeightInput('');
     setHeightInput('');
     setHeadInput('');
@@ -531,15 +536,24 @@ const GrowthScreen: React.FC = () => {
       source: 'app',
     };
     try {
+      const measurements = [];
       if (weightValue) {
         await growthService.createWeightMeasurement(selectedChild.id, { valueKg: weightValue, ...payloadBase });
+        measurements.push('weight');
       }
       if (heightValue) {
         await growthService.createHeightMeasurement(selectedChild.id, { valueCm: heightValue, ...payloadBase });
+        measurements.push('height');
       }
       if (headValue) {
         await growthService.createHeadMeasurement(selectedChild.id, { valueCm: headValue, ...payloadBase });
+        measurements.push('head');
       }
+      analyticsService.logEvent('growth_measurement_saved', {
+        child_id: selectedChild.id,
+        measurements: measurements.join(','),
+        has_notes: !!notesInput.trim(),
+      });
       setShowAddModal(false);
       if (activeTab === 'summary') {
         await loadSummary(selectedChild);
@@ -588,7 +602,13 @@ const GrowthScreen: React.FC = () => {
             <TouchableOpacity
               key={tab.key}
               style={[styles.tabItem, activeTab === tab.key && styles.tabItemActive]}
-              onPress={() => setActiveTab(tab.key)}
+              onPress={() => {
+                analyticsService.logEvent('growth_tab_changed', {
+                  child_id: selectedChild?.id,
+                  tab: tab.key,
+                });
+                setActiveTab(tab.key);
+              }}
             >
               <Text style={[styles.tabLabel, activeTab === tab.key && styles.tabLabelActive]}>
                 {tab.label}

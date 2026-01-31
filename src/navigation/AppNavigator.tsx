@@ -2,7 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import { NavigationContainer, NavigationContainerRef } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { View, ActivityIndicator, StyleSheet, TouchableOpacity, Platform, Image, Linking, Text, Modal, ScrollView } from 'react-native';
+import { View, ActivityIndicator, StyleSheet, TouchableOpacity, Platform, Image, Linking, Text, Modal, ScrollView, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '../contexts/AuthContext';
@@ -41,6 +41,9 @@ import CommentsScreen from '../screens/CommentsScreen';
 import PostDetailScreen from '../screens/PostDetailScreen';
 import GrowthScreen from '../screens/GrowthScreen';
 import MedicationsScreen from '../screens/MedicationsScreen';
+import DevelopmentScreen from '../screens/DevelopmentScreen';
+import ArticlesScreen from '../screens/ArticlesScreen';
+import ArticleDetailScreen from '../screens/ArticleDetailScreen';
 import ListsScreen from '../screens/ListsScreen';
 import ListDetailScreen from '../screens/ListDetailScreen';
 import ItemCommentsScreen from '../screens/ItemCommentsScreen';
@@ -87,10 +90,20 @@ const ProfileButton = () => {
 
 // Componente para mostrar las caritas de los hijos en el header
 const ChildrenHeaderTitle = () => {
+  const { user, setUser } = useAuth();
   const [children, setChildren] = React.useState<any[]>([]);
   const [selectedChildId, setSelectedChildId] = React.useState<string | null>(null);
+  const [profile, setProfile] = React.useState<any>(null);
   const [loading, setLoading] = React.useState(true);
   const [showSelector, setShowSelector] = React.useState(false);
+  const [showLocationModal, setShowLocationModal] = React.useState(false);
+  const [countries, setCountries] = React.useState<any[]>([]);
+  const [cities, setCities] = React.useState<any[]>([]);
+  const [selectedCountryId, setSelectedCountryId] = React.useState<string | null>(null);
+  const [selectedCityId, setSelectedCityId] = React.useState<string | null>(null);
+  const [loadingLocation, setLoadingLocation] = React.useState(false);
+  const [loadingCountries, setLoadingCountries] = React.useState(false);
+  const [loadingCities, setLoadingCities] = React.useState(false);
   const navigation = useNavigation<any>();
 
   React.useEffect(() => {
@@ -99,6 +112,7 @@ const ChildrenHeaderTitle = () => {
         const authToken = await AsyncStorage.getItem('authToken');
         if (!authToken) return;
 
+        // Cargar hijos
         const response = await fetch('https://api.munpa.online/api/auth/children', {
           headers: {
             'Authorization': `Bearer ${authToken}`,
@@ -130,6 +144,20 @@ const ChildrenHeaderTitle = () => {
           setSelectedChildId(validChildren[0].id);
           await AsyncStorage.setItem('selectedChildId', validChildren[0].id);
         }
+
+        // Cargar perfil del usuario para ubicación
+        const profileResponse = await fetch('https://api.munpa.online/api/auth/profile', {
+          headers: {
+            'Authorization': `Bearer ${authToken}`,
+            'Content-Type': 'application/json'
+          }
+        });
+        const profileData = await profileResponse.json();
+        if (profileData.success && profileData.data) {
+          setProfile(profileData.data);
+        } else if (profileData.user) {
+          setProfile(profileData.user);
+        }
       } catch (error) {
         console.error('Error cargando hijos para header:', error);
       } finally {
@@ -155,6 +183,148 @@ const ChildrenHeaderTitle = () => {
       childrenCount: 1,
       gender: 'F',
     });
+  };
+
+  const handleLocationPress = () => {
+    setShowLocationModal(true);
+    loadCountries();
+  };
+
+  const loadCountries = async () => {
+    try {
+      setLoadingCountries(true);
+      const authToken = await AsyncStorage.getItem('authToken');
+      if (!authToken) return;
+
+      const response = await fetch('https://api.munpa.online/api/locations/countries', {
+        headers: {
+          'Authorization': `Bearer ${authToken}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      const data = await response.json();
+      if (data.success && data.data) {
+        setCountries(data.data);
+      }
+    } catch (error) {
+      console.error('Error cargando países:', error);
+    } finally {
+      setLoadingCountries(false);
+    }
+  };
+
+  const loadCities = async (countryId: string) => {
+    try {
+      setLoadingCities(true);
+      const authToken = await AsyncStorage.getItem('authToken');
+      if (!authToken) return;
+
+      const response = await fetch(`https://api.munpa.online/api/locations/cities?countryId=${countryId}`, {
+        headers: {
+          'Authorization': `Bearer ${authToken}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      const data = await response.json();
+      if (data.success && data.data) {
+        setCities(data.data);
+      }
+    } catch (error) {
+      console.error('Error cargando ciudades:', error);
+    } finally {
+      setLoadingCities(false);
+    }
+  };
+
+  const handleCountrySelect = (countryId: string) => {
+    setSelectedCountryId(countryId);
+    setSelectedCityId(null);
+    setCities([]);
+    loadCities(countryId);
+  };
+
+  const handleSaveLocation = async () => {
+    if (!selectedCountryId || !selectedCityId) {
+      Alert.alert('Error', 'Por favor selecciona país y ciudad');
+      return;
+    }
+
+    try {
+      setLoadingLocation(true);
+      const authToken = await AsyncStorage.getItem('authToken');
+      if (!authToken) return;
+
+      const selectedCountry = countries.find(c => c.id === selectedCountryId);
+      const selectedCity = cities.find(c => c.id === selectedCityId);
+
+      const response = await fetch('https://api.munpa.online/api/auth/location', {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${authToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          countryId: selectedCountryId,
+          cityId: selectedCityId,
+          country: selectedCountry?.name,
+          city: selectedCity?.name,
+        })
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        const updatedProfile = {
+          ...profile,
+          countryId: selectedCountryId,
+          cityId: selectedCityId,
+          countryName: selectedCountry?.name,
+          cityName: selectedCity?.name,
+        };
+        
+        console.log('✅ Ubicación actualizada:', {
+          country: selectedCountry?.name,
+          city: selectedCity?.name,
+        });
+        
+        // Actualizar el perfil local
+        setProfile(updatedProfile);
+        
+        // Actualizar el contexto global de autenticación
+        // @ts-ignore
+        setUser((prevUser: any) => ({
+          ...prevUser,
+          countryId: selectedCountryId,
+          cityId: selectedCityId,
+          countryName: selectedCountry?.name,
+          cityName: selectedCity?.name,
+        }));
+        
+        setShowLocationModal(false);
+        Alert.alert('Éxito', 'Ubicación actualizada correctamente');
+        
+        // Forzar recarga completa del HomeScreen navegando de nuevo
+        // Esto hará que se recargue todo el contenido basado en la nueva ubicación
+        navigation.reset({
+          index: 0,
+          routes: [
+            {
+              name: 'MainTabs',
+              state: {
+                routes: [{ name: 'Home' }],
+                index: 0,
+              },
+            },
+          ],
+        });
+      } else {
+        Alert.alert('Error', 'No se pudo actualizar la ubicación');
+      }
+    } catch (error) {
+      console.error('Error guardando ubicación:', error);
+      Alert.alert('Error', 'No se pudo actualizar la ubicación');
+    } finally {
+      setLoadingLocation(false);
+    }
   };
 
   if (loading) {
@@ -193,23 +363,48 @@ const ChildrenHeaderTitle = () => {
 
   return (
     <>
-      <TouchableOpacity
-        style={styles.childHeaderPill}
-        onPress={() => setShowSelector(true)}
-        activeOpacity={0.8}
-      >
-        {selectedChild?.photoUrl ? (
-          <Image source={{ uri: selectedChild.photoUrl }} style={styles.childHeaderPillAvatar} />
-        ) : (
-          <View style={styles.childHeaderPillPlaceholder}>
-            <Text style={styles.childHeaderEmoji}>{selectedChild?.isUnborn ? '🤰' : '👶'}</Text>
-          </View>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+        <TouchableOpacity
+          style={styles.childHeaderPill}
+          onPress={() => setShowSelector(true)}
+          activeOpacity={0.8}
+        >
+          {selectedChild?.photoUrl ? (
+            <Image source={{ uri: selectedChild.photoUrl }} style={styles.childHeaderPillAvatar} />
+          ) : (
+            <View style={styles.childHeaderPillPlaceholder}>
+              <Text style={styles.childHeaderEmoji}>{selectedChild?.isUnborn ? '🤰' : '👶'}</Text>
+            </View>
+          )}
+          <Text style={styles.childHeaderPillName} numberOfLines={1}>
+            {selectedChild?.name && selectedChild.name.length > 8 
+              ? `${selectedChild.name.substring(0, 8)}...` 
+              : selectedChild?.name || 'Tu bebé'}
+          </Text>
+          <Ionicons name="chevron-down" size={16} color="#4A5568" />
+        </TouchableOpacity>
+
+        {/* Ubicación del usuario */}
+        {(profile?.cityName || profile?.countryName) && (
+          <TouchableOpacity 
+            style={styles.locationContainer}
+            onPress={handleLocationPress}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="location-outline" size={14} color="#FFFFFF" />
+            <Text style={styles.locationText} numberOfLines={1}>
+              {profile.cityName && profile.cityName.length > 8 
+                ? `${profile.cityName.substring(0, 8)}...` 
+                : profile.cityName}
+              {profile.cityName && profile.countryName && ', '}
+              {profile.countryName && profile.countryName.length > 8
+                ? `${profile.countryName.substring(0, 8)}...`
+                : profile.countryName}
+            </Text>
+            <Ionicons name="chevron-down" size={12} color="#FFFFFF" />
+          </TouchableOpacity>
         )}
-        <Text style={styles.childHeaderPillName} numberOfLines={1}>
-          {selectedChild?.name || 'Tu bebé'}
-        </Text>
-        <Ionicons name="chevron-down" size={16} color="#4A5568" />
-      </TouchableOpacity>
+      </View>
 
       <Modal
         visible={showSelector}
@@ -259,6 +454,122 @@ const ChildrenHeaderTitle = () => {
             </TouchableOpacity>
           </TouchableOpacity>
         </TouchableOpacity>
+      </Modal>
+
+      {/* Modal para cambiar ubicación */}
+      <Modal
+        visible={showLocationModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowLocationModal(false)}
+      >
+        <View style={styles.locationModalOverlay}>
+          <View style={styles.locationModalCard}>
+            <View style={styles.locationModalHeader}>
+              <Text style={styles.locationModalTitle}>Cambiar ubicación</Text>
+              <TouchableOpacity onPress={() => setShowLocationModal(false)}>
+                <Ionicons name="close" size={24} color="#4A5568" />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={styles.locationModalContent}>
+              {/* Selector de País */}
+              <Text style={styles.locationModalLabel}>País</Text>
+              <View style={styles.locationPickerContainer}>
+                {loadingCountries ? (
+                  // Skeleton para países
+                  <>
+                    {[1, 2, 3].map((i) => (
+                      <View key={`country-skeleton-${i}`} style={styles.locationSkeletonItem}>
+                        <View style={styles.locationSkeletonText} />
+                      </View>
+                    ))}
+                  </>
+                ) : countries.length > 0 ? (
+                  countries.map((country) => (
+                    <TouchableOpacity
+                      key={country.id}
+                      style={[
+                        styles.locationPickerItem,
+                        selectedCountryId === country.id && styles.locationPickerItemSelected
+                      ]}
+                      onPress={() => handleCountrySelect(country.id)}
+                    >
+                      <Text style={[
+                        styles.locationPickerItemText,
+                        selectedCountryId === country.id && styles.locationPickerItemTextSelected
+                      ]}>
+                        {country.name}
+                      </Text>
+                      {selectedCountryId === country.id && (
+                        <Ionicons name="checkmark-circle" size={18} color="#59C6C0" />
+                      )}
+                    </TouchableOpacity>
+                  ))
+                ) : (
+                  <Text style={styles.locationEmptyText}>No hay países disponibles</Text>
+                )}
+              </View>
+
+              {/* Selector de Ciudad */}
+              {selectedCountryId && (
+                <>
+                  <Text style={styles.locationModalLabel}>Ciudad</Text>
+                  <View style={styles.locationPickerContainer}>
+                    {loadingCities ? (
+                      // Skeleton para ciudades
+                      <>
+                        {[1, 2, 3, 4].map((i) => (
+                          <View key={`city-skeleton-${i}`} style={styles.locationSkeletonItem}>
+                            <View style={styles.locationSkeletonText} />
+                          </View>
+                        ))}
+                      </>
+                    ) : cities.length > 0 ? (
+                      cities.map((city) => (
+                        <TouchableOpacity
+                          key={city.id}
+                          style={[
+                            styles.locationPickerItem,
+                            selectedCityId === city.id && styles.locationPickerItemSelected
+                          ]}
+                          onPress={() => setSelectedCityId(city.id)}
+                        >
+                          <Text style={[
+                            styles.locationPickerItemText,
+                            selectedCityId === city.id && styles.locationPickerItemTextSelected
+                          ]}>
+                            {city.name}
+                          </Text>
+                          {selectedCityId === city.id && (
+                            <Ionicons name="checkmark-circle" size={18} color="#59C6C0" />
+                          )}
+                        </TouchableOpacity>
+                      ))
+                    ) : (
+                      <Text style={styles.locationEmptyText}>No hay ciudades disponibles</Text>
+                    )}
+                  </View>
+                </>
+              )}
+            </ScrollView>
+
+            <TouchableOpacity 
+              style={[
+                styles.locationModalSaveButton,
+                (!selectedCountryId || !selectedCityId) && styles.locationModalSaveButtonDisabled
+              ]}
+              onPress={handleSaveLocation}
+              disabled={!selectedCountryId || !selectedCityId || loadingLocation}
+            >
+              {loadingLocation ? (
+                <ActivityIndicator color="#FFFFFF" />
+              ) : (
+                <Text style={styles.locationModalSaveButtonText}>Guardar cambios</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        </View>
       </Modal>
     </>
   );
@@ -519,6 +830,30 @@ const AuthenticatedNavigator = () => {
         }}
       />
       <Stack.Screen
+        name="Development"
+        component={DevelopmentScreen}
+        options={{
+          title: 'Desarrollo',
+          headerShown: false,
+        }}
+      />
+      <Stack.Screen
+        name="Articles"
+        component={ArticlesScreen}
+        options={{
+          title: 'Artículos',
+          headerShown: false,
+        }}
+      />
+      <Stack.Screen
+        name="ArticleDetail"
+        component={ArticleDetailScreen}
+        options={{
+          title: 'Artículo',
+          headerShown: false,
+        }}
+      />
+      <Stack.Screen
         name="Doula"
         component={DoulaChatScreen}
         options={({ navigation }) => ({
@@ -757,6 +1092,7 @@ const RecommendationsStackNavigator = () => {
           fontWeight: 'bold',
         },
         headerRight: () => <ProfileButton />,
+        headerLeft: () => null, // Ocultar la flecha de atrás
       }}
     >
       <Stack.Screen
@@ -766,6 +1102,7 @@ const RecommendationsStackNavigator = () => {
           headerTitle: () => <ChildrenHeaderTitle />,
           headerShown: true,
           headerTitleAlign: 'left',
+          headerLeft: () => null, // Ocultar la flecha de atrás
         }}
       />
       <Stack.Screen
@@ -968,32 +1305,11 @@ const MainTabNavigator = () => {
         component={RecommendationsStackNavigator}
         listeners={({ navigation }) => ({
           tabPress: (e) => {
-            // Resetear el stack a RecommendationsMain cuando se presiona el tab
-            const state = navigation.getState();
-            const recommendationsTab = state.routes.find((r: any) => r.name === 'Recommendations');
-            
-            if (recommendationsTab) {
-              const recommendationsState = recommendationsTab.state as any;
-              const currentRoute =
-                recommendationsState?.routes?.[recommendationsState.index || 0]?.name;
-
-              // Si no estamos en el listado principal, resetear al main
-              if (currentRoute && currentRoute !== 'RecommendationsMain') {
-                e.preventDefault();
-                navigation.reset({
-                  index: 0,
-                  routes: [
-                    {
-                      name: 'Recommendations',
-                      state: {
-                        routes: [{ name: 'RecommendationsMain' }],
-                        index: 0,
-                      },
-                    },
-                  ],
-                });
-              }
-            }
+            e.preventDefault();
+            // Navegar directamente al main de Recommendations
+            navigation.navigate('Recommendations', {
+              screen: 'RecommendationsMain',
+            });
           },
         })}
         options={{
@@ -1440,6 +1756,23 @@ const styles = StyleSheet.create({
     marginRight: 6,
     maxWidth: 140,
   },
+  locationContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 12,
+    maxWidth: 180,
+    minHeight: 32,
+  },
+  locationText: {
+    fontSize: 13,
+    color: '#FFFFFF',
+    marginLeft: 6,
+    marginRight: 6,
+    fontWeight: '600',
+  },
   childHeaderModalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.35)',
@@ -1522,6 +1855,102 @@ const styles = StyleSheet.create({
   addChildHeaderButton: {
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  locationModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  locationModalCard: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingTop: 20,
+    paddingBottom: 40,
+    paddingHorizontal: 20,
+    maxHeight: '80%',
+  },
+  locationModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  locationModalTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#2D3748',
+  },
+  locationModalContent: {
+    maxHeight: 400,
+  },
+  locationModalLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#4A5568',
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  locationPickerContainer: {
+    gap: 8,
+  },
+  locationPickerItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 14,
+    backgroundColor: '#F7FAFC',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  locationPickerItemSelected: {
+    backgroundColor: '#E6F7F6',
+    borderColor: '#59C6C0',
+  },
+  locationPickerItemText: {
+    fontSize: 15,
+    color: '#4A5568',
+    fontWeight: '500',
+  },
+  locationPickerItemTextSelected: {
+    color: '#2D3748',
+    fontWeight: '600',
+  },
+  locationModalSaveButton: {
+    backgroundColor: '#59C6C0',
+    paddingVertical: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+    marginTop: 24,
+  },
+  locationModalSaveButtonDisabled: {
+    backgroundColor: '#CBD5E0',
+  },
+  locationModalSaveButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  locationSkeletonItem: {
+    padding: 14,
+    backgroundColor: '#F7FAFC',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    marginBottom: 8,
+  },
+  locationSkeletonText: {
+    height: 18,
+    backgroundColor: '#E2E8F0',
+    borderRadius: 4,
+    width: '60%',
+  },
+  locationEmptyText: {
+    fontSize: 14,
+    color: '#6B7280',
+    textAlign: 'center',
+    padding: 20,
   },
 });
 

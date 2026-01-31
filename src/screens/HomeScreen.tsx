@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
   View,
   Text,
@@ -13,7 +13,7 @@ import {
   Modal,
   ActivityIndicator,
 } from "react-native";
-import { useNavigation, useRoute, DrawerActions } from "@react-navigation/native";
+import { useNavigation, useRoute, DrawerActions, useFocusEffect } from "@react-navigation/native";
 import { Ionicons, FontAwesome5 } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import * as Notifications from "expo-notifications";
@@ -177,6 +177,7 @@ const HomeScreen: React.FC = () => {
   const route = useRoute<any>();
   const [children, setChildren] = useState<Child[]>([]);
   const [selectedChild, setSelectedChild] = useState<Child | null>(null);
+  const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [imageErrors, setImageErrors] = useState<Set<string>>(new Set());
 
@@ -279,6 +280,15 @@ const HomeScreen: React.FC = () => {
     };
   }, []);
 
+  // Recargar datos cuando la pantalla reciba foco (ej: después de cambiar ubicación)
+  useFocusEffect(
+    useCallback(() => {
+      console.log('🔄 Home screen focused, reloading data...');
+      loadData();
+      loadUserProfile();
+    }, [])
+  );
+
   useEffect(() => {
     const interval = setInterval(() => setNow(new Date()), 60000);
     return () => clearInterval(interval);
@@ -363,7 +373,20 @@ const HomeScreen: React.FC = () => {
         const locationKey = `${todayLat.toFixed(4)}|${todayLon.toFixed(4)}`;
         if (lastLocationSyncRef.current !== locationKey) {
           lastLocationSyncRef.current = locationKey;
-          await syncUserLocation(todayLat, todayLon);
+          
+          // Solo actualizar la ubicación automáticamente si el usuario NO tiene ciudad ni país
+          // Si ya tiene ubicación configurada, debe cambiarla manualmente desde el header
+          if (!profile?.cityName && !profile?.countryName) {
+            console.log('📍 Usuario sin ubicación, sincronizando automáticamente...');
+            await syncUserLocation(todayLat, todayLon);
+            // Recargar el perfil después de sincronizar
+            await loadUserProfile();
+          } else {
+            console.log('📍 Usuario ya tiene ubicación configurada:', {
+              city: profile?.cityName,
+              country: profile?.countryName
+            });
+          }
         }
       }
       setIsLocationReady(true);
@@ -450,11 +473,18 @@ const HomeScreen: React.FC = () => {
       if (user?.id) {
         const profileResponse = await profileService.getProfile();
         if (profileResponse.success && profileResponse.data) {
+          console.log('📍 Perfil cargado en Home:', {
+            city: profileResponse.data.cityName,
+            country: profileResponse.data.countryName,
+          });
+          // Actualizar el contexto de usuario
           // @ts-ignore
           setUser((prevUser: any) => ({
             ...prevUser!,
             ...profileResponse.data,
           }));
+          // Actualizar el estado local del perfil
+          setProfile(profileResponse.data);
         }
       }
     } catch (error) {
@@ -550,6 +580,7 @@ const HomeScreen: React.FC = () => {
       setLoadingTodayCommunityPosts(true);
       setTodayCommunityError(null);
       const response = await communitiesService.getTopPosts(3);
+      console.log('🔍 [TOP POSTS] Respuesta completa del backend:', JSON.stringify(response, null, 2));
       const items =
         (Array.isArray(response?.data) && response.data) ||
         (Array.isArray(response?.data?.data) && response.data.data) ||
@@ -557,6 +588,7 @@ const HomeScreen: React.FC = () => {
         (Array.isArray(response?.posts) && response.posts) ||
         (Array.isArray(response) && response) ||
         [];
+      console.log('🔍 [TOP POSTS] Posts procesados:', JSON.stringify(items, null, 2));
       setTodayCommunityPosts(items);
     } catch (error: any) {
       console.error('❌ [TODAY] Error cargando top posts:', error);
@@ -578,8 +610,18 @@ const HomeScreen: React.FC = () => {
         return;
       }
 
-      console.log('📘 [GUIDE] Payload enviado:', { childId: child.id });
+      console.log('📘 [HOME GUIDE] Cargando guía para el niño:', {
+        childId: child.id,
+        name: child.name,
+        birthDate: child.birthDate,
+        isUnborn: child.isUnborn,
+      });
+      console.log('📘 [HOME GUIDE] Payload enviado a learningService:', { childId: child.id });
+      
       const response = await learningService.getTodayGuide({ childId: child.id });
+      
+      console.log('📘 [HOME GUIDE] Respuesta recibida:', response);
+      
       if (response?.success && response?.data) {
         setTodayGuide(response.data);
       } else {
@@ -656,55 +698,35 @@ const HomeScreen: React.FC = () => {
   };
 
   const openHealthProfile = () => {
-    if (!selectedChild) {
-      Alert.alert('Selecciona un hijo', 'Primero elige un hijo para ver su salud.');
-      return;
-    }
-    // @ts-ignore
-    navigation.navigate("ChildProfile", {
-      childId: selectedChild.id,
-      child: selectedChild,
-      initialTab: 'health',
+    // Navegar a la pantalla de Desarrollo
+    analyticsService.logEvent('development_section_open', {
+      source: 'home_tools',
     });
+    
+    // @ts-ignore
+    navigation.navigate('Development');
   };
 
   const openAdvisories = async () => {
     try {
-      const response = await categoriesService.getCategories();
-      const categories =
-        response?.data ||
-        response?.data?.data ||
-        response?.categories ||
-        [];
-      const normalize = (value: string) =>
-        value
-          .toLowerCase()
-          .normalize('NFD')
-          .replace(/[\u0300-\u036f]/g, '');
-      const advisoryCategory = categories.find((category: any) =>
-        normalize(category?.name || '').includes('asesori')
-      );
-
-      if (advisoryCategory?.id) {
-        // @ts-ignore
-        navigation.navigate('Recommendations', {
-          screen: 'CategoryRecommendations',
-          params: {
-            categoryId: advisoryCategory.id,
-            categoryName: advisoryCategory.name || 'Asesorías',
-          },
-        });
-        return;
-      }
+      // Navegar directamente al artículo de Primeros Auxilios
+      const articleId = 'FBB5VZEVSairFBWblAre';
+      
+      // Log analytics
+      await analyticsService.logEvent('first_aid_guide_open', {
+        articleId,
+        source: 'home_tools',
+      });
+      
+      // @ts-ignore
+      navigation.navigate('ArticleDetail', {
+        articleId,
+        articleTitle: 'Primeros Auxilios: Una guía rápida',
+      });
     } catch (error) {
-      console.error('❌ [HOME] Error abriendo asesorías:', error);
+      console.error('❌ [HOME] Error abriendo primeros auxilios:', error);
     }
-
-    // Fallback si no se pudo resolver la categoría
-    // @ts-ignore
-    navigation.navigate('Recommendations');
   };
-
 
   const getGreeting = () => {
     const hour = now.getHours();
@@ -1021,27 +1043,66 @@ const HomeScreen: React.FC = () => {
         >
           <TouchableOpacity
             style={[styles.quickActionButton, styles.quickActionTeal]}
-            onPress={() => (navigation as any).navigate('Growth')}
+            onPress={() => {
+              analyticsService.logEvent('quick_action_clicked', {
+                action: 'crecimiento',
+                child_id: selectedChild?.id,
+              });
+              (navigation as any).navigate('Growth');
+            }}
           >
             <Ionicons name="scale-outline" size={20} color="#FFFFFF" />
             <Text style={styles.quickActionLabel}>Crecimiento</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={[styles.quickActionButton, styles.quickActionGreen]} onPress={() => {}}>
+          <TouchableOpacity 
+            style={[styles.quickActionButton, styles.quickActionGreen]} 
+            onPress={() => {
+              analyticsService.logEvent('quick_action_clicked', {
+                action: 'vacunas',
+                child_id: selectedChild?.id,
+              });
+              Alert.alert('Próximamente', 'Esta funcionalidad estará disponible pronto');
+            }}
+          >
             <Ionicons name="shield-checkmark-outline" size={20} color="#FFFFFF" />
             <Text style={styles.quickActionLabel}>Vacunas</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.quickActionButton, styles.quickActionYellow]}
-            onPress={() => (navigation as any).navigate('Medications')}
+            onPress={() => {
+              analyticsService.logEvent('quick_action_clicked', {
+                action: 'medicacion',
+                child_id: selectedChild?.id,
+              });
+              (navigation as any).navigate('Medications');
+            }}
           >
             <FontAwesome5 name="briefcase-medical" size={22} color="#FFFFFF" />
             <Text style={styles.quickActionLabel}>Medicación</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={[styles.quickActionButton, styles.quickActionPurple]} onPress={() => {}}>
+          <TouchableOpacity 
+            style={[styles.quickActionButton, styles.quickActionPurple]} 
+            onPress={() => {
+              analyticsService.logEvent('quick_action_clicked', {
+                action: 'denticion',
+                child_id: selectedChild?.id,
+              });
+              Alert.alert('Próximamente', 'Esta funcionalidad estará disponible pronto');
+            }}
+          >
             <FontAwesome5 name="tooth" size={20} color="#FFFFFF" />
             <Text style={styles.quickActionLabel}>Dentición</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={[styles.quickActionButton, styles.quickActionPink]} onPress={() => {}}>
+          <TouchableOpacity 
+            style={[styles.quickActionButton, styles.quickActionPink]} 
+            onPress={() => {
+              analyticsService.logEvent('quick_action_clicked', {
+                action: 'hitos',
+                child_id: selectedChild?.id,
+              });
+              Alert.alert('Próximamente', 'Esta funcionalidad estará disponible pronto');
+            }}
+          >
             <Ionicons name="trophy-outline" size={20} color="#FFFFFF" />
             <Text style={styles.quickActionLabel}>Hitos</Text>
           </TouchableOpacity>
@@ -1050,6 +1111,19 @@ const HomeScreen: React.FC = () => {
         {/* Contenido principal */}
         {selectedChild && (
           <View style={styles.todaySection}>
+            {/* Banner Home 1 - Debajo de los botones de acción rápida */}
+            <View style={styles.bannerHome1Container}>
+              <BannerCarousel 
+                section="home1" 
+                fallbackToHome={false}
+                imageResizeMode="cover"
+                bannerHeight={140}
+                bannerWidth={290}
+                autoScroll={false}
+                showIndicators={false}
+              />
+            </View>
+
             <Text style={styles.todaySubtitle}></Text>
             <View style={styles.todayGuideCard}>
               <Text style={styles.todayGuideLabel}>Tu guía de hoy</Text>
@@ -1086,50 +1160,18 @@ const HomeScreen: React.FC = () => {
                   </View>
                 </>
               )}
-              {activitySuggestions?.suggestions?.activities?.length > 0 && (
-                <View style={styles.todayGuideActivities}>
-                  <Text style={styles.todayGuideActivitiesTitle}>
-                    Douli te recomienda estas actividades para {childFirstName}:
-                  </Text>
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                    {activitySuggestions.suggestions.activities.map((activity: any, index: number) => (
-                      <TouchableOpacity
-                        key={`${activity?.title || 'activity'}-${index}`}
-                        style={styles.todayGuideActivityCard}
-                        onPress={() => {
-                          setSelectedActivityDetail(activity);
-                          setShowActivityDetailModal(true);
-                        }}
-                      >
-                        <View style={styles.todayGuideActivityHeader}>
-                          <Ionicons name="sparkles" size={16} color="#6B5CA5" />
-                          <Text style={styles.todayGuideActivityText} numberOfLines={2}>
-                            {activity.title || 'Actividad'}
-                          </Text>
-                        </View>
-                        {activity.description && (
-                          <Text style={styles.todayGuideActivityDesc} numberOfLines={3}>
-                            {activity.description}
-                          </Text>
-                        )}
-                        {activity.benefits && (
-                          <Text style={styles.todayGuideActivityMeta} numberOfLines={1}>
-                            Beneficios: {Array.isArray(activity.benefits) ? activity.benefits.join(', ') : activity.benefits}
-                          </Text>
-                        )}
-                        {activity.duration && (
-                          <Text style={styles.todayGuideActivityMeta}>
-                            Duración: {activity.duration}
-                          </Text>
-                        )}
-                      </TouchableOpacity>
-                    ))}
-                  </ScrollView>
-                </View>
-              )}
             </View>
 
             <Text style={styles.todaySectionTitle}>Herramientas</Text>
+
+            {/* Banner Home 2 - Debajo del título Herramientas */}
+            <View style={styles.bannerHome2Container}>
+              <BannerCarousel 
+                section="home2" 
+                fallbackToHome={false}
+              />
+            </View>
+
             <View style={styles.todayToolsRow}>
               <TouchableOpacity style={[styles.todayToolCard, styles.todayToolCardSounds]} onPress={openWhiteNoiseModal}>
                 <Ionicons name="musical-notes" size={22} color="#FFF" />
@@ -1137,14 +1179,14 @@ const HomeScreen: React.FC = () => {
                 <Text style={styles.todayToolSubtitle}>Ruido Blanco</Text>
               </TouchableOpacity>
               <TouchableOpacity style={[styles.todayToolCard, styles.todayToolCardAdvisories]} onPress={openAdvisories}>
-                <Ionicons name="school" size={22} color="#FFF" />
-                <Text style={styles.todayToolTitle}>Asesorías</Text>
-                <Text style={styles.todayToolSubtitle}>Recomendados</Text>
+                <Ionicons name="medical" size={22} color="#FFF" />
+                <Text style={styles.todayToolTitle}>Primeros Auxilios</Text>
+                <Text style={styles.todayToolSubtitle}>Una guía rápida</Text>
               </TouchableOpacity>
               <TouchableOpacity style={[styles.todayToolCard, styles.todayToolCardHealth]} onPress={openHealthProfile}>
-                <Ionicons name="heart" size={22} color="#FFF" />
-                <Text style={styles.todayToolTitle}>Salud</Text>
-                <Text style={styles.todayToolSubtitle}>Citas y vacunas</Text>
+                <Ionicons name="fitness" size={22} color="#FFF" />
+                <Text style={styles.todayToolTitle}>Desarrollo</Text>
+                <Text style={styles.todayToolSubtitle}>Ejercicios</Text>
               </TouchableOpacity>
             </View>
 
@@ -1323,6 +1365,19 @@ const HomeScreen: React.FC = () => {
               )}
             </View>
 
+            {/* Banner Home 3 - Sobre Popular en la comunidad */}
+            <View style={styles.bannerHome3Container}>
+            <BannerCarousel 
+                section="home3" 
+                fallbackToHome={false}
+                imageResizeMode="cover"
+                bannerHeight={140}
+                bannerWidth={290}
+                autoScroll={false}
+                showIndicators={false}
+              />
+            </View>
+
             <View style={styles.todayNearbySection}>
               <View style={styles.todayNearbyHeader}>
                 <Text style={styles.todayNearbyTitle}>Popular en la comunidad</Text>
@@ -1371,16 +1426,26 @@ const HomeScreen: React.FC = () => {
                               </>
                             ) : null}
                           </View>
-                          <Text style={styles.popularPostCommunity}>Comunidad Munpa</Text>
+                          <Text style={styles.popularPostCommunity}>
+                            {post.communityName || 'Comunidad Munpa'}
+                          </Text>
                         </View>
                       </View>
 
-                      <Text style={styles.popularPostTitle} numberOfLines={2}>
-                        {post.content || 'Publicación destacada'}
-                      </Text>
-                      <Text style={styles.popularPostExcerpt} numberOfLines={3}>
-                        {post.content || 'Contenido de la comunidad'}
-                      </Text>
+                      {post.title ? (
+                        <>
+                          <Text style={styles.popularPostTitle} numberOfLines={2}>
+                            {post.title}
+                          </Text>
+                          <Text style={styles.popularPostExcerpt} numberOfLines={3}>
+                            {post.content || ''}
+                          </Text>
+                        </>
+                      ) : (
+                        <Text style={styles.popularPostTitle} numberOfLines={5}>
+                          {post.content || 'Publicación destacada'}
+                        </Text>
+                      )}
 
                       <View style={styles.popularPostActions}>
                         <View style={styles.popularPostActionItem}>
@@ -1585,6 +1650,17 @@ const styles = StyleSheet.create({
   },
   quickActionPink: {
     backgroundColor: "#F08EB7",
+  },
+  bannerHome1Container: {
+    marginTop: -15,
+    marginBottom: -28,
+  },
+  bannerHome2Container: {
+    marginVertical: 12,
+  },
+  bannerHome3Container: {
+    marginTop: -15,
+    marginVertical: 12,
   },
   childSelectorModal: {
     backgroundColor: "#FFF",
@@ -4618,7 +4694,7 @@ const styles = StyleSheet.create({
   },
   popularPostTitle: {
     fontSize: 15,
-    fontWeight: '700',
+    fontWeight: '400',
     color: '#1F2937',
     marginBottom: 6,
   },

@@ -20,6 +20,8 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { childrenService } from '../services/api';
 import { medicationsService } from '../services/childProfileService';
+import BannerCarousel from '../components/BannerCarousel';
+import analyticsService from '../services/analyticsService';
 
 interface Child {
   id: string;
@@ -72,15 +74,21 @@ const MedicationsScreen: React.FC = () => {
     try {
       setLoading(true);
       const childrenResponse = await childrenService.getChildren();
-      if (childrenResponse.success && childrenResponse.data) {
-        setChildren(childrenResponse.data);
+      const data =
+        (Array.isArray(childrenResponse?.data) && childrenResponse.data) ||
+        (Array.isArray(childrenResponse?.data?.children) && childrenResponse.data.children) ||
+        (Array.isArray(childrenResponse?.children) && childrenResponse.children) ||
+        (Array.isArray(childrenResponse) && childrenResponse) ||
+        [];
+      if (data.length > 0) {
+        setChildren(data);
         const savedChildId = await AsyncStorage.getItem('selectedChildId');
         let childToSelect = null;
         if (savedChildId) {
-          childToSelect = childrenResponse.data.find((c: Child) => c.id === savedChildId);
+          childToSelect = data.find((c: Child) => c.id === savedChildId) || null;
         }
-        if (!childToSelect && childrenResponse.data.length > 0) {
-          childToSelect = childrenResponse.data[0];
+        if (!childToSelect && data.length > 0) {
+          childToSelect = data[0];
           await AsyncStorage.setItem('selectedChildId', childToSelect.id);
         }
         if (childToSelect) {
@@ -88,10 +96,12 @@ const MedicationsScreen: React.FC = () => {
         }
       } else {
         setChildren([]);
+        setSelectedChild(null);
       }
     } catch (error) {
       console.error('Error cargando hijos:', error);
       setChildren([]);
+      setSelectedChild(null);
       Alert.alert('Error', 'No se pudieron cargar los datos de los hijos');
     } finally {
       setLoading(false);
@@ -112,8 +122,17 @@ const MedicationsScreen: React.FC = () => {
     try {
       setLoadingMedications(true);
       const response = await medicationsService.getMedications(childId);
-      if (response.success) {
-        setMedications(response.data || []);
+      const items =
+        (Array.isArray(response?.data) && response.data) ||
+        (Array.isArray(response?.data?.data) && response.data.data) ||
+        (Array.isArray(response?.medications) && response.medications) ||
+        (Array.isArray(response) && response) ||
+        [];
+      console.log('💊 [MED] Medicamentos recibidos:', items);
+      if (response?.success !== false) {
+        setMedications(items);
+      } else {
+        setMedications([]);
       }
     } catch (error) {
       console.error('❌ Error cargando medicamentos:', error);
@@ -137,6 +156,9 @@ const MedicationsScreen: React.FC = () => {
   );
 
   const openAddMedicationModal = () => {
+    analyticsService.logEvent('medication_add_opened', {
+      child_id: selectedChild?.id,
+    });
     setEditingMedication(null);
     setMedName('');
     setMedDose('');
@@ -245,6 +267,12 @@ const MedicationsScreen: React.FC = () => {
           notes: medNotes.trim(),
           scheduleDays,
         });
+        analyticsService.logEvent('medication_updated', {
+          child_id: selectedChild.id,
+          medication_name: medName.trim(),
+          schedule_mode: medScheduleMode,
+          has_notes: !!medNotes.trim(),
+        });
       } else {
         await medicationsService.addMedication(selectedChild.id, {
           name: medName.trim(),
@@ -259,6 +287,13 @@ const MedicationsScreen: React.FC = () => {
           notes: medNotes.trim(),
           timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
           scheduleDays,
+        });
+        analyticsService.logEvent('medication_added', {
+          child_id: selectedChild.id,
+          medication_name: medName.trim(),
+          schedule_mode: medScheduleMode,
+          has_notes: !!medNotes.trim(),
+          schedule_days: scheduleDays,
         });
       }
 
@@ -309,6 +344,13 @@ const MedicationsScreen: React.FC = () => {
               </View>
               <Ionicons name="ellipsis-vertical" size={20} color="#9CA3AF" />
             </View>
+
+            <BannerCarousel 
+              section="medicina" 
+              fallbackToHome={false} 
+              imageResizeMode="cover"
+              bannerHeight={180}
+            />
 
             <View style={styles.medicationsSection}>
               <View style={styles.medicationsHeader}>
@@ -843,6 +885,10 @@ const MedicationsScreen: React.FC = () => {
                       onPress: async () => {
                         try {
                           await medicationsService.deleteMedication(selectedMedication.id);
+                          analyticsService.logEvent('medication_deleted', {
+                            child_id: selectedChild?.id,
+                            medication_name: selectedMedication.name,
+                          });
                           setShowMedicationDetailModal(false);
                           if (selectedChild) {
                             await loadMedications(selectedChild.id);

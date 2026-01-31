@@ -1802,8 +1802,10 @@ export const guideService = {
     gestationWeeks?: number;
     isPregnant?: boolean;
     ageWeeks?: number;
+    childId?: string; // ✅ AGREGAR childId
   }) => {
     try {
+      console.log('📘 [GUIDE SERVICE] Enviando payload:', payload);
       const response = await api.post('/api/guide/today', payload);
       return response.data;
     } catch (error: any) {
@@ -2232,6 +2234,49 @@ export const faqService = {
       return response.data;
     } catch (error: any) {
       console.error('❌ [FAQ] Error obteniendo preguntas:', error.response?.data || error.message);
+      throw error;
+    }
+  },
+};
+
+// ============================================
+// ARTICLES / ARTÍCULOS
+// ============================================
+export const articlesService = {
+  // Obtener artículos por categoría
+  getArticlesByCategory: async (categoryId: string, page: number = 1, limit: number = 20) => {
+    try {
+      const response = await api.get(`/api/articles/category/${categoryId}`, {
+        params: { page, limit },
+      });
+      console.log(`📰 [ARTICLES] Artículos obtenidos para categoría ${categoryId}:`, response.data);
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ [ARTICLES] Error obteniendo artículos:', error.response?.data || error.message);
+      throw error;
+    }
+  },
+
+  // Obtener detalle de un artículo
+  getArticleDetail: async (articleId: string) => {
+    try {
+      const response = await api.get(`/api/articles/${articleId}`);
+      console.log(`📰 [ARTICLES] Detalle de artículo obtenido:`, response.data);
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ [ARTICLES] Error obteniendo detalle de artículo:', error.response?.data || error.message);
+      throw error;
+    }
+  },
+
+  // Obtener categorías de artículos
+  getArticleCategories: async () => {
+    try {
+      const response = await api.get('/api/articles/categories');
+      console.log(`📰 [ARTICLES] Categorías de artículos obtenidas:`, response.data);
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ [ARTICLES] Error obteniendo categorías:', error.response?.data || error.message);
       throw error;
     }
   },

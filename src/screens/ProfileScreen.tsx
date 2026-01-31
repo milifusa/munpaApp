@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -9,7 +9,7 @@ import {
   Modal,
   TextInput,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../contexts/AuthContext';
 import { authService } from '../services/api';
@@ -41,6 +41,14 @@ const ProfileScreen: React.FC = () => {
   useEffect(() => {
     loadProfile();
   }, []);
+
+  // Recargar perfil cuando la pantalla reciba foco (ej: después de cambiar ubicación)
+  useFocusEffect(
+    useCallback(() => {
+      console.log('🔄 Profile screen focused, reloading profile...');
+      loadProfile();
+    }, [])
+  );
 
   const loadProfile = async () => {
     try {

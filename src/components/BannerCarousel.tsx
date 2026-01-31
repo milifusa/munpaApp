@@ -11,6 +11,7 @@ import {
   ActivityIndicator,
   Text,
   ImageResizeMode,
+  Alert,
 } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import bannerService, { Banner, BannerSection } from '../services/bannerService';
@@ -28,6 +29,10 @@ interface BannerCarouselProps {
   bannerRadius?: number;
   scrollEnabled?: boolean;
   bannerBackgroundColor?: string;
+  bannerHeight?: number;
+  bannerWidth?: number; // NUEVO: Ancho personalizado del banner
+  autoScroll?: boolean; // NUEVO: Controlar auto-scroll
+  showIndicators?: boolean; // NUEVO: Mostrar/ocultar indicadores
 }
 
 const BannerCarousel: React.FC<BannerCarouselProps> = ({
@@ -38,8 +43,14 @@ const BannerCarousel: React.FC<BannerCarouselProps> = ({
   imageResizeMode = 'cover',
   bannerRadius = 12,
   scrollEnabled = true,
-  bannerBackgroundColor = '#f0f0f0',
+  bannerBackgroundColor = 'transparent',
+  bannerHeight,
+  bannerWidth,
+  autoScroll = true,
+  showIndicators = true,
 }) => {
+  const resolvedBannerHeight = bannerHeight ?? BANNER_HEIGHT;
+  const resolvedBannerWidth = bannerWidth ?? BANNER_WIDTH;
   const navigation = useNavigation<any>();
   const [banners, setBanners] = useState<Banner[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -51,6 +62,11 @@ const BannerCarousel: React.FC<BannerCarouselProps> = ({
   const customBannerIndex = customBanner ? banners.length : -1;
   const totalItems = banners.length + (customBanner ? 1 : 0);
   const viewedBannersRef = useRef<Set<string>>(new Set());
+
+  // Si solo hay 1 banner en home1, hacerlo más grande
+  const shouldEnlargeSingleBanner = (section === 'home1') && banners.length === 1;
+  const finalBannerWidth = shouldEnlargeSingleBanner ? SCREEN_WIDTH - 40 : resolvedBannerWidth;
+  const finalBannerHeight = shouldEnlargeSingleBanner ? (resolvedBannerHeight * 1.3) : resolvedBannerHeight;
 
   const lastReloadAtRef = useRef(0);
 
@@ -111,7 +127,7 @@ const BannerCarousel: React.FC<BannerCarouselProps> = ({
   );
 
   useEffect(() => {
-    if (totalItems > 0) {
+    if (totalItems > 0 && autoScroll) {
       startAutoRotation();
     }
 
@@ -120,10 +136,11 @@ const BannerCarousel: React.FC<BannerCarouselProps> = ({
         clearInterval(autoScrollTimerRef.current);
       }
     };
-  }, [banners, customBanner, totalItems]);
+  }, [banners, customBanner, totalItems, autoScroll]);
 
   const startAutoRotation = () => {
-    // Solo auto-rotar si hay más de un item y no estamos en el banner personalizado
+    // Solo auto-rotar si autoScroll está activado y hay más de un item
+    if (!autoScroll) return;
     if (totalItems <= 1) return;
     if (currentIndex >= banners.length) return; // No auto-rotar si estamos en el banner personalizado
 
@@ -144,7 +161,7 @@ const BannerCarousel: React.FC<BannerCarouselProps> = ({
       setCurrentIndex(nextIndex);
       
       scrollViewRef.current?.scrollTo({
-        x: nextIndex * BANNER_WIDTH,
+        x: nextIndex * resolvedBannerWidth,
         animated: true,
       });
 
@@ -174,6 +191,48 @@ const BannerCarousel: React.FC<BannerCarouselProps> = ({
   const handleBannerPress = async (banner: Banner) => {
     // Registrar click
     await bannerService.registerClick(banner.id);
+
+    // Mostrar alerta para el banner específico de "Consulta a un Pediatra"
+    if (banner.id === 'AyXkG5GFtrvt6U5WanvI') {
+      Alert.alert(
+        'Próximamente',
+        'Consulta un doctor a través de Munpa',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+
+    // Si tiene articleId, navegar a la pantalla de detalle del artículo
+    if (banner.articleId) {
+      navigation.navigate('ArticleDetail', {
+        articleId: banner.articleId,
+      });
+      return;
+    }
+
+    // Si tiene articleCategoryId, navegar a la pantalla de artículos
+    if (banner.articleCategoryId) {
+      navigation.navigate('Articles', {
+        categoryId: banner.articleCategoryId,
+        categoryName: banner.title || 'Artículos',
+      });
+      return;
+    }
+
+    // Si tiene recommendationCategoryId o linkType es "recommendation-category", navegar a categoría de recomendaciones
+    if (banner.recommendationCategoryId || banner.linkType === 'recommendation-category') {
+      const categoryId = banner.recommendationCategoryId;
+      if (categoryId) {
+        navigation.navigate('Recommendations', {
+          screen: 'CategoryRecommendations',
+          params: { 
+            categoryId: categoryId,
+            categoryName: banner.title || 'Recomendaciones',
+          },
+        });
+        return;
+      }
+    }
 
     // Navegar si tiene link
     if (banner.link) {
@@ -258,7 +317,7 @@ const BannerCarousel: React.FC<BannerCarouselProps> = ({
 
   const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
     const offsetX = event.nativeEvent.contentOffset.x;
-    const newIndex = Math.round(offsetX / BANNER_WIDTH);
+    const newIndex = Math.round(offsetX / finalBannerWidth);
     
     if (newIndex !== currentIndex && newIndex >= 0 && newIndex < totalItems) {
       setCurrentIndex(newIndex);
@@ -271,20 +330,20 @@ const BannerCarousel: React.FC<BannerCarouselProps> = ({
         }
       }
 
-      // Reiniciar auto-rotación con la nueva duración (solo para banners reales)
+      // Reiniciar auto-rotación con la nueva duración (solo para banners reales y si autoScroll está activado)
       if (autoScrollTimerRef.current) {
         clearInterval(autoScrollTimerRef.current);
       }
       
-      // Solo auto-rotar si hay más de un item y no estamos en el banner personalizado
-      if (totalItems > 1 && newIndex < banners.length) {
+      // Solo auto-rotar si autoScroll está activado, hay más de un item y no estamos en el banner personalizado
+      if (autoScroll && totalItems > 1 && newIndex < banners.length) {
         const banner = banners[newIndex];
         const duration = (banner?.duration || 5) * 1000;
         autoScrollTimerRef.current = setInterval(() => {
           const nextIndex = (newIndex + 1) % totalItems;
           setCurrentIndex(nextIndex);
           scrollViewRef.current?.scrollTo({
-            x: nextIndex * BANNER_WIDTH,
+            x: nextIndex * finalBannerWidth,
             animated: true,
           });
           // Registrar vista si es un banner real
@@ -305,8 +364,10 @@ const BannerCarousel: React.FC<BannerCarouselProps> = ({
 
   if (loading) {
     return (
-      <View style={[styles.container, styles.loadingContainer, style]}>
-        <ActivityIndicator size="large" color="#59C6C0" />
+      <View style={[styles.container, style]}>
+        <View style={[styles.loadingContainer, { height: resolvedBannerHeight }]}>
+          <ActivityIndicator size="large" color="#59C6C0" />
+        </View>
       </View>
     );
   }
@@ -327,44 +388,63 @@ const BannerCarousel: React.FC<BannerCarouselProps> = ({
         onScroll={handleScroll}
         scrollEventThrottle={16}
         decelerationRate="fast"
-        snapToInterval={BANNER_WIDTH}
+        snapToInterval={finalBannerWidth}
         snapToAlignment="center"
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[
+          styles.scrollContent,
+          shouldEnlargeSingleBanner && { paddingLeft: 20, paddingRight: 20, paddingVertical: 12 }
+        ]}
         scrollEnabled={scrollEnabled}
       >
         {/* Banners del backend */}
-        {banners.map((banner, index) => (
-          <TouchableOpacity
-            key={banner.id}
-            style={[
-              styles.bannerContainer,
-              {
-                borderRadius: bannerRadius,
-                overflow: bannerRadius ? 'hidden' : 'visible',
-                backgroundColor: bannerBackgroundColor,
-              },
-            ]}
-            onPress={() => handleBannerPress(banner)}
-            activeOpacity={0.9}
-          >
-            <Image
-              source={{ uri: banner.imageUrl }}
-              style={styles.bannerImage}
-              resizeMode={imageResizeMode}
-            />
-          </TouchableOpacity>
-        ))}
+        {banners.map((banner, index) => {
+          const wrapperMarginLeft = shouldEnlargeSingleBanner ? 0 : (index === 0 ? 20 : 0);
+          
+          return (
+            <View 
+              key={banner.id} 
+              style={[
+                styles.bannerWrapper,
+                { marginLeft: wrapperMarginLeft }
+              ]}
+            >
+              {/* Línea decorativa morada detrás - Solo si hay más de 1 banner */}
+              {banners.length > 1 && <View style={styles.decorativeLine} />}
+            
+            <TouchableOpacity
+              style={[
+                styles.bannerContainer,
+                {
+                  width: finalBannerWidth,
+                  height: finalBannerHeight,
+                  borderRadius: bannerRadius,
+                  backgroundColor: bannerBackgroundColor === 'transparent' ? '#FFFFFF' : bannerBackgroundColor,
+                  overflow: 'hidden',
+                },
+              ]}
+              onPress={() => handleBannerPress(banner)}
+              activeOpacity={0.9}
+            >
+              <Image
+                source={{ uri: banner.imageUrl }}
+                style={styles.bannerImage}
+                resizeMode={imageResizeMode}
+              />
+            </TouchableOpacity>
+          </View>
+          );
+        })}
         
         {/* Banner personalizado (ej: economía circular) */}
         {customBanner && (
-          <View style={styles.customBannerContainer}>
+          <View style={[styles.customBannerContainer, { width: finalBannerWidth }]}>
             {customBanner}
           </View>
         )}
       </ScrollView>
 
       {/* Indicadores de página */}
-      {totalItems > 1 && (
+      {showIndicators && totalItems > 1 && (
         <View style={styles.indicators}>
           {Array.from({ length: totalItems }).map((_, index) => (
             <View
@@ -383,21 +463,47 @@ const BannerCarousel: React.FC<BannerCarouselProps> = ({
 
 const styles = StyleSheet.create({
   container: {
-    marginVertical: 4,
+    marginVertical:10,
   },
   loadingContainer: {
     height: BANNER_HEIGHT,
   },
   scrollContent: {
-    paddingHorizontal: 20,
+    paddingLeft: 0,
+    paddingRight: 20,
+    paddingVertical: 12,
+    gap: 16, 
+  },
+  bannerWrapper: {
+    position: 'relative',
+    marginRight: 0,
+    // Sombra para iOS
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 6,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
+    // Sombra para Android
+    elevation: 8,
+  },
+  decorativeLine: {
+    position: 'absolute',
+    top: '50%',
+    left: -10,
+    right: -10,
+    height: 25,
+    zIndex: -1,
+    transform: [{ translateY: -4 }],
   },
   bannerContainer: {
     width: BANNER_WIDTH,
     height: BANNER_HEIGHT,
-    marginRight: 0,
     borderRadius: 12,
-    overflow: 'hidden',
-    backgroundColor: '#f0f0f0',
+    backgroundColor: '#FFFFFF',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   bannerImage: {
     width: '100%',

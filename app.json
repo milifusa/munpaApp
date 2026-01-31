@@ -35,7 +35,10 @@
         "backgroundColor": "#887CBC"
       },
       "edgeToEdgeEnabled": true,
-      "icon": "./assets/icon.png"
+      "icon": "./assets/icon.png",
+      "permissions": [
+        "com.google.android.gms.permission.AD_ID"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png",
