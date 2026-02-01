@@ -1,6 +1,6 @@
 import 'react-native-gesture-handler';
 import React, { useEffect } from 'react';
-import { Platform, AppState, ErrorUtils, View, Text, TextInput } from 'react-native';
+import { Platform, AppState, ErrorUtils, View, Text, TextInput, ActivityIndicator } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { AuthProvider } from './src/contexts/AuthContext';
 import { MenuProvider } from './src/contexts/MenuContext';
@@ -10,6 +10,9 @@ import { trackingService } from './src/services/trackingService';
 import sentryService from './src/services/sentryService';
 import { ensureFirebaseApp } from './src/services/firebaseApp';
 import analyticsService from './src/services/analyticsService';
+import { useVersionCheck } from './src/hooks/useVersionCheck';
+import UpdateRequiredScreen from './src/screens/UpdateRequiredScreen';
+import { colors } from './src/styles/globalStyles';
 
 // Evita error de tipado en RN 0.81+
 (Text as any).defaultProps = {
@@ -21,7 +24,10 @@ import analyticsService from './src/services/analyticsService';
   allowFontScaling: false,
 };
 
-export default function App() {
+// Componente interno que usa el hook
+function AppContent() {
+  const versionCheck = useVersionCheck();
+
   useEffect(() => {
     console.log('🚀 [APP] Iniciando aplicación...');
 
@@ -65,8 +71,6 @@ export default function App() {
     }
 
     // Solicitar permiso de tracking cuando la app se vuelve activa
-    // NOTA: Requiere NSUserTrackingUsageDescription en Info.plist (ya agregado en app.json)
-    // Necesita rebuild para que funcione: npx expo prebuild --clean && npx expo run:ios
     const requestTracking = async () => {
       // Solo en iOS
       if (Platform.OS !== 'ios') {
@@ -82,9 +86,7 @@ export default function App() {
         console.log('✅ [APP] Estado de tracking:', status);
         
       } catch (error: any) {
-        // Si hay error, solo logear pero NO crashear la app
-        console.warn('⚠️ [APP] No se pudo solicitar tracking (probablemente falta rebuild):', error?.message);
-        // La app continúa funcionando sin tracking
+        console.warn('⚠️ [APP] No se pudo solicitar tracking:', error?.message);
       }
     };
 
@@ -110,6 +112,27 @@ export default function App() {
     };
   }, []);
 
+  // Mostrar loading mientras verifica la versión
+  if (versionCheck.loading) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.primary }}>
+        <ActivityIndicator size="large" color="#FFFFFF" />
+        <Text style={{ color: '#FFFFFF', marginTop: 16, fontSize: 16 }}>Verificando versión...</Text>
+      </View>
+    );
+  }
+
+  // Mostrar pantalla de actualización si es necesario
+  if (versionCheck.forceUpdate) {
+    return (
+      <UpdateRequiredScreen
+        currentVersion={versionCheck.currentVersion}
+        latestVersion={versionCheck.latestVersion || versionCheck.minVersion || 'N/A'}
+        message={versionCheck.message || undefined}
+      />
+    );
+  }
+
   console.log('🎨 [APP] Renderizando componentes...')
   
   try {
@@ -126,7 +149,6 @@ export default function App() {
   } catch (error: any) {
     console.error('❌ [APP] Error en render:', error);
     console.error('❌ [APP] Error stack:', error?.stack);
-    // Retornar un componente de error simple
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#fff' }}>
         <Text>Error al cargar la aplicación</Text>
@@ -134,4 +156,8 @@ export default function App() {
       </View>
     );
   }
+}
+
+export default function App() {
+  return <AppContent />;
 }

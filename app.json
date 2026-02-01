@@ -2,7 +2,7 @@
   "expo": {
     "name": "Munpa",
     "slug": "munpaApp",
-    "version": "2.0.3",
+    "version": "2.0.4",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -29,7 +29,7 @@
     },
     "android": {
       "package": "com.munpa.app",
-      "versionCode": 8,
+      "versionCode": 10,
       "adaptiveIcon": {
         "foregroundImage": "./assets/icon.png",
         "backgroundColor": "#887CBC"
@@ -37,6 +37,13 @@
       "edgeToEdgeEnabled": true,
       "icon": "./assets/icon.png",
       "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION",
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE",
+        "RECORD_AUDIO",
+        "VIBRATE",
         "com.google.android.gms.permission.AD_ID"
       ]
     },

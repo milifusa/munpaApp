@@ -843,7 +843,9 @@ const HomeScreen: React.FC = () => {
   };
 
   const openWhiteNoiseModal = async () => {
+    console.log('🎵 [HOME] Abriendo modal de ruido blanco...');
     setShowWhiteNoiseModal(true);
+    console.log('🎵 [HOME] showWhiteNoiseModal actualizado a true');
     analyticsService.logEvent('white_noise_open', {
       child_id: selectedChild?.id || null,
     });
@@ -1173,7 +1175,14 @@ const HomeScreen: React.FC = () => {
             </View>
 
             <View style={styles.todayToolsRow}>
-              <TouchableOpacity style={[styles.todayToolCard, styles.todayToolCardSounds]} onPress={openWhiteNoiseModal}>
+              <TouchableOpacity 
+                style={[styles.todayToolCard, styles.todayToolCardSounds]} 
+                onPress={() => {
+                  console.log('🔘 [TEST] TouchableOpacity presionado!');
+                  Alert.alert('Prueba', 'El botón táctil funciona!');
+                  openWhiteNoiseModal();
+                }}
+              >
                 <Ionicons name="musical-notes" size={22} color="#FFF" />
                 <Text style={styles.todayToolTitle}>Sonidos</Text>
                 <Text style={styles.todayToolSubtitle}>Ruido Blanco</Text>
@@ -4237,17 +4246,19 @@ const styles = StyleSheet.create({
   },
   todayToolsRow: {
     flexDirection: "row",
-    justifyContent: "space-between",
+    justifyContent: "center",
     marginBottom: 16,
-    columnGap: 10,
+    gap: 16,
   },
   todayToolCard: {
-    flex: 1,
+    width: 112,
+    height: 112,
     backgroundColor: "#FFFFFF",
-    borderRadius: 999,
-    paddingVertical: 12,
-    paddingHorizontal: 10,
+    borderRadius: 56,
+    paddingVertical: 16,
+    paddingHorizontal: 12,
     alignItems: "center",
+    justifyContent: "center",
     borderWidth: 0,
   },
   todayToolCardSounds: {
@@ -4260,15 +4271,17 @@ const styles = StyleSheet.create({
     backgroundColor: "#F08EB7",
   },
   todayToolTitle: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: "700",
     color: "#FFF",
-    marginTop: 6,
+    marginTop: 8,
+    textAlign: "center",
   },
   todayToolSubtitle: {
-    fontSize: 11,
+    fontSize: 10,
     color: "rgba(255, 255, 255, 0.9)",
     marginTop: 2,
+    textAlign: "center",
   },
   todayTitle: {
     fontSize: 20,

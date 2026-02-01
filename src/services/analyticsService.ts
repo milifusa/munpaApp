@@ -1,11 +1,12 @@
-import analytics from '@react-native-firebase/analytics';
+import { getAnalytics, logEvent as firebaseLogEvent, setAnalyticsCollectionEnabled, logScreenView as firebaseLogScreenView, setUserId, setUserProperties } from '@react-native-firebase/analytics';
 import { ensureFirebaseApp } from './firebaseApp';
 
 const analyticsService = {
   setEnabled: async (enabled: boolean) => {
     try {
-      ensureFirebaseApp();
-      await analytics().setAnalyticsCollectionEnabled(enabled);
+      const app = ensureFirebaseApp();
+      const analytics = getAnalytics(app);
+      await setAnalyticsCollectionEnabled(analytics, enabled);
     } catch (error) {
       console.warn('⚠️ [ANALYTICS] Error setEnabled:', error);
     }
@@ -13,8 +14,9 @@ const analyticsService = {
 
   logScreenView: async (screenName: string, screenClass?: string) => {
     try {
-      ensureFirebaseApp();
-      await analytics().logScreenView({
+      const app = ensureFirebaseApp();
+      const analytics = getAnalytics(app);
+      await firebaseLogScreenView(analytics, {
         screen_name: screenName,
         screen_class: screenClass || screenName,
       });
@@ -25,8 +27,9 @@ const analyticsService = {
 
   logEvent: async (name: string, params?: Record<string, any>) => {
     try {
-      ensureFirebaseApp();
-      await analytics().logEvent(name, params);
+      const app = ensureFirebaseApp();
+      const analytics = getAnalytics(app);
+      await firebaseLogEvent(analytics, name, params);
     } catch (error) {
       console.warn('⚠️ [ANALYTICS] Error logEvent:', error);
     }
@@ -34,10 +37,11 @@ const analyticsService = {
 
   setUser: async (userId: string | null, properties?: Record<string, any>) => {
     try {
-      ensureFirebaseApp();
-      await analytics().setUserId(userId);
+      const app = ensureFirebaseApp();
+      const analytics = getAnalytics(app);
+      await setUserId(analytics, userId);
       if (properties) {
-        await analytics().setUserProperties(properties);
+        await setUserProperties(analytics, properties);
       }
     } catch (error) {
       console.warn('⚠️ [ANALYTICS] Error setUser:', error);

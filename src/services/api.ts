@@ -2124,6 +2124,21 @@ export const activitiesService = {
   },
 };
 
+// ============= VERSIÓN DE APP 📱 =============
+export const appVersionService = {
+  // Verificar versión de la app
+  checkVersion: async (platform: 'ios' | 'android') => {
+    try {
+      const response = await api.get(`/api/app/version?platform=${platform}`);
+      console.log(`📱 [APP VERSION] Versión obtenida para ${platform}:`, response.data);
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ [APP VERSION] Error verificando versión:', error.response?.data || error.message);
+      throw error;
+    }
+  },
+};
+
 // ============= EMBARAZO 🤰 =============
 export const pregnancyService = {
   getWeekInfo: async (gestationWeeks: number, name?: string, includeImage: boolean = true) => {
@@ -2302,4 +2317,5 @@ export default {
   ...pregnancyService,
   ...growthService,
   ...faqService,
+  ...appVersionService,
 };

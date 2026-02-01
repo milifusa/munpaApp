@@ -32,6 +32,9 @@ module.exports = ({ config }) => ({
   },
   android: {
     package: 'com.munpa.app',
+    permissions: [
+      "com.google.android.gms.permission.AD_ID"
+    ],
     adaptiveIcon: {
       foregroundImage: './assets/icon.png',
       backgroundColor: '#887CBC'
