@@ -47,6 +47,16 @@ interface ArticleDetail {
   };
   author?: string | { uid?: string; name?: string; displayName?: string };
   authorAvatar?: string;
+  authorProfessional?: {
+    id: string;
+    name: string;
+    headline?: string;
+    photoUrl?: string;
+    contactEmail?: string;
+    contactPhone?: string;
+    website?: string;
+    userId?: string;
+  };
   category?: { id: string; name: string };
   categoryId: string;
   categoryName?: string | { id: string; name: string };
@@ -379,18 +389,63 @@ const ArticleDetailScreen: React.FC<ArticleDetailScreenProps> = ({ route, naviga
           )}
 
           {/* Author Section */}
-          {getAuthorName() && (
+          {(getAuthorName() || article.authorProfessional) && (
             <View style={styles.authorSection}>
-              <Text style={styles.authorSectionTitle}>Autor</Text>
+              <Text style={styles.authorSectionTitle}>Sobre el Autor</Text>
               <View style={styles.authorCard}>
+                {/* Foto del autor */}
                 <View style={styles.authorAvatar}>
-                  {article.authorAvatar ? (
-                    <Image source={{ uri: article.authorAvatar }} style={styles.avatarImage} />
+                  {(article.authorProfessional?.photoUrl || article.authorAvatar) ? (
+                    <Image 
+                      source={{ uri: article.authorProfessional?.photoUrl || article.authorAvatar }} 
+                      style={styles.avatarImage} 
+                    />
                   ) : (
                     <Ionicons name="person" size={32} color="#A0AEC0" />
                   )}
                 </View>
-                <Text style={styles.authorCardName}>{getAuthorName()}</Text>
+                
+                {/* Nombre del autor */}
+                <Text style={styles.authorCardName}>
+                  {article.authorProfessional?.name || getAuthorName()}
+                </Text>
+                
+                {/* Headline del profesional */}
+                {article.authorProfessional?.headline && (
+                  <Text style={styles.authorHeadline}>
+                    {article.authorProfessional.headline}
+                  </Text>
+                )}
+                
+                {/* Información de contacto */}
+                {article.authorProfessional && (
+                  <View style={styles.authorContactContainer}>
+                    {article.authorProfessional.contactEmail && (
+                      <View style={styles.authorContactRow}>
+                        <Ionicons name="mail-outline" size={16} color="#6B5CA5" />
+                        <Text style={styles.authorContactText}>
+                          {article.authorProfessional.contactEmail}
+                        </Text>
+                      </View>
+                    )}
+                    {article.authorProfessional.contactPhone && (
+                      <View style={styles.authorContactRow}>
+                        <Ionicons name="call-outline" size={16} color="#6B5CA5" />
+                        <Text style={styles.authorContactText}>
+                          {article.authorProfessional.contactPhone}
+                        </Text>
+                      </View>
+                    )}
+                    {article.authorProfessional.website && (
+                      <View style={styles.authorContactRow}>
+                        <Ionicons name="globe-outline" size={16} color="#6B5CA5" />
+                        <Text style={styles.authorContactText}>
+                          {article.authorProfessional.website}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                )}
               </View>
             </View>
           )}
@@ -640,9 +695,35 @@ const styles = StyleSheet.create({
     borderRadius: 32,
   },
   authorCardName: {
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: 18,
+    fontWeight: '700',
     color: '#2D3748',
+    marginBottom: 6,
+    textAlign: 'center',
+  },
+  authorHeadline: {
+    fontSize: 14,
+    color: '#718096',
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: 16,
+    paddingHorizontal: 20,
+  },
+  authorContactContainer: {
+    width: '100%',
+    marginTop: 8,
+    gap: 10,
+  },
+  authorContactRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 20,
+  },
+  authorContactText: {
+    fontSize: 14,
+    color: '#4A5568',
+    flex: 1,
   },
   disclaimer: {
     backgroundColor: '#F7FAFC',

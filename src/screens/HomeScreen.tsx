@@ -952,6 +952,65 @@ const HomeScreen: React.FC = () => {
     }
   };
 
+  const playWhiteNoise = async () => {
+    try {
+      const sound = whiteNoiseSound || (await loadWhiteNoiseSound());
+      if (!sound) return;
+      
+      const status = await sound.getStatusAsync();
+      if (!status.isLoaded) return;
+      
+      await sound.playAsync();
+      setWhiteNoisePlaying(true);
+      
+      if (whiteNoiseDurationMinutes) {
+        const ms = whiteNoiseDurationMinutes * 60 * 1000;
+        const timer = setTimeout(async () => {
+          try {
+            await sound.stopAsync();
+          } catch (error) {
+            console.warn('⚠️ [WHITE NOISE] Error deteniendo por duración:', error);
+          } finally {
+            setWhiteNoisePlaying(false);
+            setWhiteNoiseTimer(null);
+          }
+        }, ms);
+        setWhiteNoiseTimer(timer);
+      }
+      
+      analyticsService.logEvent('white_noise_play', {
+        child_id: selectedChild?.id || null,
+      });
+    } catch (error) {
+      console.error('❌ [WHITE NOISE] Error reproduciendo:', error);
+      setWhiteNoiseError('Error al reproducir. Por favor, intenta de nuevo.');
+    }
+  };
+
+  const pauseWhiteNoise = async () => {
+    try {
+      const sound = whiteNoiseSound;
+      if (!sound) return;
+      
+      const status = await sound.getStatusAsync();
+      if (!status.isLoaded || !status.isPlaying) return;
+      
+      await sound.pauseAsync();
+      setWhiteNoisePlaying(false);
+      
+      if (whiteNoiseTimer) {
+        clearTimeout(whiteNoiseTimer);
+        setWhiteNoiseTimer(null);
+      }
+      
+      analyticsService.logEvent('white_noise_pause', {
+        child_id: selectedChild?.id || null,
+      });
+    } catch (error) {
+      console.error('❌ [WHITE NOISE] Error pausando:', error);
+    }
+  };
+
   const closeWhiteNoiseModal = async () => {
     setShowWhiteNoiseModal(false);
     analyticsService.logEvent('white_noise_close', {
@@ -1177,11 +1236,7 @@ const HomeScreen: React.FC = () => {
             <View style={styles.todayToolsRow}>
               <TouchableOpacity 
                 style={[styles.todayToolCard, styles.todayToolCardSounds]} 
-                onPress={() => {
-                  console.log('🔘 [TEST] TouchableOpacity presionado!');
-                  Alert.alert('Prueba', 'El botón táctil funciona!');
-                  openWhiteNoiseModal();
-                }}
+                onPress={openWhiteNoiseModal}
               >
                 <Ionicons name="musical-notes" size={22} color="#FFF" />
                 <Text style={styles.todayToolTitle}>Sonidos</Text>
@@ -1479,6 +1534,93 @@ const HomeScreen: React.FC = () => {
         {/* Espacio final - con padding extra para el botón fijo */}
         <View style={[styles.finalSpacing, { height: 100 }]} />
       </ScrollView>
+
+      {/* Modal de Ruido Blanco */}
+      <Modal
+        visible={showWhiteNoiseModal}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={closeWhiteNoiseModal}
+      >
+        <View style={styles.whiteNoiseModalOverlay}>
+          <View style={styles.whiteNoiseModalContent}>
+            <View style={styles.whiteNoiseModalHeader}>
+              <Text style={styles.whiteNoiseModalTitle}>Ruido Blanco</Text>
+              <TouchableOpacity onPress={closeWhiteNoiseModal}>
+                <Ionicons name="close" size={28} color="#2D3748" />
+              </TouchableOpacity>
+            </View>
+
+            {whiteNoiseError && (
+              <View style={styles.whiteNoiseErrorContainer}>
+                <Text style={styles.whiteNoiseErrorText}>{whiteNoiseError}</Text>
+                <TouchableOpacity
+                  style={styles.whiteNoiseRetryButton}
+                  onPress={() => {
+                    setWhiteNoiseError(null);
+                    playWhiteNoise();
+                  }}
+                >
+                  <Text style={styles.whiteNoiseRetryButtonText}>Reintentar</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            <View style={styles.whiteNoiseDurationSection}>
+              <Text style={styles.whiteNoiseDurationLabel}>Duración:</Text>
+              <View style={styles.whiteNoiseDurationButtons}>
+                {[15, 30, 60, null].map((duration) => (
+                  <TouchableOpacity
+                    key={duration || 'unlimited'}
+                    style={[
+                      styles.whiteNoiseDurationButton,
+                      whiteNoiseDurationMinutes === duration &&
+                        styles.whiteNoiseDurationButtonActive,
+                    ]}
+                    onPress={() => setWhiteNoiseDurationMinutes(duration)}
+                  >
+                    <Text
+                      style={[
+                        styles.whiteNoiseDurationButtonText,
+                        whiteNoiseDurationMinutes === duration &&
+                          styles.whiteNoiseDurationButtonTextActive,
+                      ]}
+                    >
+                      {duration ? `${duration} min` : 'Ilimitado'}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+
+            <View style={styles.whiteNoiseControlsContainer}>
+              {whiteNoiseLoading ? (
+                <ActivityIndicator size="large" color="#887CBC" />
+              ) : (
+                <TouchableOpacity
+                  style={[
+                    styles.whiteNoisePlayButton,
+                    whiteNoisePlaying && styles.whiteNoisePlayButtonActive,
+                  ]}
+                  onPress={whiteNoisePlaying ? pauseWhiteNoise : playWhiteNoise}
+                >
+                  <Ionicons
+                    name={whiteNoisePlaying ? 'pause' : 'play'}
+                    size={48}
+                    color="#FFFFFF"
+                  />
+                </TouchableOpacity>
+              )}
+            </View>
+
+            {whiteNoisePlaying && whiteNoiseDurationMinutes && (
+              <Text style={styles.whiteNoiseTimerText}>
+                Deteniéndose en {whiteNoiseDurationMinutes} minutos
+              </Text>
+            )}
+          </View>
+        </View>
+      </Modal>
 
     </View>
   );
@@ -4734,6 +4876,117 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#4A5568',
     fontWeight: '600',
+  },
+
+  // Estilos del Modal de Ruido Blanco
+  whiteNoiseModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  whiteNoiseModalContent: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 24,
+    paddingBottom: 40,
+  },
+  whiteNoiseModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  whiteNoiseModalTitle: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#2D3748',
+  },
+  whiteNoiseErrorContainer: {
+    backgroundColor: '#FEE2E2',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 16,
+  },
+  whiteNoiseErrorText: {
+    color: '#DC2626',
+    fontSize: 14,
+    marginBottom: 8,
+  },
+  whiteNoiseRetryButton: {
+    backgroundColor: '#DC2626',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 6,
+    alignSelf: 'flex-start',
+  },
+  whiteNoiseRetryButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  whiteNoiseDurationSection: {
+    marginBottom: 24,
+  },
+  whiteNoiseDurationLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#2D3748',
+    marginBottom: 12,
+  },
+  whiteNoiseDurationButtons: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  whiteNoiseDurationButton: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    borderRadius: 12,
+    backgroundColor: '#F7FAFC',
+    borderWidth: 2,
+    borderColor: '#E2E8F0',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  whiteNoiseDurationButtonActive: {
+    backgroundColor: '#887CBC',
+    borderColor: '#887CBC',
+  },
+  whiteNoiseDurationButtonText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#4A5568',
+    textAlign: 'center',
+  },
+  whiteNoiseDurationButtonTextActive: {
+    color: '#FFFFFF',
+  },
+  whiteNoiseControlsContainer: {
+    alignItems: 'center',
+    marginVertical: 32,
+  },
+  whiteNoisePlayButton: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    backgroundColor: '#887CBC',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  whiteNoisePlayButtonActive: {
+    backgroundColor: '#7B68B0',
+  },
+  whiteNoiseTimerText: {
+    textAlign: 'center',
+    fontSize: 14,
+    color: '#6B7280',
+    marginTop: 16,
   },
 
 });
