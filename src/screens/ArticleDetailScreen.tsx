@@ -417,33 +417,11 @@ const ArticleDetailScreen: React.FC<ArticleDetailScreenProps> = ({ route, naviga
                   </Text>
                 )}
                 
-                {/* Información de contacto */}
+                {/* Encuentra sus servicios en Munpa */}
                 {article.authorProfessional && (
-                  <View style={styles.authorContactContainer}>
-                    {article.authorProfessional.contactEmail && (
-                      <View style={styles.authorContactRow}>
-                        <Ionicons name="mail-outline" size={16} color="#6B5CA5" />
-                        <Text style={styles.authorContactText}>
-                          {article.authorProfessional.contactEmail}
-                        </Text>
-                      </View>
-                    )}
-                    {article.authorProfessional.contactPhone && (
-                      <View style={styles.authorContactRow}>
-                        <Ionicons name="call-outline" size={16} color="#6B5CA5" />
-                        <Text style={styles.authorContactText}>
-                          {article.authorProfessional.contactPhone}
-                        </Text>
-                      </View>
-                    )}
-                    {article.authorProfessional.website && (
-                      <View style={styles.authorContactRow}>
-                        <Ionicons name="globe-outline" size={16} color="#6B5CA5" />
-                        <Text style={styles.authorContactText}>
-                          {article.authorProfessional.website}
-                        </Text>
-                      </View>
-                    )}
+                  <View style={styles.findServicesContainer}>
+                    <Text style={styles.findServicesText}>Encuentra sus servicios en </Text>
+                    <Text style={styles.munpaText}>Munpa</Text>
                   </View>
                 )}
               </View>
@@ -709,21 +687,20 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     paddingHorizontal: 20,
   },
-  authorContactContainer: {
-    width: '100%',
-    marginTop: 8,
-    gap: 10,
-  },
-  authorContactRow: {
+  findServicesContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: 20,
+    justifyContent: 'center',
+    marginTop: 8,
   },
-  authorContactText: {
-    fontSize: 14,
-    color: '#4A5568',
-    flex: 1,
+  findServicesText: {
+    fontSize: 13,
+    color: '#718096',
+  },
+  munpaText: {
+    fontSize: 13,
+    color: '#887CBC',
+    fontWeight: '700',
   },
   disclaimer: {
     backgroundColor: '#F7FAFC',

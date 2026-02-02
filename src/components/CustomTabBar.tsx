@@ -2,6 +2,7 @@ import React from 'react';
 import { View, TouchableOpacity, StyleSheet, Platform, Image, Text } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import DouliChatBubble from './DouliChatBubble';
 import { useDouliChat } from '../hooks/useDouliChat';
 
@@ -17,9 +18,11 @@ const CustomTabBar: React.FC<CustomTabBarProps> = ({ state, descriptors, navigat
   const currentRoute = useRoute();
   console.log('🔍 CustomTabBar: useRoute ejecutado, ruta:', currentRoute.name);
   
+  const insets = useSafeAreaInsets();
   const { isVisible, currentMessage, hideMessage, handleChatPress } = useDouliChat(currentRoute.name);
   
   console.log('🔍 CustomTabBar: Hook ejecutado, valores:', { isVisible, currentMessage: currentMessage?.text });
+  console.log('🔍 CustomTabBar: Safe area insets:', { bottom: insets.bottom });
 
   const getIconName = (routeName: string) => {
     switch (routeName) {
@@ -73,7 +76,10 @@ const CustomTabBar: React.FC<CustomTabBarProps> = ({ state, descriptors, navigat
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { 
+      paddingBottom: Math.max(insets.bottom, Platform.OS === 'ios' ? 20 : 8),
+      height: Platform.OS === 'ios' ? 70 + insets.bottom : 60 + insets.bottom,
+    }]}>
       {state.routes.map((route: any, index: number) => {
         const isDoula = route.name === 'Doula';
         const active = isActive(route.name);
@@ -146,8 +152,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#59C6C0',
     borderTopWidth: 0,
     paddingTop: 8,
-    paddingBottom: Platform.OS === 'ios' ? 40 : 5,
-    height: Platform.OS === 'ios' ? 70 : 60,
+    // paddingBottom y height se aplican dinámicamente con insets
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
