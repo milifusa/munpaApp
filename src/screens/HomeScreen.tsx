@@ -1139,7 +1139,7 @@ const HomeScreen: React.FC = () => {
               (navigation as any).navigate('Medications');
             }}
           >
-            <FontAwesome5 name="briefcase-medical" size={22} color="#FFFFFF" />
+            <FontAwesome5 name="briefcase-medical" size={20} color="#FFFFFF" />
             <Text style={styles.quickActionLabel}>Medicación</Text>
           </TouchableOpacity>
           <TouchableOpacity 
@@ -1163,11 +1163,74 @@ const HomeScreen: React.FC = () => {
                 action: 'hitos',
                 child_id: selectedChild?.id,
               });
-              Alert.alert('Próximamente', 'Esta funcionalidad estará disponible pronto');
+              // @ts-ignore
+              navigation.navigate('Milestones');
             }}
           >
             <Ionicons name="trophy-outline" size={20} color="#FFFFFF" />
             <Text style={styles.quickActionLabel}>Hitos</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={[styles.quickActionButton, styles.quickActionOrange]} 
+            onPress={() => {
+              // Calcular edad desde birthDate si está disponible
+              let ageInMonths = selectedChild?.ageInMonths ?? 0;
+              
+              if (selectedChild?.birthDate) {
+                let birthDate: Date;
+                
+                // Manejar Firestore Timestamp
+                if (typeof selectedChild.birthDate === 'object' && '_seconds' in selectedChild.birthDate) {
+                  birthDate = new Date((selectedChild.birthDate as any)._seconds * 1000);
+                } else if (typeof selectedChild.birthDate === 'string') {
+                  birthDate = new Date(selectedChild.birthDate);
+                } else {
+                  birthDate = new Date(selectedChild.birthDate as any);
+                }
+                
+                const today = new Date();
+                const diffTime = Math.abs(today.getTime() - birthDate.getTime());
+                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                ageInMonths = diffDays / 30.44; // Promedio de días por mes
+              }
+              
+              console.log('🍎 [NUTRICION] Edad del niño:', {
+                name: selectedChild?.name,
+                ageInMonths: ageInMonths,
+                ageFloor: Math.floor(ageInMonths),
+                birthDate: selectedChild?.birthDate,
+                canAccess: Math.floor(ageInMonths) >= 5
+              });
+              
+              const ageFloor = Math.floor(ageInMonths);
+              if (ageFloor < 5) {
+                const monthsRemaining = 5 - ageFloor;
+                Alert.alert(
+                  '🍎 Nutrición disponible pronto',
+                  `Esta funcionalidad estará disponible cuando ${selectedChild?.name || 'tu bebé'} cumpla 5 meses.\n\n¡Solo ${monthsRemaining} ${monthsRemaining === 1 ? 'mes' : 'meses'} más! 💙`,
+                  [{ text: 'Entendido', style: 'default' }]
+                );
+                analyticsService.logEvent('nutrition_early_access_attempted', {
+                  child_id: selectedChild?.id,
+                  age_in_months: ageInMonths,
+                });
+                return;
+              }
+              analyticsService.logEvent('quick_action_clicked', {
+                action: 'nutricion',
+                child_id: selectedChild?.id,
+                age_in_months: ageInMonths,
+              });
+              // @ts-ignore
+              navigation.navigate('Feeding');
+            }}
+          >
+            <Ionicons 
+              name="restaurant-outline" 
+              size={20} 
+              color="#FFFFFF" 
+            />
+            <Text style={styles.quickActionLabel}>Nutrición</Text>
           </TouchableOpacity>
         </ScrollView>
 
@@ -1769,8 +1832,8 @@ const styles = StyleSheet.create({
     fontWeight: "500",
   },
   quickActionsContainer: {
-    paddingHorizontal: 20,
-    gap: 18,
+    paddingHorizontal: 12,
+    gap: 8,
     paddingBottom: 10,
     flexGrow: 1,
     justifyContent: "center",
@@ -1803,6 +1866,9 @@ const styles = StyleSheet.create({
   },
   quickActionPink: {
     backgroundColor: "#F08EB7",
+  },
+  quickActionOrange: {
+    backgroundColor: "#FF9244",
   },
   bannerHome1Container: {
     marginTop: -15,

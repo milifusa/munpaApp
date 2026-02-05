@@ -62,6 +62,8 @@ import TeethingTrackerScreen from '../screens/TeethingTrackerScreen';
 import TeethingGuideScreen from '../screens/TeethingGuideScreen';
 import ServiceRequestScreen from '../screens/ServiceRequestScreen';
 import VaccineTrackerScreen from '../screens/VaccineTrackerScreen';
+import FeedingScreen from '../screens/FeedingScreen';
+import MilestonesScreen from '../screens/MilestonesScreen';
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -857,6 +859,20 @@ const AuthenticatedNavigator = () => {
           title: 'Vacunas',
           headerShown: true,
           headerBackTitle: '',
+        }}
+      />
+      <Stack.Screen
+        name="Feeding"
+        component={FeedingScreen}
+        options={{
+          headerShown: false,
+        }}
+      />
+      <Stack.Screen
+        name="Milestones"
+        component={MilestonesScreen}
+        options={{
+          headerShown: false,
         }}
       />
       <Stack.Screen
