@@ -737,7 +737,7 @@ const GrowthScreen: React.FC = () => {
 
       <Modal visible={showAddModal} transparent animationType="slide" onRequestClose={() => setShowAddModal(false)}>
         <View style={styles.modalOverlay}>
-          <SafeAreaView style={styles.modalContainer}>
+          <View style={styles.modalContainer}>
             <KeyboardAvoidingView
               behavior={Platform.OS === 'ios' ? 'padding' : undefined}
               style={styles.modalCard}
@@ -750,94 +750,99 @@ const GrowthScreen: React.FC = () => {
                 <View style={{ width: 22 }} />
               </View>
 
-              <View style={styles.modalSection}>
-                <TouchableOpacity
-                  style={styles.modalRow}
-                  onPress={() => {
-                    setPickerMode('date');
-                    setShowDatePicker(true);
-                  }}
-                >
-                  <Text style={styles.modalRowLabel}>Fecha</Text>
-                  <View style={styles.modalRowValue}>
-                    <Text style={styles.modalRowValueText}>{measuredAt.toLocaleDateString('es-ES')}</Text>
-                    <Ionicons name="chevron-forward" size={18} color="#9CA3AF" />
+              <ScrollView 
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={styles.modalScrollContent}
+              >
+                <View style={styles.modalSection}>
+                  <TouchableOpacity
+                    style={styles.modalRow}
+                    onPress={() => {
+                      setPickerMode('date');
+                      setShowDatePicker(true);
+                    }}
+                  >
+                    <Text style={styles.modalRowLabel}>Fecha</Text>
+                    <View style={styles.modalRowValue}>
+                      <Text style={styles.modalRowValueText}>{measuredAt.toLocaleDateString('es-ES')}</Text>
+                      <Ionicons name="chevron-forward" size={18} color="#9CA3AF" />
+                    </View>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.modalRow}
+                    onPress={() => {
+                      setPickerMode('time');
+                      setShowDatePicker(true);
+                    }}
+                  >
+                    <Text style={styles.modalRowLabel}>Hora</Text>
+                    <View style={styles.modalRowValue}>
+                      <Text style={styles.modalRowValueText}>
+                        {measuredAt.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
+                      </Text>
+                      <Ionicons name="chevron-forward" size={18} color="#9CA3AF" />
+                    </View>
+                  </TouchableOpacity>
+                </View>
+
+                <View style={styles.modalSection}>
+                  <View style={styles.modalRow}>
+                    <Text style={styles.modalRowLabel}>Peso</Text>
+                    <TextInput
+                      style={styles.modalRowInput}
+                      value={weightInput}
+                      onChangeText={setWeightInput}
+                      keyboardType="decimal-pad"
+                      placeholder="0.00 kg"
+                      placeholderTextColor="#9CA3AF"
+                    />
                   </View>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.modalRow}
-                  onPress={() => {
-                    setPickerMode('time');
-                    setShowDatePicker(true);
-                  }}
-                >
-                  <Text style={styles.modalRowLabel}>Hora</Text>
-                  <View style={styles.modalRowValue}>
-                    <Text style={styles.modalRowValueText}>
-                      {measuredAt.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
-                    </Text>
-                    <Ionicons name="chevron-forward" size={18} color="#9CA3AF" />
+                  <View style={styles.modalRow}>
+                    <Text style={styles.modalRowLabel}>Altura</Text>
+                    <TextInput
+                      style={styles.modalRowInput}
+                      value={heightInput}
+                      onChangeText={setHeightInput}
+                      keyboardType="decimal-pad"
+                      placeholder="0.00 cm"
+                      placeholderTextColor="#9CA3AF"
+                    />
                   </View>
-                </TouchableOpacity>
-              </View>
+                  <View style={styles.modalRow}>
+                    <Text style={styles.modalRowLabel}>Perímetro cefálico</Text>
+                    <TextInput
+                      style={styles.modalRowInput}
+                      value={headInput}
+                      onChangeText={setHeadInput}
+                      keyboardType="decimal-pad"
+                      placeholder="0.00 cm"
+                      placeholderTextColor="#9CA3AF"
+                    />
+                  </View>
+                </View>
 
-              <View style={styles.modalSection}>
-                <View style={styles.modalRow}>
-                  <Text style={styles.modalRowLabel}>Peso</Text>
+                <View style={styles.modalSection}>
                   <TextInput
-                    style={styles.modalRowInput}
-                    value={weightInput}
-                    onChangeText={setWeightInput}
-                    keyboardType="decimal-pad"
-                    placeholder="0.00 kg"
-                    placeholderTextColor="#9CA3AF"
+                    style={[styles.modalNotesInput, styles.modalNotes]}
+                    value={notesInput}
+                    onChangeText={setNotesInput}
+                    placeholder="Agregar nota"
+                    multiline
                   />
                 </View>
-                <View style={styles.modalRow}>
-                  <Text style={styles.modalRowLabel}>Altura</Text>
-                  <TextInput
-                    style={styles.modalRowInput}
-                    value={heightInput}
-                    onChangeText={setHeightInput}
-                    keyboardType="decimal-pad"
-                    placeholder="0.00 cm"
-                    placeholderTextColor="#9CA3AF"
-                  />
-                </View>
-                <View style={styles.modalRow}>
-                  <Text style={styles.modalRowLabel}>Perímetro cefálico</Text>
-                  <TextInput
-                    style={styles.modalRowInput}
-                    value={headInput}
-                    onChangeText={setHeadInput}
-                    keyboardType="decimal-pad"
-                    placeholder="0.00 cm"
-                    placeholderTextColor="#9CA3AF"
-                  />
-                </View>
-              </View>
 
-              <View style={styles.modalSection}>
-                <TextInput
-                  style={[styles.modalNotesInput, styles.modalNotes]}
-                  value={notesInput}
-                  onChangeText={setNotesInput}
-                  placeholder="Agregar nota"
-                  multiline
-                />
-              </View>
-
-              {showDatePicker && (
-                <DateTimePicker
-                  value={measuredAt}
-                  mode={pickerMode}
-                  display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                  onChange={(event, date) => {
-                    setShowDatePicker(Platform.OS === 'ios');
-                    if (date) setMeasuredAt(date);
-                  }}
-                />
-              )}
+                {showDatePicker && (
+                  <DateTimePicker
+                    value={measuredAt}
+                    mode={pickerMode}
+                    display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                    onChange={(event, date) => {
+                      setShowDatePicker(Platform.OS === 'ios');
+                      if (date) setMeasuredAt(date);
+                    }}
+                  />
+                )}
+              </ScrollView>
 
               <View style={styles.modalFooter}>
                 <TouchableOpacity style={styles.modalSaveFull} onPress={handleSaveMeasurement}>
@@ -845,7 +850,7 @@ const GrowthScreen: React.FC = () => {
                 </TouchableOpacity>
               </View>
             </KeyboardAvoidingView>
-          </SafeAreaView>
+          </View>
         </View>
       </Modal>
     </View>
@@ -1141,14 +1146,20 @@ const styles = StyleSheet.create({
   },
   modalCard: {
     backgroundColor: '#FFFFFF',
-    padding: 20,
-    paddingBottom: 12,
+    paddingTop: 20,
+    paddingHorizontal: 20,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    maxHeight: '80%',
+    maxHeight: '90%',
+  },
+  modalScrollContent: {
+    paddingBottom: 20,
   },
   modalFooter: {
-    paddingBottom: 10,
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 30,
+    backgroundColor: '#FFFFFF',
   },
   modalHeader: {
     flexDirection: 'row',

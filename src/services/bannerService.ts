@@ -15,7 +15,8 @@ export type BannerSection =
   | 'crecimiento'
   | 'vacunas'
   | 'denticion'
-  | 'hitos';
+  | 'hitos'
+  | 'menu-lateral';
 
 export interface Banner {
   id: string;

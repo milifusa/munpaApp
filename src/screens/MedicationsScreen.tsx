@@ -546,27 +546,29 @@ const MedicationsScreen: React.FC = () => {
       <Modal
         visible={showMedicationModal}
         animationType="slide"
-        transparent={false}
+        transparent
         onRequestClose={() => setShowMedicationModal(false)}
       >
-        <SafeAreaView style={{ flex: 1, backgroundColor: '#887CBC' }}>
-          <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-            style={styles.medModalContainer}
-          >
-            <View style={styles.medModalHeader}>
-              <TouchableOpacity onPress={() => setShowMedicationModal(false)}>
-                <Text style={styles.medModalCancelButton}>Cancelar</Text>
-              </TouchableOpacity>
-              <Text style={styles.medModalTitle}>
-                {editingMedication ? 'Editar Medicamento' : 'Nuevo Medicamento'}
-              </Text>
-              <TouchableOpacity onPress={handleSaveMedication}>
-                <Text style={styles.medModalSaveButton}>Guardar</Text>
-              </TouchableOpacity>
-            </View>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <KeyboardAvoidingView
+              behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+              style={styles.modalCard}
+            >
+              <View style={styles.medModalHeader}>
+                <TouchableOpacity onPress={() => setShowMedicationModal(false)}>
+                  <Ionicons name="close" size={24} color="#2D3748" />
+                </TouchableOpacity>
+                <Text style={styles.medModalTitle}>
+                  {editingMedication ? 'Editar Medicamento' : 'Nuevo Medicamento'}
+                </Text>
+                <View style={{ width: 24 }} />
+              </View>
 
-            <ScrollView style={styles.medModalScrollView}>
+              <ScrollView 
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={styles.modalScrollContent}
+              >
               <View style={styles.medModalBody}>
                 <View style={styles.medInputGroup}>
                   <Text style={styles.medInputLabel}>Nombre del medicamento</Text>
@@ -799,9 +801,19 @@ const MedicationsScreen: React.FC = () => {
                   />
                 </View>
               </View>
-            </ScrollView>
-          </KeyboardAvoidingView>
-        </SafeAreaView>
+              </ScrollView>
+
+              <View style={[styles.modalFooter, { paddingBottom: Math.max(20, insets.bottom) }]}>
+                <TouchableOpacity 
+                  style={styles.modalSaveFull} 
+                  onPress={handleSaveMedication}
+                >
+                  <Text style={styles.modalSaveText}>Guardar medicamento</Text>
+                </TouchableOpacity>
+              </View>
+            </KeyboardAvoidingView>
+          </View>
+        </View>
       </Modal>
 
       <Modal
@@ -1173,39 +1185,74 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     elevation: 6,
   },
-  medModalContainer: {
+  modalOverlay: {
     flex: 1,
-    backgroundColor: '#F5F5F5',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
   },
-  medModalScrollView: {
-    flex: 1,
+  modalContainer: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: '90%',
+  },
+  modalCard: {
+    maxHeight: '100%',
+  },
+  modalScrollContent: {
+    paddingBottom: 20,
   },
   medModalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 16,
-    backgroundColor: '#887CBC',
+    padding: 20,
     borderBottomWidth: 1,
-    borderBottomColor: '#E0E0E0',
+    borderBottomColor: '#E5E7EB',
   },
   medModalTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#FFF',
+    color: '#1F2937',
   },
   medModalCancelButton: {
     fontSize: 16,
-    color: '#FFF',
+    color: '#6B7280',
   },
   medModalSaveButton: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#FFF',
+    color: '#887CBC',
+  },
+  modalFooter: {
+    paddingHorizontal: 20,
+    paddingTop: 15,
+    borderTopWidth: 1,
+    borderTopColor: '#E5E7EB',
+    backgroundColor: '#FFFFFF',
+  },
+  modalSaveFull: {
+    backgroundColor: '#887CBC',
+    paddingVertical: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+    shadowColor: '#887CBC',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 8,
+  },
+  modalSaveText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#FFFFFF',
   },
   medModalBody: {
-    padding: 16,
-    paddingBottom: 40,
+    padding: 20,
+    paddingBottom: 20,
   },
   medInputGroup: {
     marginBottom: 20,

@@ -1122,7 +1122,8 @@ const HomeScreen: React.FC = () => {
                 action: 'vacunas',
                 child_id: selectedChild?.id,
               });
-              Alert.alert('Próximamente', 'Esta funcionalidad estará disponible pronto');
+              // @ts-ignore
+              navigation.navigate('VaccineTracker');
             }}
           >
             <Ionicons name="shield-checkmark-outline" size={20} color="#FFFFFF" />
@@ -1148,7 +1149,8 @@ const HomeScreen: React.FC = () => {
                 action: 'denticion',
                 child_id: selectedChild?.id,
               });
-              Alert.alert('Próximamente', 'Esta funcionalidad estará disponible pronto');
+              // @ts-ignore
+              navigation.navigate('TeethingTracker');
             }}
           >
             <FontAwesome5 name="tooth" size={20} color="#FFFFFF" />

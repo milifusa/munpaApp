@@ -2240,6 +2240,79 @@ export const growthService = {
 };
 
 // ============================================
+// VACCINES / VACUNAS
+// ============================================
+export const vaccineService = {
+  // Obtener vacunas de un niño
+  getVaccines: async (childId: string) => {
+    const response = await api.get(`/api/children/${childId}/vaccines`);
+    console.log('🔍 [API] getVaccines respuesta cruda:', JSON.stringify(response.data, null, 2));
+    return response.data;
+  },
+  
+  // Crear/registrar vacuna
+  createVaccine: async (
+    childId: string,
+    data: { 
+      name: string;
+      scheduledDate?: string;
+      appliedDate?: string;
+      status?: 'pending' | 'applied' | 'overdue';
+      location?: string;
+      batch?: string;
+      notes?: string;
+    }
+  ) => {
+    const response = await api.post(`/api/children/${childId}/vaccines`, data);
+    return response.data;
+  },
+  
+  // Actualizar vacuna
+  updateVaccine: async (
+    childId: string,
+    vaccineId: string,
+    data: { 
+      name?: string;
+      scheduledDate?: string;
+      appliedDate?: string;
+      status?: 'pending' | 'applied' | 'overdue';
+      location?: string;
+      batch?: string;
+      notes?: string;
+    }
+  ) => {
+    const response = await api.put(`/api/children/${childId}/vaccines/${vaccineId}`, data);
+    return response.data;
+  },
+  
+  // Eliminar vacuna
+  deleteVaccine: async (childId: string, vaccineId: string) => {
+    const response = await api.delete(`/api/children/${childId}/vaccines/${vaccineId}`);
+    return response.data;
+  },
+  
+  // Asignar calendario de vacunación por país
+  assignSchedule: async (childId: string, countryId: string) => {
+    const response = await api.post(`/api/children/${childId}/vaccines/assign-schedule`, {
+      countryId,
+    });
+    return response.data;
+  },
+  
+  // Obtener calendarios de vacunación activos
+  getSchedules: async () => {
+    const response = await api.get('/api/vaccines/schedules');
+    return response.data;
+  },
+  
+  // Obtener calendario por país
+  getScheduleByCountry: async (countryId: string) => {
+    const response = await api.get(`/api/vaccines/schedules/country/${countryId}`);
+    return response.data;
+  },
+};
+
+// ============================================
 // FAQ MOMS
 // ============================================
 export const faqService = {
@@ -2316,6 +2389,7 @@ export default {
   ...activitiesService,
   ...pregnancyService,
   ...growthService,
+  ...vaccineService,
   ...faqService,
   ...appVersionService,
 };

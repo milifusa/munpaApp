@@ -14,6 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../contexts/AuthContext';
 import Constants from 'expo-constants';
+import BannerCarousel from './BannerCarousel';
 
 const { width, height } = Dimensions.get('window');
 
@@ -32,6 +33,12 @@ const GlobalMenu: React.FC<GlobalMenuProps> = ({ visible, onClose }) => {
     ? Constants.expoConfig?.ios?.buildNumber || '1.0.0'
     : Constants.expoConfig?.android?.versionCode?.toString() || '1';
 
+  const handleProfilePress = () => {
+    onClose();
+    // @ts-ignore
+    navigation.navigate('Profile');
+  };
+
   const menuItems = [
     {
       id: 'home',
@@ -41,16 +48,6 @@ const GlobalMenu: React.FC<GlobalMenuProps> = ({ visible, onClose }) => {
         onClose();
         // @ts-ignore
         navigation.navigate('MainTabs', { screen: 'Home' });
-      },
-    },
-    {
-      id: 'doula',
-      title: 'DOULI Chat',
-      icon: 'heart',
-      onPress: () => {
-        onClose();
-        // @ts-ignore
-        navigation.navigate('MainTabs', { screen: 'Doula' });
       },
     },
     {
@@ -84,13 +81,13 @@ const GlobalMenu: React.FC<GlobalMenuProps> = ({ visible, onClose }) => {
       },
     },
     {
-      id: 'profile',
-      title: 'Mi Perfil',
-      icon: 'person',
+      id: 'service-request',
+      title: 'Ofrecer Servicio',
+      icon: 'briefcase',
       onPress: () => {
         onClose();
         // @ts-ignore
-        navigation.navigate('Profile');
+        navigation.navigate('ServiceRequest');
       },
     },
     {
@@ -125,7 +122,11 @@ const GlobalMenu: React.FC<GlobalMenuProps> = ({ visible, onClose }) => {
         <View style={styles.menuContainer}>
           {/* Header del menú */}
           <View style={styles.menuHeader}>
-            <View style={styles.userInfo}>
+            <TouchableOpacity 
+              style={styles.userInfo}
+              onPress={handleProfilePress}
+              activeOpacity={0.7}
+            >
               {user?.photoURL ? (
                 <Image
                   source={{ uri: user.photoURL }}
@@ -142,7 +143,8 @@ const GlobalMenu: React.FC<GlobalMenuProps> = ({ visible, onClose }) => {
                 </Text>
                 <Text style={styles.userEmail}>{user?.email}</Text>
               </View>
-            </View>
+              <Ionicons name="chevron-forward" size={20} color="#CCC" style={styles.userChevron} />
+            </TouchableOpacity>
             <TouchableOpacity style={styles.closeButton} onPress={onClose}>
               <Ionicons name="close" size={24} color="#666" />
             </TouchableOpacity>
@@ -163,6 +165,18 @@ const GlobalMenu: React.FC<GlobalMenuProps> = ({ visible, onClose }) => {
                 <Ionicons name="chevron-forward" size={20} color="#CCC" />
               </TouchableOpacity>
             ))}
+
+            {/* Banner del menú lateral */}
+            <View style={styles.bannerContainer}>
+              <BannerCarousel 
+                section="menu-lateral"
+                fallbackToHome={false}
+                bannerHeight={120}
+                bannerWidth={width * 0.75}
+                autoScroll={true}
+                showIndicators={false}
+              />
+            </View>
           </ScrollView>
 
           {/* Footer del menú */}
@@ -216,6 +230,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 10,
+    paddingRight: 40,
+  },
+  userChevron: {
+    marginLeft: 'auto',
   },
   avatar: {
     width: 60,
@@ -269,6 +287,13 @@ const styles = StyleSheet.create({
     color: '#333',
     marginLeft: 15,
     fontWeight: '500',
+  },
+  bannerContainer: {
+    paddingVertical: 16,
+    paddingHorizontal: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#F0F0F0',
+    marginTop: 8,
   },
   menuFooter: {
     padding: 20,

@@ -58,6 +58,10 @@ import NotificationsScreen from '../screens/NotificationsScreen';
 import SleepTrackerScreen from '../screens/SleepTrackerScreen';
 import EditSleepEventScreen from '../screens/EditSleepEventScreen';
 import ChildrenListScreen from '../screens/ChildrenListScreen';
+import TeethingTrackerScreen from '../screens/TeethingTrackerScreen';
+import TeethingGuideScreen from '../screens/TeethingGuideScreen';
+import ServiceRequestScreen from '../screens/ServiceRequestScreen';
+import VaccineTrackerScreen from '../screens/VaccineTrackerScreen';
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -715,6 +719,7 @@ const AuthenticatedNavigator = () => {
         headerTitleStyle: {
           fontWeight: 'bold',
         },
+        headerBackTitle: '', // Ocultar texto junto a la flecha de atrás
         headerRight: () => <ProfileButton />,
       }}
       initialRouteName={initialRoute}
@@ -827,6 +832,38 @@ const AuthenticatedNavigator = () => {
           title: 'Medicación',
           headerShown: true,
           headerBackTitle: '',
+        }}
+      />
+      <Stack.Screen
+        name="TeethingTracker"
+        component={TeethingTrackerScreen}
+        options={{
+          title: 'Dentición',
+          headerShown: true,
+          headerBackTitle: '',
+        }}
+      />
+      <Stack.Screen
+        name="TeethingGuide"
+        component={TeethingGuideScreen}
+        options={{
+          headerShown: false,
+        }}
+      />
+      <Stack.Screen
+        name="VaccineTracker"
+        component={VaccineTrackerScreen}
+        options={{
+          title: 'Vacunas',
+          headerShown: true,
+          headerBackTitle: '',
+        }}
+      />
+      <Stack.Screen
+        name="ServiceRequest"
+        component={ServiceRequestScreen}
+        options={{
+          headerShown: false,
         }}
       />
       <Stack.Screen
@@ -992,6 +1029,7 @@ const CommunitiesStackNavigator = () => {
         headerTitleStyle: {
           fontWeight: 'bold',
         },
+        headerBackTitle: '', // Ocultar texto junto a la flecha de atrás
         headerRight: () => <ProfileButton />,
       }}
     >
@@ -999,6 +1037,7 @@ const CommunitiesStackNavigator = () => {
         name="CommunitiesMain"
         component={CommunitiesScreen}
         options={{
+          title: '', // Título vacío para evitar que muestre texto de respaldo
           headerTitle: () => <ChildrenHeaderTitle />,
           headerShown: true,
           headerTitleAlign: 'left',
@@ -1061,6 +1100,7 @@ const DoulaStackNavigator = () => {
         headerTitleStyle: {
           fontWeight: 'bold',
         },
+        headerBackTitle: '', // Ocultar texto junto a la flecha de atrás
         headerRight: () => <ProfileButton />,
       }}
     >
@@ -1451,6 +1491,34 @@ const AppNavigator = () => {
           case 'interest':
             // Navegar a MyProductsScreen
             navigationRef.current.navigate('MyProducts');
+            break;
+
+          case 'post_comment':
+          case 'post_like':
+          case 'community_post':
+            // Navegar a la pantalla de posts de la comunidad
+            if (data?.communityId) {
+              console.log('🚀 [NAV] Navegando a CommunityPosts:', data.communityId);
+              navigationRef.current.navigate('MainTabs', {
+                screen: 'Communities',
+                params: {
+                  screen: 'CommunityPosts',
+                  params: {
+                    communityId: data.communityId,
+                    communityName: data.communityName || 'Comunidad',
+                  },
+                },
+              });
+            } else if (data?.postId) {
+              // Si solo tenemos el postId, usar el deep link handler
+              console.log('🚀 [NAV] Navegando a post usando deep link handler:', data.postId);
+              Linking.openURL(`munpa://post/${data.postId}`);
+            } else {
+              // Sin datos suficientes, ir a Communities
+              navigationRef.current.navigate('MainTabs', {
+                screen: 'Communities',
+              });
+            }
             break;
 
           case 'admin_notification':

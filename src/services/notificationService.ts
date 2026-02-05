@@ -106,13 +106,27 @@ const notificationService = {
     // Listener para cuando el usuario interactúa con una notificación
     Notifications.addNotificationResponseReceivedListener((response) => {
       console.log('👆 [NOTIF] Usuario interactuó con notificación:', response.notification.request.content.title);
+      console.log('👆 [NOTIF] Notification data:', response.notification.request.content.data);
+      
+      // Manejar acciones de medicamentos
       if (response.actionIdentifier === 'MED_TAKEN') {
         console.log('✅ [MED] Confirmado: tomado');
       }
       if (response.actionIdentifier === 'MED_SKIPPED') {
         console.log('🟡 [MED] Confirmado: no tomado');
       }
-      // Aquí puedes manejar la navegación basada en la notificación
+      
+      // Manejar navegación basada en la notificación
+      const data: any = response.notification.request.content.data || {};
+      const type = data.type;
+      
+      // Usar la función global de navegación si está disponible
+      if (typeof (global as any).handleNotificationNavigation === 'function') {
+        console.log('🚀 [NOTIF] Llamando a handleNotificationNavigation con:', { type, data });
+        (global as any).handleNotificationNavigation({ type, screen: data.screen, data });
+      } else {
+        console.warn('⚠️ [NOTIF] handleNotificationNavigation no está disponible');
+      }
     });
   },
 

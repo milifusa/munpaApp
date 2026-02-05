@@ -116,48 +116,39 @@ const MarketplaceMessagesScreen = () => {
     try {
       console.log('💬 [MESSAGES] Cargando mensajes para producto:', productId);
       console.log('👤 [MESSAGES] Usuario actual ID:', user?.id);
+      console.log('👤 [MESSAGES] Otro usuario ID:', otherUserId);
       console.log('👤 [MESSAGES] Usuario actual nombre:', user?.name || user?.displayName);
-      const fetchedMessages = await marketplaceService.getProductMessages(productId);
-      console.log('✅ [MESSAGES] Mensajes cargados:', fetchedMessages?.length || 0);
       
-      // Primero, encontrar información del otro usuario desde los mensajes
+      const fetchedMessages = await marketplaceService.getProductMessages(productId);
+      console.log('✅ [MESSAGES] Mensajes cargados del backend:', fetchedMessages?.length || 0);
+      
       const messagesArray = Array.isArray(fetchedMessages) ? fetchedMessages : [];
       
-      // Log detallado de cada mensaje
-      console.log('📋 [MESSAGES] Analizando mensajes recibidos:');
-      messagesArray.forEach((msg: any, index: number) => {
-        console.log(`📨 [MESSAGES] Mensaje ${index + 1}:`, {
-          id: msg.id,
-          senderId: msg.senderId,
-          senderName: msg.senderName,
-          senderPhoto: msg.senderPhoto ? 'Presente' : 'Ausente',
-          receiverId: msg.receiverId,
-          receiverName: msg.receiverName,
-          message: msg.message?.substring(0, 50) + '...',
-          createdAt: msg.createdAt,
-          isMe: msg.senderId === user?.id,
-        });
+      // FILTRAR SOLO LOS MENSAJES DE ESTA CONVERSACIÓN ESPECÍFICA
+      // Una conversación es entre el usuario actual y otherUserId
+      const filteredMessages = messagesArray.filter((msg: any) => {
+        const isFromMe = msg.senderId === user?.id;
+        const isToMe = msg.receiverId === user?.id;
+        const isFromOther = msg.senderId === otherUserId;
+        const isToOther = msg.receiverId === otherUserId;
+        
+        // El mensaje es parte de esta conversación si:
+        // - Lo envié yo al otro usuario (senderId: yo, receiverId: otro)
+        // - El otro me lo envió a mí (senderId: otro, receiverId: yo)
+        const belongsToThisConversation = 
+          (isFromMe && isToOther) || (isFromOther && isToMe);
+        
+        return belongsToThisConversation;
       });
       
-      // Encontrar mensajes del otro usuario
-      const otherUserMessages = messagesArray.filter((m: any) => m.senderId !== user?.id);
-      console.log('👥 [MESSAGES] Mensajes del otro usuario:', otherUserMessages.length);
+      console.log('✅ [MESSAGES] Mensajes filtrados para esta conversación:', filteredMessages.length);
+      console.log('📊 [MESSAGES] Total mensajes del producto:', messagesArray.length);
+      console.log('📊 [MESSAGES] Mensajes filtrados:', filteredMessages.length);
       
-      if (otherUserMessages.length > 0) {
-        console.log('🔍 [MESSAGES] Información del otro usuario en mensajes:');
-        otherUserMessages.forEach((msg: any, index: number) => {
-          console.log(`  Mensaje ${index + 1}:`, {
-            senderId: msg.senderId,
-            senderName: msg.senderName || 'NO TIENE NOMBRE',
-            senderPhoto: msg.senderPhoto || 'NO TIENE FOTO',
-            receiverId: msg.receiverId,
-            receiverName: msg.receiverName || 'NO TIENE NOMBRE',
-          });
-        });
-      }
+      // Encontrar información del otro usuario desde los mensajes FILTRADOS
+      const otherUserMessages = filteredMessages.filter((m: any) => m.senderId !== user?.id);
       
-      const otherUserMessage = messagesArray.find((m: any) => 
-        m.senderId !== user?.id && 
+      const otherUserMessage = otherUserMessages.find((m: any) => 
         m.senderName && 
         m.senderName !== 'Usuario'
       );
@@ -180,12 +171,10 @@ const MarketplaceMessagesScreen = () => {
           name: otherUserMessage.senderName,
           photo: otherUserMessage.senderPhoto,
         });
-      } else {
-        console.warn('⚠️ [MESSAGES] No se encontró información válida del otro usuario en los mensajes');
       }
       
-      // Validar y normalizar mensajes antes de establecerlos
-      const normalizedMessages = messagesArray.map((msg: any) => {
+      // Validar y normalizar SOLO los mensajes filtrados
+      const normalizedMessages = filteredMessages.map((msg: any) => {
         // Validar y normalizar createdAt - preservar la fecha original si es válida
         let createdAt = msg.createdAt;
         if (createdAt) {
@@ -522,12 +511,34 @@ const MarketplaceMessagesScreen = () => {
       <StatusBar barStyle="light-content" backgroundColor="#96d2d3" />
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color="white" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Mensajes</Text>
+        
+        <View style={styles.headerCenter}>
+          {otherUserInfo.photo || productInfo.sellerPhoto ? (
+            <Image 
+              source={{ uri: otherUserInfo.photo || productInfo.sellerPhoto }} 
+              style={styles.headerAvatar}
+            />
+          ) : (
+            <View style={styles.headerAvatarPlaceholder}>
+              <Ionicons name="person" size={20} color="white" />
+            </View>
+          )}
+          <View style={styles.headerTextContainer}>
+            <Text style={styles.headerName} numberOfLines={1}>
+              {otherUserInfo.name || productInfo.sellerName || 'Usuario'}
+            </Text>
+            <Text style={styles.headerProductTitle} numberOfLines={1}>
+              {productInfo.title || 'Producto'}
+            </Text>
+          </View>
+        </View>
+        
         <TouchableOpacity
           onPress={() => navigation.navigate('ProductDetail', { productId })}
+          style={styles.infoButton}
         >
           <Ionicons name="information-circle-outline" size={24} color="white" />
         </TouchableOpacity>
@@ -613,6 +624,48 @@ const styles = StyleSheet.create({
     paddingHorizontal: 15,
     paddingTop: 6,
     paddingBottom: 15,
+  },
+  backButton: {
+    padding: 4,
+  },
+  headerCenter: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: 12,
+  },
+  headerAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.3)',
+  },
+  headerAvatarPlaceholder: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.3)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  headerTextContainer: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  headerName: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: 'white',
+    fontFamily: 'Montserrat',
+  },
+  headerProductTitle: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.8)',
+    fontFamily: 'Montserrat',
+    marginTop: 2,
+  },
+  infoButton: {
+    padding: 4,
   },
   headerTitle: {
     fontSize: 18,

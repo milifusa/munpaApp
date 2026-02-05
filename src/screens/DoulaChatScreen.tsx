@@ -299,8 +299,8 @@ const DouliChat = () => {
   return (
     <KeyboardAvoidingView 
       style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 70}
     >
       {/* Lista de mensajes */}
       {messages.length === 0 ? (
@@ -375,6 +375,7 @@ const styles = StyleSheet.create({
   },
   messagesContainer: {
     padding: 16,
+    paddingBottom: Platform.OS === 'android' ? 100 : 16,
   },
   messageContainer: {
     flexDirection: 'row',

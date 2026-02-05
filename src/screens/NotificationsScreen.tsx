@@ -21,7 +21,7 @@ import notificationService from '../services/notificationService';
 
 interface Notification {
   id: string;
-  type: 'new_message' | 'purchase' | 'reservation' | 'interest' | 'admin_notification' | 'broadcast';
+  type: 'new_message' | 'purchase' | 'reservation' | 'interest' | 'admin_notification' | 'broadcast' | 'post_comment' | 'post_like' | 'community_post';
   title: string;
   body: string;
   imageUrl?: string;
@@ -30,6 +30,9 @@ interface Notification {
     screen?: string;
     senderId?: string;
     productId?: string;
+    postId?: string;
+    communityId?: string;
+    communityName?: string;
     [key: string]: any;
   };
   read: boolean;
@@ -156,6 +159,35 @@ const NotificationsScreen = () => {
         case 'reservation':
         case 'interest':
           navigation.navigate('MyProducts');
+          break;
+
+        case 'post_comment':
+        case 'post_like':
+        case 'community_post':
+          // Navegar a la pantalla de posts de la comunidad
+          if (data.communityId) {
+            console.log('🚀 [NOTIFICATIONS] Navegando a CommunityPosts:', data.communityId);
+            navigation.navigate('MainTabs', {
+              screen: 'Communities',
+              params: {
+                screen: 'CommunityPosts',
+                params: {
+                  communityId: data.communityId,
+                  communityName: data.communityName || 'Comunidad',
+                },
+              },
+            });
+          } else if (data.postId) {
+            // Si solo tenemos el postId, usar el deep link handler
+            console.log('🚀 [NOTIFICATIONS] Navegando a post usando deep link:', data.postId);
+            const { Linking } = require('react-native');
+            Linking.openURL(`munpa://post/${data.postId}`);
+          } else {
+            // Sin datos suficientes, ir a Communities
+            navigation.navigate('MainTabs', {
+              screen: 'Communities',
+            });
+          }
           break;
 
         case 'admin_notification':

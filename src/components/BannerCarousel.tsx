@@ -202,6 +202,37 @@ const BannerCarousel: React.FC<BannerCarouselProps> = ({
       return;
     }
 
+    // Manejar linkType para navegación a pantallas específicas
+    if (banner.linkType) {
+      switch (banner.linkType) {
+        case 'denticion':
+          navigation.navigate('TeethingTracker');
+          return;
+        case 'crecimiento':
+          navigation.navigate('Growth');
+          return;
+        case 'hitos':
+          navigation.navigate('Development');
+          return;
+        case 'medicacion':
+          navigation.navigate('Medications');
+          return;
+        case 'vacunas':
+          // Navegar a ChildProfile que contiene las vacunas
+          // Nota: Necesitarás pasar el childId apropiado
+          navigation.navigate('ChildProfile');
+          return;
+        case 'solicitud-servicio':
+          navigation.navigate('ServiceRequest');
+          return;
+        case 'recommendation-category':
+          // Ya manejado abajo con recommendationCategoryId
+          break;
+        default:
+          console.warn('⚠️ [BANNER] linkType no reconocido:', banner.linkType);
+      }
+    }
+
     // Si tiene articleId, navegar a la pantalla de detalle del artículo
     if (banner.articleId) {
       navigation.navigate('ArticleDetail', {
@@ -223,13 +254,41 @@ const BannerCarousel: React.FC<BannerCarouselProps> = ({
     if (banner.recommendationCategoryId || banner.linkType === 'recommendation-category') {
       const categoryId = banner.recommendationCategoryId;
       if (categoryId) {
-        navigation.navigate('Recommendations', {
-          screen: 'CategoryRecommendations',
-          params: { 
-            categoryId: categoryId,
-            categoryName: banner.title || 'Recomendaciones',
-          },
-        });
+        // Navegar al tab de Recommendations a través de MainTabs
+        try {
+          // Intentar obtener el navegador raíz que tiene acceso a MainTabs
+          let currentNav: any = navigation;
+          let rootNav = navigation;
+          
+          // Subir hasta encontrar el navegador que puede acceder a 'MainTabs'
+          while (currentNav) {
+            const state = currentNav.getState();
+            if (state?.routeNames?.includes('MainTabs')) {
+              rootNav = currentNav;
+              break;
+            }
+            currentNav = currentNav.getParent();
+            if (!currentNav) {
+              // Si no hay más padres, usar el último navegador encontrado
+              rootNav = navigation.getParent() || navigation;
+              break;
+            }
+          }
+          
+          // Navegar a MainTabs -> Recommendations -> CategoryRecommendations
+          rootNav.navigate('MainTabs', {
+            screen: 'Recommendations',
+            params: {
+              screen: 'CategoryRecommendations',
+              params: { 
+                categoryId: categoryId,
+                categoryName: banner.title || 'Recomendaciones',
+              },
+            },
+          });
+        } catch (error) {
+          console.error('❌ [BANNER] Error navegando a categoría de recomendaciones:', error);
+        }
         return;
       }
     }
@@ -275,34 +334,82 @@ const BannerCarousel: React.FC<BannerCarouselProps> = ({
               navigation.navigate('Communities');
             }
           } else if (route === 'lists') {
+            // Encontrar el navegador que tiene acceso a MainTabs
+            let currentNav: any = navigation;
+            let rootNav = navigation;
+            
+            while (currentNav) {
+              const state = currentNav.getState();
+              if (state?.routeNames?.includes('MainTabs')) {
+                rootNav = currentNav;
+                break;
+              }
+              currentNav = currentNav.getParent();
+              if (!currentNav) {
+                rootNav = navigation.getParent() || navigation;
+                break;
+              }
+            }
+            
             if (linkParts[1]) {
               // Navegar a detalle de lista (ahora dentro de Recommendations)
-              navigation.navigate('Recommendations', {
-                screen: 'ListDetail',
-                params: { listId: linkParts[1] },
+              rootNav.navigate('MainTabs', {
+                screen: 'Recommendations',
+                params: {
+                  screen: 'ListDetail',
+                  params: { listId: linkParts[1] },
+                },
               });
             } else {
               // Navegar a listas dentro de Recommendations
-              navigation.navigate('Recommendations', {
-                screen: 'ListsMain',
+              rootNav.navigate('MainTabs', {
+                screen: 'Recommendations',
+                params: {
+                  screen: 'ListsMain',
+                },
               });
             }
           } else if (route === 'recommendations') {
+            // Encontrar el navegador que tiene acceso a MainTabs
+            let currentNav: any = navigation;
+            let rootNav = navigation;
+            
+            while (currentNav) {
+              const state = currentNav.getState();
+              if (state?.routeNames?.includes('MainTabs')) {
+                rootNav = currentNav;
+                break;
+              }
+              currentNav = currentNav.getParent();
+              if (!currentNav) {
+                rootNav = navigation.getParent() || navigation;
+                break;
+              }
+            }
+            
             if (linkParts[1] === 'category' && linkParts[2]) {
               // Navegar a recomendaciones por categoría (usando ruta anidada)
-              navigation.navigate('Recommendations', {
-                screen: 'CategoryRecommendations',
-                params: { category: linkParts[2] },
+              rootNav.navigate('MainTabs', {
+                screen: 'Recommendations',
+                params: {
+                  screen: 'CategoryRecommendations',
+                  params: { category: linkParts[2] },
+                },
               });
             } else if (linkParts[1]) {
               // Navegar a detalle de recomendación específica (usando ruta anidada)
-              navigation.navigate('Recommendations', {
-                screen: 'RecommendationDetail',
-                params: { recommendationId: linkParts[1] },
+              rootNav.navigate('MainTabs', {
+                screen: 'Recommendations',
+                params: {
+                  screen: 'RecommendationDetail',
+                  params: { recommendationId: linkParts[1] },
+                },
               });
             } else {
               // Navegar a la pantalla principal de recomendaciones
-              navigation.navigate('Recommendations');
+              rootNav.navigate('MainTabs', {
+                screen: 'Recommendations',
+              });
             }
           } else {
             // Intentar navegar directamente
