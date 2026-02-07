@@ -2,7 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import { NavigationContainer, NavigationContainerRef } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { View, ActivityIndicator, StyleSheet, TouchableOpacity, Platform, Image, Linking, Text, Modal, ScrollView, Alert } from 'react-native';
+import { View, ActivityIndicator, StyleSheet, TouchableOpacity, Platform, Image, Linking, Text, Modal, ScrollView, Alert, DeviceEventEmitter } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '../contexts/AuthContext';
@@ -10,6 +10,7 @@ import { useMenu } from '../contexts/MenuContext';
 import { useNavigation } from '@react-navigation/native';
 import GlobalMenu from '../components/GlobalMenu';
 import DouliChatOverlay from '../components/DouliChatOverlay';
+import RequiredLocationModal from '../components/RequiredLocationModal';
 import { useDeepLinking, setNavigationRef } from '../hooks/useDeepLinking';
 import analyticsService from '../services/analyticsService';
 
@@ -37,6 +38,8 @@ import CommunitiesScreen from '../screens/CommunitiesScreen';
 import CommunityRequestsScreen from '../screens/CommunityRequestsScreen';
 import CommunityPostsScreen from '../screens/CommunityPostsScreen';
 import CreatePostScreen from '../screens/CreatePostScreen';
+import CreateEventScreen from '../screens/CreateEventScreen';
+import EventDetailScreen from '../screens/EventDetailScreen';
 import CommentsScreen from '../screens/CommentsScreen';
 import PostDetailScreen from '../screens/PostDetailScreen';
 import GrowthScreen from '../screens/GrowthScreen';
@@ -172,6 +175,16 @@ const ChildrenHeaderTitle = () => {
     };
 
     loadChildren();
+    
+    // Escuchar evento de actualización de hijos
+    const subscription = DeviceEventEmitter.addListener('childrenUpdated', () => {
+      console.log('🔄 [HEADER] Recargando hijos después de aceptar invitación...');
+      loadChildren();
+    });
+
+    return () => {
+      subscription.remove();
+    };
   }, []);
 
   const handleSelectChild = async (child: any) => {
@@ -1013,6 +1026,22 @@ const HomeStackNavigator = () => {
         }}
       />
       <Stack.Screen
+        name="CreateEvent"
+        component={CreateEventScreen}
+        options={{
+          title: 'Crear Evento',
+          headerShown: false, // Usamos header personalizado
+        }}
+      />
+      <Stack.Screen
+        name="EventDetail"
+        component={EventDetailScreen}
+        options={{
+          title: 'Detalle del Evento',
+          headerShown: false, // Usamos header personalizado
+        }}
+      />
+      <Stack.Screen
         name="Comments"
         component={CommentsScreen}
         options={{
@@ -1080,6 +1109,22 @@ const CommunitiesStackNavigator = () => {
         component={CreatePostScreen}
         options={{
           title: 'Crear Post',
+          headerShown: false, // Usamos header personalizado
+        }}
+      />
+      <Stack.Screen
+        name="CreateEvent"
+        component={CreateEventScreen}
+        options={{
+          title: 'Crear Evento',
+          headerShown: false, // Usamos header personalizado
+        }}
+      />
+      <Stack.Screen
+        name="EventDetail"
+        component={EventDetailScreen}
+        options={{
+          title: 'Detalle del Evento',
           headerShown: false, // Usamos header personalizado
         }}
       />
@@ -1454,13 +1499,52 @@ const LoadingScreen = () => (
 
 // Navegador principal con menú global
 const AppNavigator = () => {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, user } = useAuth();
   const { isMenuOpen, closeMenu } = useMenu();
   const navigationRef = useRef<NavigationContainerRef<any>>(null);
   const routeNameRef = useRef<string | undefined>(undefined);
+  const [showLocationModal, setShowLocationModal] = React.useState(false);
+  const [checkingLocation, setCheckingLocation] = React.useState(true);
+  const hasCheckedLocation = useRef(false);
 
   // Activar deep linking
   useDeepLinking();
+
+  // Verificar si el usuario necesita configurar su ubicación
+  React.useEffect(() => {
+    const checkUserLocation = async () => {
+      if (isAuthenticated && user && !isLoading) {
+        // Solo verificar una vez
+        if (hasCheckedLocation.current) {
+          console.log('🌍 [LOCATION CHECK] Ya se verificó, saltando...');
+          return;
+        }
+
+        // Pequeño delay para asegurar que los datos del usuario estén completos
+        await new Promise(resolve => setTimeout(resolve, 300));
+
+        console.log('🌍 [LOCATION CHECK] Usuario completo:', JSON.stringify(user, null, 2));
+        
+        const needsLocation = !user.countryId || !user.cityId;
+        console.log('🌍 [LOCATION CHECK] Usuario:', user.id, 'Necesita ubicación:', needsLocation, {
+          countryId: user.countryId,
+          cityId: user.cityId,
+          countryName: user.countryName,
+          cityName: user.cityName,
+        });
+        
+        setShowLocationModal(needsLocation);
+        setCheckingLocation(false);
+        hasCheckedLocation.current = true; // Marcar como verificado
+      } else if (!isAuthenticated) {
+        setShowLocationModal(false);
+        setCheckingLocation(false);
+        hasCheckedLocation.current = false; // Reset cuando se cierra sesión
+      }
+    };
+
+    checkUserLocation();
+  }, [isAuthenticated, user, isLoading]);
 
   // Establecer navigationRef global para deep linking
   React.useEffect(() => {
@@ -1509,33 +1593,34 @@ const AppNavigator = () => {
             navigationRef.current.navigate('MyProducts');
             break;
 
-          case 'post_comment':
-          case 'post_like':
-          case 'community_post':
-            // Navegar a la pantalla de posts de la comunidad
-            if (data?.communityId) {
-              console.log('🚀 [NAV] Navegando a CommunityPosts:', data.communityId);
-              navigationRef.current.navigate('MainTabs', {
-                screen: 'Communities',
+        case 'post_comment':
+        case 'post_like':
+        case 'community_post':
+          // Prioridad: Si hay postId, navegar directamente al post
+          if (data?.postId) {
+            console.log('🚀 [NAV] Navegando directamente al post:', data.postId);
+            Linking.openURL(`munpa://post/${data.postId}`);
+          } else if (data?.communityId) {
+            // Si no hay postId pero sí communityId, navegar a la comunidad
+            console.log('🚀 [NAV] Navegando a CommunityPosts:', data.communityId);
+            navigationRef.current.navigate('MainTabs', {
+              screen: 'Communities',
+              params: {
+                screen: 'CommunityPosts',
                 params: {
-                  screen: 'CommunityPosts',
-                  params: {
-                    communityId: data.communityId,
-                    communityName: data.communityName || 'Comunidad',
-                  },
+                  communityId: data.communityId,
+                  communityName: data.communityName || 'Comunidad',
                 },
-              });
-            } else if (data?.postId) {
-              // Si solo tenemos el postId, usar el deep link handler
-              console.log('🚀 [NAV] Navegando a post usando deep link handler:', data.postId);
-              Linking.openURL(`munpa://post/${data.postId}`);
-            } else {
-              // Sin datos suficientes, ir a Communities
-              navigationRef.current.navigate('MainTabs', {
-                screen: 'Communities',
-              });
-            }
-            break;
+              },
+            });
+          } else {
+            // Sin datos suficientes, ir a Communities
+            console.log('🚀 [NAV] Sin postId ni communityId, navegando a Communities');
+            navigationRef.current.navigate('MainTabs', {
+              screen: 'Communities',
+            });
+          }
+          break;
 
           case 'admin_notification':
           case 'broadcast':
@@ -1594,6 +1679,11 @@ const AppNavigator = () => {
     return <LoadingScreen />;
   }
 
+  // Mostrar loading mientras verificamos la ubicación del usuario
+  if (isAuthenticated && checkingLocation) {
+    return <LoadingScreen />;
+  }
+
   return (
     <NavigationContainer
       ref={navigationRef}
@@ -1649,6 +1739,18 @@ const AppNavigator = () => {
       
       {/* Burbuja de Douli con mensajes de valor */}
       {isAuthenticated && <DouliChatOverlay />}
+      
+      {/* Modal obligatorio de ubicación */}
+      {isAuthenticated && (
+        <RequiredLocationModal
+          visible={showLocationModal}
+          onComplete={() => {
+            console.log('✅ [LOCATION] Ubicación guardada, cerrando modal');
+            setShowLocationModal(false);
+            // NO resetear hasCheckedLocation - ya se validó la ubicación
+          }}
+        />
+      )}
     </NavigationContainer>
   );
 };

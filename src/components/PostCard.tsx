@@ -6,6 +6,8 @@ import LikeButton from './LikeButton';
 import { Post } from '../types/posts';
 import AttachedLists from './AttachedLists';
 import { useAuth } from '../contexts/AuthContext';
+import LinkableText from './LinkableText';
+import EventCard from './EventCard';
 
 interface PostCardProps {
   post: Post;
@@ -16,6 +18,7 @@ interface PostCardProps {
   communityName: string;
   likingPostId?: string | null;
   onViewFull?: (post: Post) => void;
+  onAttendEvent?: (post: Post) => void;
 }
 
 const PostCard: React.FC<PostCardProps> = ({
@@ -27,10 +30,10 @@ const PostCard: React.FC<PostCardProps> = ({
   communityName,
   likingPostId,
   onViewFull,
+  onAttendEvent,
 }) => {
   const navigation = useNavigation<any>();
   const { user } = useAuth();
-  const isOwn = post.authorId && user?.id ? post.authorId === user.id : false;
   const MAX_LENGTH = 200;
   const shouldTruncate = post.content.length > MAX_LENGTH;
   const displayContent = shouldTruncate 
@@ -38,34 +41,60 @@ const PostCard: React.FC<PostCardProps> = ({
     : post.content;
   const imagePosition = post.imagePosition || 'start';
 
+  // Si es un evento, renderizar EventCard
+  if (post.postType === 'event' && post.eventData) {
+    return (
+      <EventCard
+        post={post}
+        onViewDetail={onViewFull || (() => {})}
+        onAttend={onAttendEvent}
+      />
+    );
+  }
+
+  // Post normal
   return (
-    <View style={[styles.postCard, isOwn ? styles.postCardOwn : styles.postCardOther]}>
-      {/* Meta */}
-      <View style={[styles.metaRow, isOwn && styles.metaRowOwn]}>
-        {!isOwn && (
+    <View style={styles.postCard}>
+      {/* Header del Post */}
+      <View style={styles.postHeader}>
+        <View style={styles.authorInfo}>
           <View style={styles.authorAvatar}>
             {post.authorPhoto ? (
               <Image source={{ uri: post.authorPhoto }} style={styles.authorAvatarImage} />
             ) : (
-              <Ionicons name="person" size={16} color="#666" />
+              <View style={styles.avatarPlaceholder}>
+                <Ionicons name="person" size={24} color="#FFF" />
+              </View>
             )}
           </View>
-        )}
-        <View style={styles.metaText}>
-          <Text style={styles.authorName}>{post.authorName}</Text>
-          <Text style={styles.postDate}>{formatDate(post.createdAt)}</Text>
+          <View style={styles.authorDetails}>
+            <Text style={styles.authorName}>{post.authorName}</Text>
+            <Text style={styles.postDate}>{formatDate(post.createdAt)}</Text>
+          </View>
         </View>
+        
+        {/* Badge de pin si está fijado */}
+        {post.isPinned && (
+          <View style={styles.pinnedBadge}>
+            <Ionicons name="pin" size={14} color="#59C6C0" />
+          </View>
+        )}
       </View>
-      
-      {/* Burbuja de mensaje */}
-      <View style={[styles.bubble, isOwn ? styles.bubbleOwn : styles.bubbleOther]}>
+
+      {/* Contenido del Post */}
+      <View style={styles.postContent}>
         {post.title && <Text style={styles.postTitle}>{post.title}</Text>}
       
         {post.imageUrl && imagePosition === 'start' && (
           <Image source={{ uri: post.imageUrl }} style={styles.postImage} />
         )}
         
-        <Text style={[styles.postText, isOwn && styles.postTextOwn]}>{displayContent}</Text>
+        <LinkableText 
+          style={styles.postText}
+          linkStyle={styles.linkText}
+        >
+          {displayContent}
+        </LinkableText>
         
         {shouldTruncate && onViewFull && (
           <TouchableOpacity onPress={() => onViewFull(post)} style={styles.expandButton}>
@@ -91,22 +120,27 @@ const PostCard: React.FC<PostCardProps> = ({
         )}
       </View>
 
-      {/* Acciones */}
-      <View style={[styles.postActions, isOwn && styles.postActionsOwn]}>
+      {/* Barra de Acciones */}
+      <View style={styles.postActions}>
+        <View style={styles.actionsLeft}>
           <LikeButton
             isLiked={post.isLiked || false}
             likeCount={post.likeCount || 0}
             onPress={() => onLike(post)}
             isLoading={likingPostId === post.id}
-          size="small"
-            showCount={false}
+            size="small"
+            showCount={true}
           />
-        <TouchableOpacity style={styles.actionButton} onPress={() => onComment(post)}>
-          <Ionicons name="chatbubble-outline" size={18} color="#666" />
+          <TouchableOpacity style={styles.actionButton} onPress={() => onComment(post)}>
+            <Ionicons name="chatbubble-outline" size={20} color="#666" />
+            {post.commentCount > 0 && (
+              <Text style={styles.actionCount}>{post.commentCount}</Text>
+            )}
           </TouchableOpacity>
+        </View>
         <TouchableOpacity style={styles.actionButton} onPress={() => onShare(post.id)}>
-          <Ionicons name="share-outline" size={18} color="#666" />
-          </TouchableOpacity>
+          <Ionicons name="share-outline" size={20} color="#666" />
+        </TouchableOpacity>
       </View>
     </View>
   );
@@ -114,44 +148,55 @@ const PostCard: React.FC<PostCardProps> = ({
 
 const styles = StyleSheet.create({
   postCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
     marginBottom: 16,
-    maxWidth: '88%',
-      },
-  postCardOwn: {
-    alignSelf: 'flex-end',
+    marginHorizontal: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
-  postCardOther: {
-    alignSelf: 'flex-start',
-  },
-  metaRow: {
+  postHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 6,
-    gap: 8,
+    justifyContent: 'space-between',
+    padding: 16,
+    paddingBottom: 12,
   },
-  metaRowOwn: {
-    justifyContent: 'flex-end',
-  },
-  metaText: {
-    flexDirection: 'column',
+  authorInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
   },
   authorAvatar: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#F0F0F0',
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    overflow: 'hidden',
+    marginRight: 12,
+  },
+  authorAvatarImage: {
+    width: 44,
+    height: 44,
+  },
+  avatarPlaceholder: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#59C6C0',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  authorAvatarImage: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+  authorDetails: {
+    flex: 1,
   },
   authorName: {
-    fontSize: 12,
+    fontSize: 15,
     fontWeight: '600',
-    color: '#6B7280',
+    color: '#1F2937',
+    marginBottom: 2,
     fontFamily: 'Montserrat',
   },
   postDate: {
@@ -159,70 +204,80 @@ const styles = StyleSheet.create({
     color: '#9CA3AF',
     fontFamily: 'Montserrat',
   },
-  bubble: {
-    borderRadius: 16,
-    paddingVertical: 12,
-    paddingHorizontal: 14,
+  pinnedBadge: {
+    backgroundColor: '#E0F2F1',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
   },
-  bubbleOwn: {
-    backgroundColor: '#59C6C0',
-    borderTopRightRadius: 6,
-  },
-  bubbleOther: {
-    backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 6,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
+  postContent: {
+    paddingHorizontal: 16,
   },
   postTitle: {
-    fontSize: 15,
+    fontSize: 18,
     fontWeight: '700',
     color: '#1F2937',
+    marginBottom: 8,
     fontFamily: 'Montserrat',
-    marginBottom: 6,
-  },
-  postText: {
-    fontSize: 14,
-    color: '#1F2937',
-    lineHeight: 20,
-    fontFamily: 'Montserrat',
-  },
-  postTextOwn: {
-    color: '#FFFFFF',
   },
   postImage: {
     width: '100%',
-    height: 180,
-    borderRadius: 12,
-    marginBottom: 10,
-    marginTop: 10,
+    height: 250,
+    borderRadius: 8,
+    marginVertical: 12,
+    backgroundColor: '#F3F4F6',
+  },
+  postText: {
+    fontSize: 15,
+    lineHeight: 22,
+    color: '#374151',
+    fontFamily: 'Montserrat',
+  },
+  linkText: {
+    color: '#59C6C0',
+    textDecorationLine: 'underline',
+    fontWeight: '600',
   },
   expandButton: {
-    marginTop: 8,
-    alignSelf: 'flex-start',
     flexDirection: 'row',
     alignItems: 'center',
+    alignSelf: 'flex-start',
+    marginTop: 8,
     gap: 4,
   },
   expandButtonText: {
-    fontSize: 14,
     color: '#59C6C0',
+    fontSize: 14,
     fontWeight: '600',
     fontFamily: 'Montserrat',
   },
   postActions: {
-    marginTop: 6,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#F3F4F6',
+    marginTop: 12,
   },
-  postActionsOwn: {
-    justifyContent: 'flex-end',
+  actionsLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 20,
   },
   actionButton: {
-    padding: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  actionCount: {
+    fontSize: 14,
+    color: '#6B7280',
+    fontWeight: '500',
+    fontFamily: 'Montserrat',
   },
 });
 
 export default PostCard;
-

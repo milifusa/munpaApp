@@ -472,7 +472,7 @@ const CreateProductScreen = () => {
         location: {
           latitude: location.latitude,
           longitude: location.longitude,
-          address: address.trim() || undefined,
+          address: location.address,
           city: cityName || location.city,
           state: location.state,
           country: countryName || location.country || 'Ecuador',

@@ -624,39 +624,6 @@ const VaccineTrackerScreen: React.FC = () => {
     return `${numbers.slice(0, 2)}/${numbers.slice(2, 4)}/${numbers.slice(4, 8)}`;
   };
 
-  const renderChildSelector = () => {
-    if (children.length <= 1) return null;
-
-    return (
-      <ScrollView 
-        horizontal 
-        showsHorizontalScrollIndicator={false} 
-        style={styles.childSelector}
-        contentContainerStyle={styles.childSelectorContent}
-      >
-        {children.map((child) => (
-          <TouchableOpacity
-            key={child.id}
-            style={[
-              styles.childButton,
-              selectedChild?.id === child.id && styles.childButtonActive,
-            ]}
-            onPress={() => handleChildChange(child)}
-          >
-            <Text
-              style={[
-                styles.childButtonText,
-                selectedChild?.id === child.id && styles.childButtonTextActive,
-              ]}
-            >
-              {child.name}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
-    );
-  };
-
   // Obtener meses únicos del calendario de vacunación
   const getVaccineMonths = () => {
     const monthsSet = new Set<number>();
@@ -1144,9 +1111,6 @@ const VaccineTrackerScreen: React.FC = () => {
                 />
               </TouchableOpacity>
             </View>
-
-            {/* Selector de hijos */}
-            {renderChildSelector()}
 
             {loading ? (
               <View style={styles.loadingContainer}>
@@ -1643,30 +1607,6 @@ const styles = StyleSheet.create({
     color: '#6B7280',
     marginLeft: 4,
     fontWeight: '500',
-  },
-  childSelector: {
-    marginVertical: 12,
-  },
-  childSelectorContent: {
-    paddingHorizontal: 20,
-  },
-  childButton: {
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 20,
-    backgroundColor: '#E0F2F1',
-    marginRight: 10,
-  },
-  childButtonActive: {
-    backgroundColor: MUNPA_PRIMARY,
-  },
-  childButtonText: {
-    color: '#374151',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  childButtonTextActive: {
-    color: '#FFFFFF',
   },
   emptyState: {
     alignItems: 'center',

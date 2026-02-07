@@ -115,6 +115,10 @@ export interface User {
   childrenCount?: number;
   isPregnant?: boolean;
   gestationWeeks?: number;
+  countryId?: string;
+  cityId?: string;
+  countryName?: string;
+  cityName?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -949,6 +953,34 @@ export const communitiesService = {
       return response.data;
     } catch (error: any) {
       console.error('❌ [COMMUNITIES] Error obteniendo top posts:', error.response?.data || error.message);
+      throw error;
+    }
+  },
+
+  // Obtener un post específico por ID
+  getPost: async (postId: string) => {
+    console.log('📥 [COMMUNITIES] Obteniendo post:', postId);
+    
+    try {
+      const response = await api.get(`/api/posts/${postId}`);
+      console.log('✅ [COMMUNITIES] Post obtenido exitosamente:', response.data);
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ [COMMUNITIES] Error obteniendo post:', error.response?.data || error.message);
+      throw error;
+    }
+  },
+
+  // NUEVO: Eliminar un post (solo el autor puede hacerlo)
+  deletePost: async (postId: string) => {
+    console.log('🗑️ [COMMUNITIES] Eliminando post:', postId);
+    
+    try {
+      const response = await api.delete(`/api/posts/${postId}`);
+      console.log('✅ [COMMUNITIES] Post eliminado exitosamente:', response.data);
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ [COMMUNITIES] Error eliminando post:', error.response?.data || error.message);
       throw error;
     }
   },

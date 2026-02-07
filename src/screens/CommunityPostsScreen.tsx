@@ -21,6 +21,7 @@ import { communitiesService } from '../services/api';
 import LikeButton from '../components/LikeButton';
 import { shareContentHelper } from '../utils/shareContentHelper';
 import PostCard from '../components/PostCard';
+import analyticsService from '../services/analyticsService';
 
 interface Post {
   id: string;
@@ -39,6 +40,8 @@ interface Post {
   imagePosition?: 'start' | 'end';
   isPinned?: boolean;
   tags?: string[];
+  postType?: 'normal' | 'event'; // Nuevo
+  eventData?: any; // Nuevo: datos del evento
   attachedLists?: Array<{
     id: string;
     title: string;
@@ -70,6 +73,8 @@ const CommunityPostsScreen: React.FC = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [likingPostId, setLikingPostId] = useState<string | null>(null);
   const [showMenu, setShowMenu] = useState(false);
+  const [showCreateMenu, setShowCreateMenu] = useState(false);
+  const [filterType, setFilterType] = useState<'all' | 'posts' | 'events'>('all');
   const loadInFlightRef = useRef(false);
   const lastLoadAtRef = useRef(0);
 
@@ -117,7 +122,28 @@ const CommunityPostsScreen: React.FC = () => {
         
         const finalPosts = Array.isArray(postsData) ? postsData : [];
         
+        // DEBUG: Verificar tipos de posts
+        console.log('🔍 [POSTS DEBUG] Total posts:', finalPosts.length);
+        finalPosts.forEach((post: any, index: number) => {
+          console.log(`  Post ${index + 1}:`, {
+            postType: post.postType,
+            hasEventData: !!post.eventData,
+            title: post.eventData?.title || post.content?.substring(0, 30)
+          });
+        });
+        
         setPosts(finalPosts);
+        
+        // ✅ Analytics: Posts cargados
+        if (!force) {
+          analyticsService.logEvent('community_posts_viewed', {
+            community_id: communityId,
+            community_name: communityName,
+            total_posts: finalPosts.length,
+            event_posts: finalPosts.filter((p: any) => p.postType === 'event').length,
+            normal_posts: finalPosts.filter((p: any) => p.postType !== 'event').length,
+          });
+        }
       } else {
         setPosts([]);
       }
@@ -194,7 +220,17 @@ const CommunityPostsScreen: React.FC = () => {
 
   // Función para crear un nuevo post
   const handleCreatePost = () => {
+    setShowCreateMenu(false);
     (navigation as any).navigate('CreatePost', {
+      communityId: communityId,
+      communityName: communityName
+    });
+  };
+
+  // Función para crear un nuevo evento
+  const handleCreateEvent = () => {
+    setShowCreateMenu(false);
+    (navigation as any).navigate('CreateEvent', {
       communityId: communityId,
       communityName: communityName
     });
@@ -318,12 +354,12 @@ const CommunityPostsScreen: React.FC = () => {
   }
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top']}>
+    <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#96d2d3" />
-      <View style={styles.contentWrapper}>
         {/* Header */}
+      <SafeAreaView style={styles.headerSafeArea} edges={['top']}>
         <LinearGradient
-          colors={['#59C6C0', '#4DB8B3']}
+          colors={['#96d2d3', '#96d2d3']}
           style={styles.header}
         >
         <TouchableOpacity 
@@ -336,7 +372,7 @@ const CommunityPostsScreen: React.FC = () => {
         <View style={styles.headerActions}>
           <TouchableOpacity 
             style={styles.createPostButton}
-            onPress={handleCreatePost}
+            onPress={() => setShowCreateMenu(!showCreateMenu)}
           >
             <Ionicons name="add" size={24} color="white" />
           </TouchableOpacity>
@@ -348,6 +384,34 @@ const CommunityPostsScreen: React.FC = () => {
           </TouchableOpacity>
         </View>
       </LinearGradient>
+      </SafeAreaView>
+
+      {/* Menú de crear (Post o Evento) */}
+      {showCreateMenu && (
+        <View style={styles.menuOverlay}>
+          <TouchableOpacity 
+            style={styles.menuBackdrop}
+            onPress={() => setShowCreateMenu(false)}
+          />
+          <View style={[styles.menuContainer, styles.createMenuContainer]}>
+            <TouchableOpacity 
+              style={styles.menuItem}
+              onPress={handleCreatePost}
+            >
+              <Ionicons name="document-text" size={20} color="#59C6C0" />
+              <Text style={styles.menuItemText}>Crear Post</Text>
+            </TouchableOpacity>
+            <View style={styles.menuDivider} />
+            <TouchableOpacity 
+              style={styles.menuItem}
+              onPress={handleCreateEvent}
+            >
+              <Ionicons name="calendar" size={20} color="#887CBC" />
+              <Text style={styles.menuItemText}>Crear Evento</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
 
       {/* Menú desplegable */}
       {showMenu && (
@@ -377,6 +441,51 @@ const CommunityPostsScreen: React.FC = () => {
         <Text style={styles.communityName}>{communityName}</Text>
       </View>
 
+      {/* Filtros de contenido */}
+      <View style={styles.filterTabs}>
+        <TouchableOpacity 
+          style={[styles.filterTab, filterType === 'all' && styles.filterTabActive]}
+          onPress={() => setFilterType('all')}
+        >
+          <Text style={[styles.filterTabText, filterType === 'all' && styles.filterTabTextActive]}>
+            Todos
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity 
+          style={[styles.filterTab, filterType === 'posts' && styles.filterTabActive]}
+          onPress={() => setFilterType('posts')}
+        >
+          <Ionicons 
+            name="document-text" 
+            size={16} 
+            color={filterType === 'posts' ? '#59C6C0' : '#999'} 
+          />
+          <Text style={[styles.filterTabText, filterType === 'posts' && styles.filterTabTextActive]}>
+            Posts
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity 
+          style={[
+            styles.filterTab, 
+            filterType === 'events' && styles.filterTabActive,
+            filterType === 'events' && styles.filterTabActiveEvents
+          ]}
+          onPress={() => setFilterType('events')}
+        >
+          <Ionicons 
+            name="calendar" 
+            size={16} 
+            color={filterType === 'events' ? '#887CBC' : '#999'} 
+          />
+          <Text style={[
+            styles.filterTabText, 
+            filterType === 'events' && styles.filterTabTextActiveEvents
+          ]}>
+            Eventos
+          </Text>
+        </TouchableOpacity>
+      </View>
+
       {/* Contenido principal */}
       <ScrollView 
         style={styles.content}
@@ -397,53 +506,108 @@ const CommunityPostsScreen: React.FC = () => {
             <Text style={styles.emptyStateText}>
               Sé el primero en compartir algo en esta comunidad
             </Text>
-            <TouchableOpacity 
-              style={styles.createFirstPostButton}
-              onPress={handleCreatePost}
-            >
-              <Ionicons name="add-circle" size={20} color="white" />
-              <Text style={styles.createFirstPostButtonText}>Crear Primer Post</Text>
-            </TouchableOpacity>
+            <View style={styles.emptyStateButtons}>
+              <TouchableOpacity 
+                style={styles.createFirstPostButton}
+                onPress={handleCreatePost}
+              >
+                <Ionicons name="document-text" size={20} color="white" />
+                <Text style={styles.createFirstPostButtonText}>Crear Post</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.createFirstPostButton, styles.createEventButton]}
+                onPress={handleCreateEvent}
+              >
+                <Ionicons name="calendar" size={20} color="white" />
+                <Text style={styles.createFirstPostButtonText}>Crear Evento</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         ) : (
-          <View style={styles.postsContainer}>
-            {posts.map((post) => (
-              <PostCard
-                key={post.id}
-                post={post}
-                onLike={handleLikePost}
-                onComment={(post) => {
-                  (navigation as any).navigate('Comments', {
-                    postId: post.id,
-                    postContent: post.content,
-                    postAuthorName: post.authorName,
-                    communityName: communityName
-                  });
-                }}
-                onShare={(postId) => {
-                  shareContentHelper.sharePost(postId).catch((error) => {
-                    console.error('❌ [POSTS] Error compartiendo post:', error);
-                  });
-                }}
-                formatDate={formatDate}
-                communityName={communityName}
-                likingPostId={likingPostId}
-                onViewFull={(post) => {
-                  (navigation as any).navigate('PostDetail', {
-                    post,
-                    communityName,
-                    formatDate,
-                    onLike: handleLikePost,
-                    likingPostId
-                  });
-                }}
-              />
-            ))}
-          </View>
+          (() => {
+            const filteredPosts = posts.filter(post => {
+              if (filterType === 'all') return true;
+              if (filterType === 'events') return post.postType === 'event';
+              if (filterType === 'posts') return !post.postType || post.postType === 'normal';
+              return true;
+            });
+
+            if (filteredPosts.length === 0) {
+              return (
+                <View style={styles.emptyFilterState}>
+                  <Ionicons 
+                    name={filterType === 'events' ? 'calendar-outline' : 'document-text-outline'} 
+                    size={64} 
+                    color="#CCC" 
+                  />
+                  <Text style={styles.emptyStateTitle}>
+                    {filterType === 'events' ? 'No hay eventos' : 'No hay posts normales'}
+                  </Text>
+                  <Text style={styles.emptyStateText}>
+                    {filterType === 'events' 
+                      ? 'Aún no se han creado eventos en esta comunidad' 
+                      : 'Aún no hay posts normales en esta comunidad'}
+                  </Text>
+                </View>
+              );
+            }
+
+            return (
+              <View style={styles.postsContainer}>
+                {filteredPosts.map((post) => (
+                  <PostCard
+                    key={post.id}
+                    post={post}
+                    onLike={handleLikePost}
+                    onComment={(post) => {
+                      (navigation as any).navigate('Comments', {
+                        postId: post.id,
+                        postContent: post.content,
+                        postAuthorName: post.authorName,
+                        communityName: communityName
+                      });
+                    }}
+                    onShare={(postId) => {
+                      shareContentHelper.sharePost(postId).catch((error) => {
+                        console.error('❌ [POSTS] Error compartiendo post:', error);
+                      });
+                    }}
+                    formatDate={formatDate}
+                    communityName={communityName}
+                    likingPostId={likingPostId}
+                    onViewFull={(post) => {
+                      // Si es evento, navegar a EventDetail
+                      if (post.postType === 'event' && post.eventData) {
+                        (navigation as any).navigate('EventDetail', {
+                          event: post,
+                          communityName,
+                        });
+                      } else {
+                        // Post normal, navegar a PostDetail
+                        (navigation as any).navigate('PostDetail', {
+                          post,
+                          communityName,
+                          formatDate,
+                          onLike: handleLikePost,
+                          likingPostId
+                        });
+                      }
+                    }}
+                    onAttendEvent={(post) => {
+                      // Navegar directo a EventDetail cuando se intenta confirmar asistencia desde card
+                      (navigation as any).navigate('EventDetail', {
+                        event: post,
+                        communityName,
+                      });
+                    }}
+                  />
+                ))}
+              </View>
+            );
+          })()
         )}
       </ScrollView>
-      </View>
-    </SafeAreaView>
+    </View>
   );
 };
 
@@ -452,13 +616,8 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F7FAFC',
   },
-  safeArea: {
-    flex: 1,
+  headerSafeArea: {
     backgroundColor: '#96d2d3',
-  },
-  contentWrapper: {
-    flex: 1,
-    backgroundColor: '#F7FAFC',
   },
   header: {
     flexDirection: 'row',
@@ -526,6 +685,9 @@ const styles = StyleSheet.create({
     elevation: 5,
     minWidth: 200,
   },
+  createMenuContainer: {
+    right: 60, // Posicionar junto al botón de crear
+  },
   menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -533,10 +695,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     gap: 12,
   },
+  menuItemText: {
+    fontSize: 14,
+    color: '#333',
+    fontWeight: '500',
+  },
   menuItemTextDanger: {
     fontSize: 14,
     color: '#F44336',
     fontWeight: '500',
+  },
+  menuDivider: {
+    height: 1,
+    backgroundColor: '#E5E7EB',
+    marginHorizontal: 8,
   },
   communityInfo: {
     flexDirection: 'row',
@@ -550,6 +722,46 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#333',
     marginLeft: 10,
+  },
+  filterTabs: {
+    flexDirection: 'row',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+    gap: 8,
+  },
+  filterTab: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+    backgroundColor: '#F3F4F6',
+    gap: 6,
+  },
+  filterTabActive: {
+    backgroundColor: '#E0F2F1',
+    borderWidth: 1,
+    borderColor: '#59C6C0',
+  },
+  filterTabActiveEvents: {
+    backgroundColor: '#F3E8FF',
+    borderColor: '#887CBC',
+  },
+  filterTabText: {
+    fontSize: 14,
+    color: '#6B7280',
+    fontWeight: '500',
+  },
+  filterTabTextActive: {
+    color: '#59C6C0',
+    fontWeight: '600',
+  },
+  filterTabTextActiveEvents: {
+    color: '#887CBC',
+    fontWeight: '600',
   },
   content: {
     flex: 1,
@@ -572,6 +784,11 @@ const styles = StyleSheet.create({
     paddingVertical: 80,
     paddingHorizontal: 40,
   },
+  emptyFilterState: {
+    alignItems: 'center',
+    paddingVertical: 60,
+    paddingHorizontal: 40,
+  },
   emptyStateTitle: {
     fontSize: 20,
     fontWeight: 'bold',
@@ -587,6 +804,10 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     marginBottom: 20,
   },
+  emptyStateButtons: {
+    flexDirection: 'row',
+    gap: 12,
+  },
   createFirstPostButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -595,6 +816,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     borderRadius: 25,
   },
+  createEventButton: {
+    backgroundColor: '#887CBC',
+  },
   createFirstPostButtonText: {
     color: 'white',
     fontSize: 16,
@@ -602,8 +826,7 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   postsContainer: {
-    paddingHorizontal: 16,
-    gap: 12,
+    paddingBottom: 16,
   },
   postCard: {
     backgroundColor: 'white',

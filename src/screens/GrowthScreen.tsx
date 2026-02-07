@@ -22,6 +22,7 @@ import Svg, { Line, Path, Circle, Text as SvgText } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { childrenService, growthService } from '../services/api';
 import analyticsService from '../services/analyticsService';
+import BannerCarousel from '../components/BannerCarousel';
 
 type GrowthTab = 'weight' | 'height' | 'head' | 'summary';
 
@@ -617,6 +618,17 @@ const GrowthScreen: React.FC = () => {
           ))}
         </View>
 
+        {/* Banners */}
+        <View style={styles.bannerSection}>
+          <BannerCarousel
+            section="crecimiento"
+            fallbackToHome={true}
+            bannerHeight={180}
+            showIndicators={true}
+            style={{ marginTop: -10 }}
+          />
+        </View>
+
         {activeTab !== 'summary' && (
           <>
             {loading ? (
@@ -932,6 +944,10 @@ const styles = StyleSheet.create({
   },
   tabLabelActive: {
     color: '#FFFFFF',
+  },
+  bannerSection: {
+    marginTop: 16,
+    marginBottom: 8,
   },
   summaryCard: {
     marginTop: 16,

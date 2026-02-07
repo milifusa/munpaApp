@@ -8,12 +8,14 @@ import {
   Image,
   ActivityIndicator,
   Alert,
+  DeviceEventEmitter,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { shareChildService, InvitationDetails } from '../services/shareChildService';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface RouteParams {
   token: string;
@@ -62,18 +64,23 @@ const AcceptInvitationScreen: React.FC = () => {
             setAccepting(true);
             try {
               await shareChildService.acceptInvitation(token);
-              Alert.alert(
-                '¡Éxito!',
-                `Ahora puedes ver la información de ${childName}`,
-                [
-                  {
-                    text: 'OK',
-                    onPress: () => {
-                      navigation.navigate('Home' as never);
-                    },
-                  },
-                ]
-              );
+              
+              // Limpiar el flag de hasChildren para forzar recarga de hijos
+              await AsyncStorage.removeItem('hasChildren');
+              
+              // Emitir evento para que el ChildrenHeaderTitle recargue los hijos
+              DeviceEventEmitter.emit('childrenUpdated');
+              
+              // Cerrar esta pantalla y navegar a Home
+              navigation.navigate('Home' as never);
+              
+              // Mostrar mensaje de éxito después de navegar
+              setTimeout(() => {
+                Alert.alert(
+                  '¡Éxito!',
+                  `Ahora puedes ver la información de ${childName}`
+                );
+              }, 500);
             } catch (error: any) {
               Alert.alert(
                 'Error',

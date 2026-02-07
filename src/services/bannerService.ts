@@ -26,6 +26,8 @@ export interface Banner {
   imageStoragePath?: string;
   link?: string;
   linkType?: string; // NUEVO: Tipo de link (recommendation-category, etc)
+  type?: string; // NUEVO: Tipo de banner (event, product, etc)
+  eventId?: string; // NUEVO: ID del evento si type === 'event'
   articleCategoryId?: string; // ID de categoría de artículos
   articleId?: string; // ID de artículo específico
   recommendationCategoryId?: string; // NUEVO: ID de categoría de recomendaciones
@@ -67,7 +69,7 @@ class BannerService {
     return headers;
   }
 
-  // Obtener banners activos (público)
+  // Obtener banners activos
   // section: opcional, filtra banners por sección. Si no se proporciona, devuelve todos los banners activos
   async getActiveBanners(section?: BannerSection): Promise<Banner[]> {
     try {
@@ -80,7 +82,7 @@ class BannerService {
       
       const response = await fetch(url, {
         method: 'GET',
-        headers: await this.getHeaders(false),
+        headers: await this.getHeaders(true), // ✅ Incluir autenticación
       });
 
       if (!response.ok) {
@@ -92,13 +94,10 @@ class BannerService {
       }
 
       const data = await response.json();
-      
-      console.log(`🔍 [BANNERS] Respuesta del API para sección "${section || 'todas'}":`, JSON.stringify(data, null, 2));
-      
+     
       // Manejar diferentes formatos de respuesta
       let banners = data.data || data.banners || (Array.isArray(data) ? data : []);
       
-      console.log(`🔍 [BANNERS] Banners procesados (${banners.length}):`, JSON.stringify(banners, null, 2));
       
       if (!Array.isArray(banners)) {
         console.warn('⚠️ [BANNERS] Los banners no son un array, retornando array vacío');
@@ -112,7 +111,6 @@ class BannerService {
           const bannerSection = banner.section || 'home'; // Default a 'home' si no tiene sección
           return bannerSection === section;
         });
-        console.log(`🔍 [BANNERS] Banners filtrados por sección "${section}" (${filteredBanners.length}):`, JSON.stringify(filteredBanners, null, 2));
         banners = filteredBanners;
       }
       return banners as Banner[];
@@ -128,7 +126,7 @@ class BannerService {
     try {
       await fetch(`${API_BASE_URL}/banners/${bannerId}/view`, {
         method: 'POST',
-        headers: await this.getHeaders(false),
+        headers: await this.getHeaders(true), // ✅ Incluir autenticación
       });
     } catch (error) {
       console.error('❌ [BANNERS] Error registrando vista:', error);
@@ -141,7 +139,7 @@ class BannerService {
     try {
       await fetch(`${API_BASE_URL}/banners/${bannerId}/click`, {
         method: 'POST',
-        headers: await this.getHeaders(false),
+        headers: await this.getHeaders(true), // ✅ Incluir autenticación
       });
     } catch (error) {
       console.error('❌ [BANNERS] Error registrando click:', error);

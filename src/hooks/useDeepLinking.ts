@@ -181,84 +181,57 @@ const handleDeepLinkInternal = async (url: string, isAuthenticated: boolean) => 
               const posts = postsResponse?.data || postsResponse || [];
               const post = Array.isArray(posts) ? posts.find((p: any) => p.id === postId) : null;
               
-              if (post) {
-                
-                if (globalNavigationRef.isReady()) {
-                  globalNavigationRef.navigate('MainTabs', {
-                    screen: 'Home',
-                    params: {
-                      screen: 'PostDetail',
-                      params: {
-                        post,
-                        communityName: metadata?.communityName || 'Comunidad',
-                        formatDate: (date: any) => {
-                          if (!date) return 'Fecha no disponible';
-                          try {
-                            if (date._seconds) {
-                              return new Date(date._seconds * 1000).toLocaleDateString('es-ES', {
-                                year: 'numeric',
-                                month: 'long',
-                                day: 'numeric',
-                                hour: '2-digit',
-                                minute: '2-digit',
-                              });
-                            }
-                            return new Date(date).toLocaleDateString('es-ES', {
-                              year: 'numeric',
-                              month: 'long',
-                              day: 'numeric',
-                              hour: '2-digit',
-                              minute: '2-digit',
-                            });
-                          } catch {
-                            return 'Fecha inválida';
-                          }
-                        },
-                      }
-                    }
+            if (post) {
+              console.log('✅ [DEEP LINK] Post encontrado, navegando a PostDetail');
+              
+              const formatDate = (date: any) => {
+                if (!date) return 'Fecha no disponible';
+                try {
+                  if (date._seconds) {
+                    return new Date(date._seconds * 1000).toLocaleDateString('es-ES', {
+                      year: 'numeric',
+                      month: 'long',
+                      day: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    });
+                  }
+                  return new Date(date).toLocaleDateString('es-ES', {
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit',
                   });
-                  return;
-                } else {
-                  setTimeout(() => {
-                    if (globalNavigationRef && globalNavigationRef.isReady()) {
-                      globalNavigationRef.navigate('MainTabs', {
-                        screen: 'Home',
-                        params: {
-                          screen: 'PostDetail',
-                          params: {
-                            post,
-                            communityName: metadata?.communityName || 'Comunidad',
-                            formatDate: (date: any) => {
-                              if (!date) return 'Fecha no disponible';
-                              try {
-                                if (date._seconds) {
-                                  return new Date(date._seconds * 1000).toLocaleDateString('es-ES', {
-                                    year: 'numeric',
-                                    month: 'long',
-                                    day: 'numeric',
-                                    hour: '2-digit',
-                                    minute: '2-digit',
-                                  });
-                                }
-                                return new Date(date).toLocaleDateString('es-ES', {
-                                  year: 'numeric',
-                                  month: 'long',
-                                  day: 'numeric',
-                                  hour: '2-digit',
-                                  minute: '2-digit',
-                                });
-                              } catch {
-                                return 'Fecha inválida';
-                              }
-                            },
-                          }
-                        }
-                      });
-                    }
-                  }, 500);
-                  return;
+                } catch {
+                  return 'Fecha inválida';
                 }
+              };
+              
+              if (globalNavigationRef.isReady()) {
+                globalNavigationRef.navigate('PostDetail', {
+                  post,
+                  communityName: metadata?.communityName || 'Comunidad',
+                  formatDate,
+                  onLike: () => {}, // función vacía, se puede mejorar después
+                  likingPostId: null,
+                });
+                return;
               } else {
+                setTimeout(() => {
+                  if (globalNavigationRef && globalNavigationRef.isReady()) {
+                    globalNavigationRef.navigate('PostDetail', {
+                      post,
+                      communityName: metadata?.communityName || 'Comunidad',
+                      formatDate,
+                      onLike: () => {},
+                      likingPostId: null,
+                    });
+                  }
+                }, 500);
+                return;
+              }
+            } else {
                 console.warn('⚠️ [DEEP LINK] Post no encontrado en la comunidad');
               }
             }

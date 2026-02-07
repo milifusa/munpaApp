@@ -88,7 +88,50 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             // Verificar token con el backend
             try {
               await authService.verifyToken();
-              setUser(userData);
+              
+              // Si los datos locales no tienen countryId/cityId, obtener perfil completo del backend
+              if (!userData.countryId || !userData.cityId) {
+                console.log('🔄 [AUTH] Datos de ubicación faltantes, obteniendo perfil completo...');
+                
+                try {
+                  const profileResponse = await authService.getProfile();
+                  const profileData = profileResponse?.data || profileResponse;
+                  
+                  console.log('📋 [AUTH] Perfil obtenido:', profileData);
+                  
+                  // Actualizar con datos del backend
+                  const updatedUserData: User = {
+                    ...userData,
+                    countryId: profileData.countryId || userData.countryId,
+                    cityId: profileData.cityId || userData.cityId,
+                    countryName: profileData.countryName || userData.countryName,
+                    cityName: profileData.cityName || userData.cityName,
+                    gender: profileData.gender || userData.gender,
+                    childrenCount: profileData.childrenCount !== undefined ? profileData.childrenCount : userData.childrenCount,
+                    isPregnant: profileData.isPregnant !== undefined ? profileData.isPregnant : userData.isPregnant,
+                    gestationWeeks: profileData.gestationWeeks !== undefined ? profileData.gestationWeeks : userData.gestationWeeks,
+                    photoURL: profileData.photoURL || userData.photoURL,
+                  };
+                  
+                  console.log('✅ [AUTH] Datos sincronizados:', {
+                    countryId: updatedUserData.countryId,
+                    cityId: updatedUserData.cityId,
+                    countryName: updatedUserData.countryName,
+                    cityName: updatedUserData.cityName,
+                  });
+                  
+                  await AsyncStorage.setItem('userData', JSON.stringify(updatedUserData));
+                  setUser(updatedUserData);
+                } catch (profileError) {
+                  console.error('❌ [AUTH] Error obteniendo perfil:', profileError);
+                  // Si falla, usar los datos locales
+                  setUser(userData);
+                }
+              } else {
+                // Datos completos, usar directamente
+                console.log('✅ [AUTH] Datos de usuario completos');
+                setUser(userData);
+              }
               
             } catch (verifyError) {
               console.log('❌ Token inválido o expirado, limpiando datos');
@@ -147,10 +190,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         uid,
         isPregnant: isPregnantFromServer,
         gestationWeeks: gestationWeeksFromServer,
+        countryId,
+        cityId,
+        countryName,
+        cityName,
       } = data;
       
       console.log('🔑 Token extraído:', customToken ? 'Sí' : 'No');
-      console.log('👤 Datos del usuario extraídos:', { displayName: userName, email: userEmail, uid });
+      console.log('👤 Datos del usuario extraídos:', { displayName: userName, email: userEmail, uid, countryId, cityId });
       
       if (!customToken) {
         throw new Error('No se recibió token del servidor');
@@ -163,6 +210,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         name: userName,
         isPregnant: isPregnantFromServer ?? false,
         gestationWeeks: gestationWeeksFromServer ?? undefined,
+        countryId: countryId ?? undefined,
+        cityId: cityId ?? undefined,
+        countryName: countryName ?? undefined,
+        cityName: cityName ?? undefined,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
@@ -289,10 +340,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       }
       
       const data = getAuthPayload(response);
-      const { customToken, displayName: userName, email: userEmail, uid, photoUrl } = data;
+      const { customToken, displayName: userName, email: userEmail, uid, photoUrl, countryId, cityId, countryName, cityName } = data;
       
       console.log('🔑 Token extraído:', customToken ? 'Sí' : 'No');
-      console.log('👤 Datos del usuario extraídos:', { displayName: userName, email: userEmail, uid });
+      console.log('👤 Datos del usuario extraídos:', { displayName: userName, email: userEmail, uid, countryId, cityId });
       console.log('🆕 Usuario nuevo:', (response as any)?.isNewUser ? 'Sí' : 'No');
       
       if (!customToken) {
@@ -305,6 +356,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         email: userEmail,
         name: userName,
         photoURL: photoUrl || googleUser?.photo,
+        countryId: countryId ?? undefined,
+        cityId: cityId ?? undefined,
+        countryName: countryName ?? undefined,
+        cityName: cityName ?? undefined,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
@@ -455,10 +510,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       }
       
       const data = getAuthPayload(response);
-      const { customToken, displayName: userName, email: userEmail, uid, photoURL } = data;
+      const { customToken, displayName: userName, email: userEmail, uid, photoURL, countryId, cityId, countryName, cityName } = data;
       
       console.log('🔑 Token extraído:', customToken ? 'Sí' : 'No');
-      console.log('👤 Datos del usuario extraídos:', { displayName: userName, email: userEmail, uid });
+      console.log('👤 Datos del usuario extraídos:', { displayName: userName, email: userEmail, uid, countryId, cityId });
       console.log('🆕 Usuario nuevo:', (response as any)?.isNewUser ? 'Sí' : 'No');
       
       if (!customToken) {
@@ -471,6 +526,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         email: userEmail,
         name: userName,
         photoURL: photoURL || null,
+        countryId: countryId ?? undefined,
+        cityId: cityId ?? undefined,
+        countryName: countryName ?? undefined,
+        cityName: cityName ?? undefined,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
@@ -555,10 +614,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       console.log('📋 Respuesta completa del registro:', response);
       
       const data = getAuthPayload(response);
-      const { customToken, displayName: userName, email: userEmail, uid } = data;
+      const { customToken, displayName: userName, email: userEmail, uid, countryId, cityId, countryName, cityName } = data;
       
       console.log('🔑 Token extraído:', customToken ? 'Sí' : 'No');
-      console.log('👤 Datos del usuario extraídos:', { displayName: userName, email: userEmail, uid });
+      console.log('👤 Datos del usuario extraídos:', { displayName: userName, email: userEmail, uid, countryId, cityId });
       
       if (!customToken) {
         throw new Error('No se recibió token del servidor');
@@ -569,6 +628,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         id: uid,
         email: userEmail,
         name: userName,
+        countryId: countryId ?? undefined,
+        cityId: cityId ?? undefined,
+        countryName: countryName ?? undefined,
+        cityName: cityName ?? undefined,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };

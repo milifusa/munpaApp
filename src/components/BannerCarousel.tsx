@@ -189,6 +189,8 @@ const BannerCarousel: React.FC<BannerCarouselProps> = ({
   };
 
   const handleBannerPress = async (banner: Banner) => {
+    console.log('🎯 [BANNER] Click en banner:', JSON.stringify(banner, null, 2));
+    
     // Registrar click
     await bannerService.registerClick(banner.id);
 
@@ -199,6 +201,26 @@ const BannerCarousel: React.FC<BannerCarouselProps> = ({
         'Consulta un doctor a través de Munpa',
         [{ text: 'OK' }]
       );
+      return;
+    }
+
+    // Manejar banners de tipo "event"
+    if (banner.type === 'event') {
+      console.log('🎉 [BANNER] Banner de tipo evento detectado');
+      // Usar eventId si existe, si no, usar el id del banner como postId
+      const postId = banner.eventId || banner.id;
+      console.log('🎉 [BANNER] Navegando a evento con postId:', postId);
+      
+      // EventDetail está en el HomeStackNavigator
+      // Navegar directamente - React Navigation manejará la navegación anidada
+      try {
+        (navigation as any).navigate('Home', {
+          screen: 'EventDetail',
+          params: { postId }
+        });
+      } catch (error) {
+        console.error('❌ [BANNER] Error navegando a evento:', error);
+      }
       return;
     }
 
