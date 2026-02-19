@@ -9,8 +9,10 @@ import {
   ActivityIndicator,
   SafeAreaView,
   StatusBar,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { articlesService } from '../services/api';
 import analyticsService from '../services/analyticsService';
 
@@ -41,6 +43,7 @@ interface ArticlesScreenProps {
 
 const ArticlesScreen: React.FC<ArticlesScreenProps> = ({ route, navigation }) => {
   const { categoryId, categoryName } = route.params;
+  const insets = useSafeAreaInsets();
   const [articles, setArticles] = useState<Article[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -161,8 +164,8 @@ const ArticlesScreen: React.FC<ArticlesScreenProps> = ({ route, navigation }) =>
     return (
       <>
         <StatusBar barStyle="light-content" backgroundColor="#59C6C0" />
-        <View style={styles.headerWrapper}>
-          <SafeAreaView style={styles.headerSafeArea}>
+        <View style={[styles.headerWrapper, Platform.OS === 'android' && { paddingTop: insets.top }]}>
+          <View style={styles.headerSafeArea}>
             <View style={styles.header}>
               <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
                 <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
@@ -170,7 +173,7 @@ const ArticlesScreen: React.FC<ArticlesScreenProps> = ({ route, navigation }) =>
               <Text style={styles.headerTitle}>{categoryName || 'Artículos'}</Text>
               <View style={styles.headerPlaceholder} />
             </View>
-          </SafeAreaView>
+          </View>
         </View>
         
         <SafeAreaView style={styles.bottomSafeArea}>
@@ -186,8 +189,8 @@ const ArticlesScreen: React.FC<ArticlesScreenProps> = ({ route, navigation }) =>
   return (
     <>
       <StatusBar barStyle="light-content" backgroundColor="#59C6C0" />
-      <View style={styles.headerWrapper}>
-        <SafeAreaView style={styles.headerSafeArea}>
+      <View style={[styles.headerWrapper, Platform.OS === 'android' && { paddingTop: insets.top }]}>
+        <View style={styles.headerSafeArea}>
           <View style={styles.header}>
             <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
               <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
@@ -195,7 +198,7 @@ const ArticlesScreen: React.FC<ArticlesScreenProps> = ({ route, navigation }) =>
             <Text style={styles.headerTitle}>{categoryName || 'Artículos'}</Text>
             <View style={styles.headerPlaceholder} />
           </View>
-        </SafeAreaView>
+        </View>
       </View>
 
       <SafeAreaView style={styles.bottomSafeArea}>

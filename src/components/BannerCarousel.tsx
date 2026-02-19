@@ -218,6 +218,7 @@ const BannerCarousel: React.FC<BannerCarouselProps> = ({
           screen: 'EventDetail',
           params: { postId }
         });
+        console.log('✅ [BANNER] Navegación a evento iniciada');
       } catch (error) {
         console.error('❌ [BANNER] Error navegando a evento:', error);
       }
@@ -226,25 +227,32 @@ const BannerCarousel: React.FC<BannerCarouselProps> = ({
 
     // Manejar linkType para navegación a pantallas específicas
     if (banner.linkType) {
+      console.log('🔗 [BANNER] linkType detectado:', banner.linkType);
       switch (banner.linkType) {
         case 'denticion':
+          console.log('➡️ [BANNER] Navegando a TeethingTracker');
           navigation.navigate('TeethingTracker');
           return;
         case 'crecimiento':
+          console.log('➡️ [BANNER] Navegando a Growth');
           navigation.navigate('Growth');
           return;
         case 'hitos':
+          console.log('➡️ [BANNER] Navegando a Development');
           navigation.navigate('Development');
           return;
         case 'medicacion':
+          console.log('➡️ [BANNER] Navegando a Medications');
           navigation.navigate('Medications');
           return;
         case 'vacunas':
+          console.log('➡️ [BANNER] Navegando a ChildProfile');
           // Navegar a ChildProfile que contiene las vacunas
           // Nota: Necesitarás pasar el childId apropiado
           navigation.navigate('ChildProfile');
           return;
         case 'solicitud-servicio':
+          console.log('➡️ [BANNER] Navegando a ServiceRequest');
           navigation.navigate('ServiceRequest');
           return;
         case 'recommendation-category':
@@ -257,6 +265,7 @@ const BannerCarousel: React.FC<BannerCarouselProps> = ({
 
     // Si tiene articleId, navegar a la pantalla de detalle del artículo
     if (banner.articleId) {
+      console.log('📰 [BANNER] articleId detectado:', banner.articleId);
       navigation.navigate('ArticleDetail', {
         articleId: banner.articleId,
       });
@@ -265,6 +274,7 @@ const BannerCarousel: React.FC<BannerCarouselProps> = ({
 
     // Si tiene articleCategoryId, navegar a la pantalla de artículos
     if (banner.articleCategoryId) {
+      console.log('📚 [BANNER] articleCategoryId detectado:', banner.articleCategoryId);
       navigation.navigate('Articles', {
         categoryId: banner.articleCategoryId,
         categoryName: banner.title || 'Artículos',
@@ -274,6 +284,7 @@ const BannerCarousel: React.FC<BannerCarouselProps> = ({
 
     // Si tiene recommendationCategoryId o linkType es "recommendation-category", navegar a categoría de recomendaciones
     if (banner.recommendationCategoryId || banner.linkType === 'recommendation-category') {
+      console.log('💡 [BANNER] recommendationCategoryId detectado:', banner.recommendationCategoryId);
       const categoryId = banner.recommendationCategoryId;
       if (categoryId) {
         // Navegar al tab de Recommendations a través de MainTabs
@@ -317,12 +328,15 @@ const BannerCarousel: React.FC<BannerCarouselProps> = ({
 
     // Navegar si tiene link
     if (banner.link) {
+      console.log('🔗 [BANNER] link detectado:', banner.link);
       try {
         // Parsear el link (ej: "/marketplace/category/carriolas")
         const linkParts = banner.link.split('/').filter(Boolean);
+        console.log('📝 [BANNER] linkParts:', linkParts);
         
         if (linkParts.length > 0) {
           const route = linkParts[0]; // "marketplace", "communities", "lists", "recommendations", etc.
+          console.log('🛤️ [BANNER] route:', route);
           
           // Navegar según el tipo de link
           if (route === 'marketplace') {
@@ -442,6 +456,19 @@ const BannerCarousel: React.FC<BannerCarouselProps> = ({
         console.error('❌ [BANNER CAROUSEL] Error navegando:', error);
       }
     }
+
+    // Si llegamos aquí, el banner no tiene ninguna acción configurada
+    console.warn('⚠️ [BANNER] Banner sin acción configurada:', {
+      id: banner.id,
+      title: banner.title,
+      type: banner.type,
+      link: banner.link,
+      linkType: banner.linkType,
+      articleId: banner.articleId,
+      articleCategoryId: banner.articleCategoryId,
+      recommendationCategoryId: banner.recommendationCategoryId,
+      eventId: banner.eventId,
+    });
   };
 
   const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {

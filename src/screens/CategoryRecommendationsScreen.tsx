@@ -16,7 +16,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import api from '../services/api';
 import { useLocation } from '../hooks/useLocation';
 import recommendationAnalyticsService from '../services/recommendationAnalyticsService';
@@ -74,6 +74,7 @@ interface Category {
 
 const CategoryRecommendationsScreen = ({ route, navigation }: any) => {
   const { categoryId, categoryName } = route.params;
+  const insets = useSafeAreaInsets();
   
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -702,7 +703,7 @@ const CategoryRecommendationsScreen = ({ route, navigation }: any) => {
   );
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={[styles.container, Platform.OS === 'android' && { paddingTop: insets.top }]} edges={['top']}>
       <StatusBar barStyle="light-content" backgroundColor="#96d2d3" />
       <View style={styles.content}>
         {/* Header */}

@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRoute, useNavigation } from '@react-navigation/native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -27,6 +27,7 @@ const CreateEventScreen: React.FC = () => {
   const route = useRoute<any>();
   const { communityId, communityName } = route.params;
   const navigation = useNavigation();
+  const insets = useSafeAreaInsets();
 
   // Estados del formulario
   const [title, setTitle] = useState('');
@@ -245,7 +246,7 @@ const CreateEventScreen: React.FC = () => {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={[styles.container, Platform.OS === 'android' && { paddingTop: insets.top }]} edges={['top']}>
       <StatusBar barStyle="light-content" backgroundColor="#887CBC" />
       
       {/* Header */}

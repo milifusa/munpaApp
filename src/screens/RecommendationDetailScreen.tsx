@@ -28,11 +28,16 @@ interface Review {
   id: string;
   rating: number;
   comment: string;
-  user: {
-    id: string;
-    displayName: string;
+  user?: {
+    id?: string;
+    displayName?: string;
+    name?: string;
     photoURL?: string;
+    photoUrl?: string;
   } | null;
+  userName?: string; // Campo alternativo del backend
+  authorName?: string; // Campo alternativo del backend
+  userPhoto?: string; // Foto alternativa
   createdAt: Date;
   updatedAt: Date;
   photos?: string[]; // Array de URLs de fotos
@@ -180,7 +185,8 @@ const RecommendationDetailScreen = ({ route, navigation }: any) => {
       const response = await api.getRecommendationReviews(recommendationId);
       
       if (response.success) {
-        console.log('✅ [DETAIL] Reviews cargadas:', response.data.length);
+        console.log('✅ [DETAIL] Reviews cargadas:', response.data?.length);
+        console.log('📋 [DETAIL] JSON response completo:', JSON.stringify({ data: response.data, stats: response.stats }, null, 2));
         setReviews(response.data);
         setStats(response.stats);
       }
@@ -689,7 +695,7 @@ const RecommendationDetailScreen = ({ route, navigation }: any) => {
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={[styles.container, Platform.OS === 'android' && { paddingTop: insets.top }]} edges={['top']}>
       <StatusBar barStyle="light-content" backgroundColor="#96d2d3" />
       <View style={styles.contentWrapper}>
         {/* Header */}
@@ -1035,13 +1041,22 @@ const RecommendationDetailScreen = ({ route, navigation }: any) => {
             {isLoadingReviews ? (
               <ActivityIndicator color="#59C6C0" style={{ marginVertical: 20 }} />
             ) : reviews.length > 0 ? (
-              reviews.map((review) => (
+              reviews.map((review) => {
+                const reviewUserName = review.userName
+                  || review.authorName
+                  || review.user?.displayName
+                  || review.user?.name
+                  || 'Usuario';
+                const reviewUserPhoto = review.user?.photoURL
+                  || review.user?.photoUrl
+                  || review.userPhoto;
+                return (
                 <View key={review.id} style={styles.reviewCard}>
                   <View style={styles.reviewHeader}>
                     <View style={styles.reviewUser}>
-                      {review.user?.photoURL ? (
+                      {reviewUserPhoto ? (
                         <Image 
-                          source={{ uri: review.user.photoURL }} 
+                          source={{ uri: reviewUserPhoto }} 
                           style={styles.reviewUserPhoto}
                         />
                       ) : (
@@ -1051,7 +1066,7 @@ const RecommendationDetailScreen = ({ route, navigation }: any) => {
                       )}
                       <View>
                         <Text style={styles.reviewUserName}>
-                          {review.user?.displayName || 'Usuario'}
+                          {reviewUserName}
                         </Text>
                         {renderStars(review.rating, 14)}
                       </View>
@@ -1132,7 +1147,8 @@ const RecommendationDetailScreen = ({ route, navigation }: any) => {
                     </View>
                   )}
                 </View>
-              ))
+              );
+            })
             ) : (
               <Text style={styles.noReviewsText}>
                 Aún no hay reseñas. ¡Sé el primero en escribir una!

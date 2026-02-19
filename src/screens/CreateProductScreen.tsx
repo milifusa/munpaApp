@@ -17,12 +17,14 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
 import marketplaceService, { CONDITIONS, CreateProductData, MarketplaceCategory, DEFAULT_CATEGORIES } from '../services/marketplaceService';
 import { imageUploadService } from '../services/imageUploadService';
 import analyticsService from '../services/analyticsService';
 import { locationsService } from '../services/api';
+import vendorService from '../services/vendorService';
 
 const CreateProductScreen = () => {
   const navigation = useNavigation<any>();
@@ -34,12 +36,14 @@ const CreateProductScreen = () => {
   const [loading, setLoading] = useState(false);
   const [uploadingImages, setUploadingImages] = useState(false);
   const [categories, setCategories] = useState<MarketplaceCategory[]>(DEFAULT_CATEGORIES);
+  const [vendorCategories, setVendorCategories] = useState<any[]>([]);
   const [locationLoading, setLocationLoading] = useState(true);
   
   // Datos del formulario
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [category, setCategory] = useState('');
+  const [vendorCategoryId, setVendorCategoryId] = useState('');
   const [condition, setCondition] = useState('');
   const [type, setType] = useState<'venta' | 'donacion' | 'trueque'>('venta');
   const [price, setPrice] = useState('');
@@ -54,6 +58,7 @@ const CreateProductScreen = () => {
   const [isLoadingCountries, setIsLoadingCountries] = useState(true);
   const [isLoadingCities, setIsLoadingCities] = useState(false);
   const [showCategoryModal, setShowCategoryModal] = useState(false);
+  const [showVendorCategoryModal, setShowVendorCategoryModal] = useState(false);
   const [showConditionModal, setShowConditionModal] = useState(false);
   const [showCountryModal, setShowCountryModal] = useState(false);
   const [showCityModal, setShowCityModal] = useState(false);
@@ -159,6 +164,7 @@ const CreateProductScreen = () => {
 
   useEffect(() => {
     loadCategories();
+    loadVendorCategories();
     loadCountries();
     getCurrentLocation();
   }, []);
@@ -224,6 +230,7 @@ const CreateProductScreen = () => {
       setTitle(product.title || '');
       setDescription(product.description || '');
       setCategory(product.category || '');
+      setVendorCategoryId(product.vendorCategoryId || '');
       setCondition(product.condition || '');
       setType(product.type || 'venta');
       setPrice(product.price?.toString() || '');
@@ -261,6 +268,18 @@ const CreateProductScreen = () => {
     } catch (error) {
       console.error('❌ [CREATE PRODUCT] Error cargando categorías:', error);
       // Mantener las categorías por defecto en caso de error
+    }
+  };
+
+  const loadVendorCategories = async () => {
+    try {
+      const response = await vendorService.getCategories();
+      const vendorCats = response?.data || response || [];
+      setVendorCategories(Array.isArray(vendorCats) ? vendorCats : []);
+      console.log('✅ [CREATE PRODUCT] Categorías del vendedor cargadas:', vendorCats.length);
+    } catch (error) {
+      console.error('❌ [CREATE PRODUCT] Error cargando categorías del vendedor:', error);
+      setVendorCategories([]);
     }
   };
 
@@ -309,36 +328,161 @@ const CreateProductScreen = () => {
     }
 
     try {
+      console.log('📸 [CREATE PRODUCT] Solicitando permisos de galería...');
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       
       if (status !== 'granted') {
-        Alert.alert('Permiso requerido', 'Necesitamos acceso a tu galería');
+        console.warn('⚠️ [CREATE PRODUCT] Permisos de galería denegados');
+        Alert.alert(
+          'Permiso requerido',
+          'Para agregar fotos de tu producto, necesitamos acceso a tu galería. Por favor, permite el acceso en la configuración de la app.',
+          [{ text: 'OK' }]
+        );
         return;
       }
 
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsMultipleSelection: true,
+      console.log('✅ [CREATE PRODUCT] Permisos de galería concedidos');
+      
+      // Verificar que hay token de autenticación antes de intentar subir
+      const token = await AsyncStorage.getItem('authToken');
+      if (!token) {
+        console.error('❌ [CREATE PRODUCT] No hay token de autenticación');
+        Alert.alert(
+          'Sesión expirada',
+          'Tu sesión ha expirado. Por favor, inicia sesión nuevamente.',
+          [{ text: 'OK' }]
+        );
+        return;
+      }
+      
+      console.log('📸 [CREATE PRODUCT] Abriendo galería... Platform:', Platform.OS);
+
+      // En Android, allowsMultipleSelection puede causar problemas, mejor una imagen a la vez
+      const pickerOptions = {
+        mediaTypes: ['images'],
+        allowsEditing: false,
         quality: 0.8,
-        selectionLimit: 5 - photos.length,
+        allowsMultipleSelection: Platform.OS === 'ios',
+        selectionLimit: Platform.OS === 'ios' ? (5 - photos.length) : 1,
+      };
+      
+      console.log('📸 [CREATE PRODUCT] Opciones del picker:', pickerOptions);
+      
+      const result = await ImagePicker.launchImageLibraryAsync(pickerOptions);
+
+      console.log('📸 [CREATE PRODUCT] Resultado del picker:', {
+        canceled: result.canceled,
+        assetsCount: result.assets?.length || 0,
+        hasAssets: !!result.assets,
+        firstAssetUri: result.assets?.[0]?.uri,
       });
 
-      if (!result.canceled && result.assets) {
-        setUploadingImages(true);
-        
-        const uploadPromises = result.assets.map(async (asset) => {
-          const uploadedUrl = await imageUploadService.uploadMarketplaceImage(asset.uri);
-          return uploadedUrl;
-        });
-
-        const uploadedUrls = await Promise.all(uploadPromises);
-        setPhotos([...photos, ...uploadedUrls]);
-        setUploadingImages(false);
+      if (result.canceled) {
+        console.log('ℹ️ [CREATE PRODUCT] Usuario canceló la selección de imagen');
+        return;
       }
-    } catch (error) {
-      console.error('Error seleccionando imagen:', error);
+
+      if (!result.assets || result.assets.length === 0) {
+        console.error('❌ [CREATE PRODUCT] No hay assets en el resultado');
+        Alert.alert('Error', 'No se pudo obtener la imagen seleccionada. Por favor, intenta de nuevo.');
+        return;
+      }
+
+      setUploadingImages(true);
+      
+      console.log(`🔄 [CREATE PRODUCT] Subiendo ${result.assets.length} imagen(es)...`);
+      
+      // Subir imágenes una por una para mejor control de errores
+      const uploadedUrls: string[] = [];
+      let hasError = false;
+      
+      for (let i = 0; i < result.assets.length; i++) {
+        const asset = result.assets[i];
+        try {
+          console.log(`📤 [CREATE PRODUCT] Subiendo imagen ${i + 1}/${result.assets.length}:`, {
+            uri: asset.uri,
+            width: asset.width,
+            height: asset.height,
+            fileSize: asset.fileSize,
+            type: asset.type,
+          });
+          
+          if (!asset.uri) {
+            throw new Error('URI de la imagen no válida');
+          }
+          
+          const uploadedUrl = await imageUploadService.uploadMarketplaceImage(asset.uri);
+          
+          if (!uploadedUrl || typeof uploadedUrl !== 'string') {
+            throw new Error('URL de imagen subida no válida');
+          }
+          
+          uploadedUrls.push(uploadedUrl);
+          console.log(`✅ [CREATE PRODUCT] Imagen ${i + 1} subida exitosamente:`, uploadedUrl);
+        } catch (uploadError: any) {
+          hasError = true;
+          console.error(`❌ [CREATE PRODUCT] Error subiendo imagen ${i + 1}:`, {
+            message: uploadError?.message,
+            response: uploadError?.response?.data,
+            status: uploadError?.response?.status,
+          });
+          
+          let errorMessage = 'Error desconocido al subir la imagen';
+          
+          if (uploadError?.response?.status === 401) {
+            errorMessage = 'Tu sesión ha expirado. Por favor, inicia sesión nuevamente.';
+          } else if (uploadError?.response?.status === 413) {
+            errorMessage = 'La imagen es muy grande. Por favor, elige una imagen más pequeña.';
+          } else if (uploadError?.response?.status === 415) {
+            errorMessage = 'Formato de imagen no soportado. Por favor, elige una imagen JPG o PNG.';
+          } else if (uploadError?.message?.includes('Network')) {
+            errorMessage = 'Error de conexión. Por favor, verifica tu internet e intenta de nuevo.';
+          } else if (uploadError?.message) {
+            errorMessage = uploadError.message;
+          }
+          
+          Alert.alert(
+            'Error al subir imagen',
+            `No se pudo subir la imagen ${i + 1}. ${errorMessage}`,
+            [{ text: 'OK' }]
+          );
+          
+          // Si falla, no continuar con las demás en Android
+          if (Platform.OS === 'android') {
+            break;
+          }
+        }
+      }
+
+      if (uploadedUrls.length > 0) {
+        setPhotos([...photos, ...uploadedUrls]);
+        console.log(`✅ [CREATE PRODUCT] ${uploadedUrls.length} imagen(es) agregada(s) exitosamente`);
+      } else if (!hasError) {
+        Alert.alert('Error', 'No se pudieron subir las imágenes. Por favor, intenta de nuevo.');
+      }
+      
       setUploadingImages(false);
-      Alert.alert('Error', 'No se pudieron cargar las imágenes');
+    } catch (error: any) {
+      console.error('❌ [CREATE PRODUCT] Error general en handlePickImage:', {
+        message: error?.message,
+        stack: error?.stack,
+        error: error,
+      });
+      setUploadingImages(false);
+      
+      let errorMessage = 'Error inesperado al cargar las imágenes.';
+      
+      if (error?.message?.includes('permission')) {
+        errorMessage = 'No tienes permisos para acceder a la galería. Por favor, verifica la configuración de la app.';
+      } else if (error?.message) {
+        errorMessage = error.message;
+      }
+      
+      Alert.alert(
+        'Error', 
+        `${errorMessage} Por favor, intenta de nuevo.`,
+        [{ text: 'OK' }]
+      );
     }
   };
 
@@ -479,6 +623,11 @@ const CreateProductScreen = () => {
         },
       };
 
+      // Agregar vendorCategoryId si está seleccionado
+      if (vendorCategoryId) {
+        (productData as any).vendorCategoryId = vendorCategoryId;
+      }
+
       if (type === 'venta') {
         productData.price = parseFloat(price);
       } else if (type === 'trueque') {
@@ -530,19 +679,7 @@ const CreateProductScreen = () => {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      <StatusBar barStyle="light-content" backgroundColor="#96d2d3" />
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Ionicons name="close" size={28} color="white" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>
-          {isEditing ? 'Editar producto' : 'Publicar producto'}
-        </Text>
-        <View style={{ width: 28 }} />
-      </View>
-
+    <View style={styles.containerWrapper}>
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Tipo de publicación */}
         <View style={styles.section}>
@@ -674,6 +811,34 @@ const CreateProductScreen = () => {
             <Ionicons name="chevron-down" size={18} color="#6B7280" />
           </TouchableOpacity>
         </View>
+
+        {/* Categoría del Vendedor (opcional) */}
+        {vendorCategories.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>
+              Mi Categoría{' '}
+              <Text style={styles.optional}>(opcional - para organizar tus productos)</Text>
+            </Text>
+            <TouchableOpacity
+              style={styles.selectInput}
+              onPress={() => setShowVendorCategoryModal(true)}
+            >
+              <Text style={vendorCategoryId ? styles.selectText : styles.selectPlaceholder}>
+                {vendorCategoryId
+                  ? vendorCategories.find((cat) => cat.id === vendorCategoryId)?.name || 'Ninguna'
+                  : 'Ninguna'}
+              </Text>
+              <Ionicons name="chevron-down" size={18} color="#6B7280" />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.manageCategoriesButton}
+              onPress={() => navigation.navigate('VendorCategories' as never)}
+            >
+              <Ionicons name="settings" size={16} color="#96d2d3" />
+              <Text style={styles.manageCategoriesText}>Gestionar mis categorías</Text>
+            </TouchableOpacity>
+          </View>
+        )}
 
         {/* Estado/Condición */}
         <View style={styles.section}>
@@ -864,6 +1029,77 @@ const CreateProductScreen = () => {
         </View>
       </Modal>
 
+      {/* Modal Categoría del Vendedor */}
+      <Modal
+        visible={showVendorCategoryModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowVendorCategoryModal(false)}
+      >
+        <View style={styles.selectModalOverlay}>
+          <View style={styles.selectModalCard}>
+            <Text style={styles.selectModalTitle}>Mis Categorías</Text>
+            <ScrollView>
+              {/* Opción "Ninguna" */}
+              <TouchableOpacity
+                style={[
+                  styles.selectOption,
+                  !vendorCategoryId && styles.selectOptionActive,
+                ]}
+                onPress={() => {
+                  setVendorCategoryId('');
+                  setShowVendorCategoryModal(false);
+                }}
+              >
+                <View style={styles.selectOptionRow}>
+                  <Ionicons name="close-circle" size={24} color="#6B7280" />
+                  <Text
+                    style={[
+                      styles.selectOptionText,
+                      !vendorCategoryId && styles.selectOptionTextActive,
+                    ]}
+                  >
+                    Ninguna
+                  </Text>
+                </View>
+              </TouchableOpacity>
+
+              {vendorCategories.map((cat) => (
+                <TouchableOpacity
+                  key={cat.id}
+                  style={[
+                    styles.selectOption,
+                    vendorCategoryId === cat.id && styles.selectOptionActive,
+                  ]}
+                  onPress={() => {
+                    setVendorCategoryId(cat.id);
+                    setShowVendorCategoryModal(false);
+                  }}
+                >
+                  <View style={styles.selectOptionRow}>
+                    <Ionicons name="folder" size={24} color="#96d2d3" />
+                    <Text
+                      style={[
+                        styles.selectOptionText,
+                        vendorCategoryId === cat.id && styles.selectOptionTextActive,
+                      ]}
+                    >
+                      {cat.name}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            <TouchableOpacity
+              style={styles.selectModalClose}
+              onPress={() => setShowVendorCategoryModal(false)}
+            >
+              <Text style={styles.selectModalCloseText}>Cerrar</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
       <Modal
         visible={showConditionModal}
         transparent
@@ -993,11 +1229,15 @@ const CreateProductScreen = () => {
         </View>
       </Modal>
 
-    </SafeAreaView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
+  containerWrapper: {
+    flex: 1,
+    backgroundColor: '#F5F5F5',
+  },
   container: {
     flex: 1,
     backgroundColor: '#F5F5F5',
@@ -1019,6 +1259,7 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
+    backgroundColor: '#F5F5F5',
   },
   section: {
     padding: 20,
@@ -1597,6 +1838,27 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: 'white',
     fontFamily: 'Montserrat',
+    fontWeight: '600',
+  },
+  optional: {
+    fontSize: 11,
+    color: '#9CA3AF',
+    fontWeight: '400',
+  },
+  manageCategoriesButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    backgroundColor: '#D1F2F2',
+    alignSelf: 'flex-start',
+  },
+  manageCategoriesText: {
+    fontSize: 13,
+    color: '#96d2d3',
     fontWeight: '600',
   },
 });

@@ -20,12 +20,16 @@ platform :ios, podfile_properties['ios.deploymentTarget'] || '15.1'
 
 # Firebase configuration
 $RNFirebaseAnalyticsWithoutAdIdSupport = true
-use_modular_headers!
+# use_modular_headers! removido: causa "Redefinition of module react_runtime" con React Native 0.81
+# Si Firebase falla, usar modular_headers solo en pods específicos
 
 prepare_react_native_project!
 
 target 'Munpa' do
   use_expo_modules!
+  
+  # Modular headers solo para Firebase (evita use_modular_headers! global que causa react_runtime)
+  pod 'GoogleUtilities', :modular_headers => true
 
   if ENV['EXPO_USE_COMMUNITY_AUTOLINKING'] == '1'
     config_command = ['node', '-e', "process.argv=['', '', 'config'];require('@react-native-community/cli').run()"];

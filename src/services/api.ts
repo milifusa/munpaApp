@@ -40,7 +40,7 @@ const exchangeCustomTokenForIdToken = async (customToken: string): Promise<strin
   }
 };
 
-// Interceptor para agregar token de autenticación y timezone
+// Interceptor para agregar token de autenticación, timezone y device info
 api.interceptors.request.use(
   async (config) => {
     
@@ -62,6 +62,15 @@ api.interceptors.request.use(
     // Agregar timezone del usuario en el header
     const timezone = getUserTimezone();
     config.headers['X-Timezone'] = timezone;
+    
+    // Agregar device info headers (lazy loading para no bloquear)
+    try {
+      const deviceInfoService = (await import('./deviceInfoService')).default;
+      const deviceHeaders = await deviceInfoService.getHeaders();
+      Object.assign(config.headers, deviceHeaders);
+    } catch (error) {
+      console.warn('⚠️ [INTERCEPTOR] No se pudieron agregar headers de dispositivo:', error);
+    }
     
     return config;
   },
@@ -119,6 +128,12 @@ export interface User {
   cityId?: string;
   countryName?: string;
   cityName?: string;
+  professionalProfile?: {
+    isActive: boolean;
+    specialistId: string;
+    accountType: 'specialist' | 'nutritionist' | 'coach' | 'psychologist' | 'service';
+    verifiedAt: string;
+  } | null;
   createdAt: string;
   updatedAt: string;
 }

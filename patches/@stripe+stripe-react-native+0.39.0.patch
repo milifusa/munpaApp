@@ -1,0 +1,13 @@
+diff --git a/node_modules/@stripe/stripe-react-native/android/src/main/java/com/reactnativestripesdk/StripeSdkModule.kt b/node_modules/@stripe/stripe-react-native/android/src/main/java/com/reactnativestripesdk/StripeSdkModule.kt
+index 0000000..1111111 100644
+--- a/node_modules/@stripe/stripe-react-native/android/src/main/java/com/reactnativestripesdk/StripeSdkModule.kt
++++ b/node_modules/@stripe/stripe-react-native/android/src/main/java/com/reactnativestripesdk/StripeSdkModule.kt
+@@ -962,7 +962,7 @@
+    * provided will be resolved with an error message instructing the user to retry the method.
+    */
+   private fun getCurrentActivityOrResolveWithError(promise: Promise?): FragmentActivity? {
+-    (currentActivity as? FragmentActivity)?.let {
++    (getCurrentActivity() as? FragmentActivity)?.let {
+       return it
+     }
+     promise?.resolve(createMissingActivityError())

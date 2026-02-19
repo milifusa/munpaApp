@@ -15,7 +15,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import marketplaceService, { MarketplaceMessage } from '../services/marketplaceService';
 import { useAuth } from '../contexts/AuthContext';
 import { axiosInstance as api } from '../services/api';
@@ -24,6 +24,7 @@ const MarketplaceMessagesScreen = () => {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const { user } = useAuth();
+  const insets = useSafeAreaInsets();
   const { productId, otherUserId } = route.params || {};
 
   const [messages, setMessages] = useState<MarketplaceMessage[]>([]);
@@ -507,7 +508,7 @@ const MarketplaceMessagesScreen = () => {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={[styles.container, Platform.OS === 'android' && { paddingTop: insets.top }]} edges={['top']}>
       <StatusBar barStyle="light-content" backgroundColor="#96d2d3" />
       {/* Header */}
       <View style={styles.header}>

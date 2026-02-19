@@ -3,9 +3,11 @@ import React, { useEffect } from 'react';
 import { Platform, AppState, ErrorUtils, View, Text, TextInput, ActivityIndicator } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { AuthProvider } from './src/contexts/AuthContext';
+import { ViewModeProvider } from './src/contexts/ViewModeContext';
 import { MenuProvider } from './src/contexts/MenuContext';
 import { ChatProvider } from './src/contexts/ChatContext';
 import AppNavigator from './src/navigation/AppNavigator';
+import StripeProviderWrapper from './src/components/StripeProviderWrapper';
 import { trackingService } from './src/services/trackingService';
 import sentryService from './src/services/sentryService';
 import { ensureFirebaseApp } from './src/services/firebaseApp';
@@ -138,12 +140,16 @@ function AppContent() {
   try {
     return (
       <AuthProvider>
-        <MenuProvider>
-          <ChatProvider>
-            <StatusBar style="light" backgroundColor="#887CBC" />
-            <AppNavigator />
-          </ChatProvider>
-        </MenuProvider>
+        <StripeProviderWrapper>
+          <ViewModeProvider>
+            <MenuProvider>
+              <ChatProvider>
+                <StatusBar style="light" backgroundColor="#887CBC" />
+                <AppNavigator />
+              </ChatProvider>
+            </MenuProvider>
+          </ViewModeProvider>
+        </StripeProviderWrapper>
       </AuthProvider>
     );
   } catch (error: any) {

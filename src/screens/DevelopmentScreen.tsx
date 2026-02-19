@@ -10,7 +10,9 @@ import {
   SafeAreaView,
   StatusBar,
   Modal,
+  Platform,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -32,6 +34,7 @@ interface Activity {
 
 const DevelopmentScreen: React.FC = () => {
   const navigation = useNavigation();
+  const insets = useSafeAreaInsets();
   const [selectedChild, setSelectedChild] = useState<any>(null);
   const [activities, setActivities] = useState<Activity[]>([]);
   const [loading, setLoading] = useState(true);
@@ -115,7 +118,7 @@ const DevelopmentScreen: React.FC = () => {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={[styles.safeArea, Platform.OS === 'android' && { paddingTop: insets.top }]}>
       <StatusBar barStyle="light-content" backgroundColor="#59C6C0" />
       
       {/* Header */}

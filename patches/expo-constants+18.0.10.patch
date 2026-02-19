@@ -1,0 +1,18 @@
+diff --git a/node_modules/expo-constants/ios/EXConstants.podspec b/node_modules/expo-constants/ios/EXConstants.podspec
+index 0000000..1111111 100644
+--- a/node_modules/expo-constants/ios/EXConstants.podspec
++++ b/node_modules/expo-constants/ios/EXConstants.podspec
+@@ -34,9 +34,11 @@ Pod::Spec.new do |s|
+     s.source_files = "**/*.{h,m,swift}"
+   end
+ 
+-  env_vars = ENV['PROJECT_ROOT'] ? "PROJECT_ROOT=#{ENV['PROJECT_ROOT']} " : ""
++  # Quote paths to handle project directories with spaces (e.g. "Documents - Eduardo's MacBook Pro")
++  project_root = ENV['PROJECT_ROOT']
++  env_vars = project_root ? "PROJECT_ROOT=\"#{project_root}\" " : ""
+   script_phase = {
+     :name => 'Generate app.config for prebuilt Constants.manifest',
+-    :script => "bash -l -c \"#{env_vars}$PODS_TARGET_SRCROOT/../scripts/get-app-config-ios.sh\"",
++    :script => "bash -l -c \"#{env_vars}\\\"$PODS_TARGET_SRCROOT/../scripts/get-app-config-ios.sh\\\"\"",
+     :execution_position => :before_compile
+   }

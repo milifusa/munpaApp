@@ -11,8 +11,10 @@ import {
   Share,
   StatusBar,
   useWindowDimensions,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import RenderHTML from 'react-native-render-html';
 import { articlesService } from '../services/api';
 import analyticsService from '../services/analyticsService';
@@ -74,6 +76,7 @@ interface ArticleDetail {
 const ArticleDetailScreen: React.FC<ArticleDetailScreenProps> = ({ route, navigation }) => {
   const { articleId } = route.params;
   const { width } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
   const [article, setArticle] = useState<ArticleDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [bookmarked, setBookmarked] = useState(false);
@@ -218,8 +221,8 @@ const ArticleDetailScreen: React.FC<ArticleDetailScreenProps> = ({ route, naviga
   return (
     <>
       <StatusBar barStyle="light-content" backgroundColor="#59C6C0" />
-      <View style={styles.headerWrapper}>
-        <SafeAreaView style={styles.headerSafeArea}>
+      <View style={[styles.headerWrapper, Platform.OS === 'android' && { paddingTop: insets.top }]}>
+        <View style={styles.headerSafeArea}>
           {/* Header */}
           <View style={styles.header}>
             <TouchableOpacity onPress={() => navigation.goBack()} style={styles.headerButton}>
@@ -230,7 +233,7 @@ const ArticleDetailScreen: React.FC<ArticleDetailScreenProps> = ({ route, naviga
               <Ionicons name="share-outline" size={24} color="#FFFFFF" />
             </TouchableOpacity>
           </View>
-        </SafeAreaView>
+        </View>
       </View>
 
       <SafeAreaView style={styles.bottomSafeArea}>

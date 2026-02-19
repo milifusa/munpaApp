@@ -213,7 +213,7 @@ const CommentsScreen: React.FC = () => {
   // Si el usuario no está autenticado, mostrar mensaje
   if (!isAuthenticated) {
     return (
-      <SafeAreaView style={styles.safeArea} edges={['top']}>
+      <SafeAreaView style={[styles.safeArea, Platform.OS === 'android' && { paddingTop: insets.top }]} edges={['top']}>
         <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
         <View style={styles.header}>
           <TouchableOpacity 
@@ -237,7 +237,7 @@ const CommentsScreen: React.FC = () => {
   }
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top']}>
+    <SafeAreaView style={[styles.safeArea, Platform.OS === 'android' && { paddingTop: insets.top }]} edges={['top']}>
       <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
       <KeyboardAvoidingView 
         style={styles.container}

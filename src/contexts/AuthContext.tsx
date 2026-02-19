@@ -176,6 +176,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     return root?.data ?? root ?? {};
   };
 
+  // Helper para actualizar device info después del login
+  const updateDeviceInfoAfterLogin = async () => {
+    try {
+      const deviceInfoService = (await import('../services/deviceInfoService')).default;
+      console.log('📱 [AUTH] Actualizando device info...');
+      await deviceInfoService.updateDeviceInfo();
+    } catch (deviceError) {
+      console.error('❌ [AUTH] Error actualizando device info:', deviceError);
+    }
+  };
+
   const login = async (email: string, password: string) => {
     console.log('🔑 Iniciando proceso de login...');
     try {
@@ -225,6 +236,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       console.log('✅ Login completado, actualizando estado...');
       setUser(user);
       
+      // 📊 Analytics: Login exitoso
+      analyticsService.logEvent('login', {
+        method: 'email',
+        user_id: user.id,
+        has_country: !!user.countryId,
+        has_city: !!user.cityId,
+      });
+      
       // Configurar usuario en Sentry
       sentryService.setUser({
         id: user.id,
@@ -255,6 +274,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         } catch (error) {
           console.error('❌ [AUTH] Error inicializando notificaciones después del login:', error);
         }
+
+        // Actualizar device info después del login
+        await updateDeviceInfoAfterLogin();
       }, 2000);
     } catch (error: any) {
       console.error('❌ Error en login:', error);
@@ -370,6 +392,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       
       console.log('✅ Login con Google completado, actualizando estado...');
       setUser(user);
+      
+      // 📊 Analytics: Login con Google
+      const isNewUser = (response as any)?.isNewUser || false;
+      analyticsService.logEvent(isNewUser ? 'sign_up' : 'login', {
+        method: 'google',
+        user_id: user.id,
+        has_country: !!user.countryId,
+        has_city: !!user.cityId,
+        is_new_user: isNewUser,
+      });
       
       // Configurar usuario en Sentry
       sentryService.setUser({
@@ -541,6 +573,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       console.log('✅ Login con Apple completado, actualizando estado...');
       setUser(userData);
       
+      // 📊 Analytics: Login con Apple
+      const isNewUser = (response as any)?.isNewUser || false;
+      analyticsService.logEvent(isNewUser ? 'sign_up' : 'login', {
+        method: 'apple',
+        user_id: userData.id,
+        has_country: !!userData.countryId,
+        has_city: !!userData.cityId,
+        is_new_user: isNewUser,
+      });
+      
       // Configurar usuario en Sentry
       sentryService.setUser({
         id: userData.id,
@@ -643,6 +685,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       console.log('✅ Registro completado, actualizando estado...');
       setUser(user);
       
+      // 📊 Analytics: Registro exitoso
+      analyticsService.logEvent('sign_up', {
+        method: 'email',
+        user_id: user.id,
+        has_gender: !!gender,
+        has_children_count: !!childrenCount,
+        is_pregnant: !!isPregnant,
+        has_gestation_weeks: !!gestationWeeks,
+      });
+      
       // Configurar usuario en Sentry
       sentryService.setUser({
         id: user.id,
@@ -680,6 +732,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const logout = async () => {
     console.log('🚪 Iniciando proceso de logout...');
     try {
+      const userId = user?.id;
+      
       // Eliminar token de notificaciones del backend
       await notificationService.removeToken().catch((error) => {
         console.error('❌ [AUTH] Error eliminando token de notificaciones:', error);
@@ -688,6 +742,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       // Limpiar token, userData y hasChildren
       await AsyncStorage.multiRemove(['authToken', 'userData', 'hasChildren']);
       setUser(null);
+      
+      // 📊 Analytics: Logout
+      if (userId) {
+        analyticsService.logEvent('logout', {
+          user_id: userId,
+        });
+      }
       
       // Limpiar usuario de Sentry
       sentryService.clearUser();

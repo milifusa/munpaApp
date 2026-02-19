@@ -37,6 +37,7 @@ import { imageUploadService } from "../services/imageUploadService";
 import notificationService from "../services/notificationService";
 import analyticsService from "../services/analyticsService";
 import learningService from "../services/learning-service";
+import consultationsService from "../services/consultationsService";
 import {
   colors,
   typography,
@@ -207,6 +208,9 @@ const HomeScreen: React.FC = () => {
   const [todayGuideError, setTodayGuideError] = useState<string | null>(null);
   const [todayFaqQuestions, setTodayFaqQuestions] = useState<string[]>([]);
   const [loadingTodayFaq, setLoadingTodayFaq] = useState(false);
+
+  const [activeConsultations, setActiveConsultations] = useState<any[]>([]);
+  const [loadingConsultations, setLoadingConsultations] = useState(false);
 
   const [showActivityDetailModal, setShowActivityDetailModal] = useState(false);
   const [selectedActivityDetail, setSelectedActivityDetail] = useState<any>(null);
@@ -411,6 +415,7 @@ const HomeScreen: React.FC = () => {
           loadActivitySuggestions(selectedChild.id),
           loadTodayGuide(selectedChild),
           loadTodayFaq(selectedChild.id),
+          loadActiveConsultations(),
         ]);
       } finally {
         todayLoadInFlightRef.current = false;
@@ -580,7 +585,6 @@ const HomeScreen: React.FC = () => {
       setLoadingTodayCommunityPosts(true);
       setTodayCommunityError(null);
       const response = await communitiesService.getTopPosts(3);
-      console.log('🔍 [TOP POSTS] Respuesta completa del backend:', JSON.stringify(response, null, 2));
       const items =
         (Array.isArray(response?.data) && response.data) ||
         (Array.isArray(response?.data?.data) && response.data.data) ||
@@ -588,7 +592,6 @@ const HomeScreen: React.FC = () => {
         (Array.isArray(response?.posts) && response.posts) ||
         (Array.isArray(response) && response) ||
         [];
-      console.log('🔍 [TOP POSTS] Posts procesados:', JSON.stringify(items, null, 2));
       setTodayCommunityPosts(items);
     } catch (error: any) {
       console.error('❌ [TODAY] Error cargando top posts:', error);
@@ -650,6 +653,99 @@ const HomeScreen: React.FC = () => {
       setTodayFaqQuestions([]);
     } finally {
       setLoadingTodayFaq(false);
+    }
+  };
+
+  const loadActiveConsultations = async () => {
+    try {
+      setLoadingConsultations(true);
+      console.log('🏥 [HOME] Cargando consultas activas y pendientes...');
+      
+      const response = await consultationsService.getConsultations();
+      console.log('✅ [HOME] Consultas obtenidas:', response);
+      
+      // Extraer el array de consultas de la respuesta
+      const consultations = response.data || response;
+      console.log('🔍 [HOME] Total de consultas:', consultations.length);
+      
+      // Log de cada consulta y su estado
+      consultations.forEach((c: any, index: number) => {
+        console.log(`📋 [HOME] Consulta ${index + 1}:`, {
+          id: c.consultationId || c.id,
+          status: c.status,
+          specialist: c.specialistName,
+          child: c.childName,
+          type: c.type,
+          createdAt: c.createdAt,
+          requestedAt: c.schedule?.requestedAt,
+        });
+      });
+      
+      // Filtrar consultas activas (pending, accepted, in_progress) y completadas recientes (últimas 24h)
+      const now = new Date();
+      const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+      
+      const relevant = consultations.filter((c: any) => {
+        // Incluir todas las pendientes, aceptadas y en progreso
+        if (['pending', 'accepted', 'in_progress'].includes(c.status)) {
+          console.log(`✅ [HOME] Consulta ${c.consultationId || c.id} incluida (status: ${c.status})`);
+          return true;
+        }
+        
+        // Incluir completadas de las últimas 24 horas
+        if (c.status === 'completed' && c.schedule?.completedAt) {
+          const completedDate = new Date(c.schedule.completedAt);
+          const isRecent = completedDate >= oneDayAgo;
+          console.log(`${isRecent ? '✅' : '❌'} [HOME] Consulta completada ${c.consultationId || c.id} (${isRecent ? 'reciente' : 'antigua'})`);
+          return isRecent;
+        }
+        
+        console.log(`❌ [HOME] Consulta ${c.consultationId || c.id} excluida (status: ${c.status})`);
+        return false;
+      });
+      
+      console.log(`📊 [HOME] Consultas filtradas: ${relevant.length} de ${consultations.length}`);
+      
+      // Normalizar el campo consultationId (el backend puede devolver 'id' o 'consultationId')
+      const normalized = relevant.map((c: any) => ({
+        ...c,
+        consultationId: c.consultationId || c.id,
+      }));
+      
+      // Ordenar por fecha: pendientes y en progreso primero, luego por fecha más reciente
+      normalized.sort((a: any, b: any) => {
+        // Prioridad: in_progress > accepted > pending > completed
+        const priorityOrder: any = {
+          'in_progress': 1,
+          'accepted': 2,
+          'pending': 3,
+          'completed': 4,
+        };
+        
+        const priorityA = priorityOrder[a.status] || 5;
+        const priorityB = priorityOrder[b.status] || 5;
+        
+        if (priorityA !== priorityB) {
+          return priorityA - priorityB;
+        }
+        
+        // Si tienen la misma prioridad, ordenar por fecha más reciente
+        const dateA = new Date(a.schedule?.requestedAt || a.createdAt || 0);
+        const dateB = new Date(b.schedule?.requestedAt || b.createdAt || 0);
+        return dateB.getTime() - dateA.getTime();
+      });
+      
+      console.log('🏥 [HOME] Consultas finales ordenadas:');
+      normalized.forEach((c: any, index: number) => {
+        console.log(`  ${index + 1}. ${c.status} - ${c.specialistName} (${c.childName})`);
+      });
+      
+      setActiveConsultations(normalized);
+    } catch (error) {
+      console.error('❌ [HOME] Error cargando consultas:', error);
+      setActiveConsultations([]);
+    } finally {
+      setLoadingConsultations(false);
     }
   };
 
@@ -1233,6 +1329,164 @@ const HomeScreen: React.FC = () => {
             <Text style={styles.quickActionLabel}>Nutrición</Text>
           </TouchableOpacity>
         </ScrollView>
+
+        {/* Consultas Activas */}
+        {(activeConsultations.length > 0 || loadingConsultations) && (
+          <View style={styles.activeConsultationsContainer}>
+            <View style={styles.consultationsHeader}>
+              <View style={styles.consultationsHeaderLeft}>
+                <Ionicons name="medical" size={20} color="#887CBC" />
+                <Text style={styles.consultationsTitle}>Mis Consultas</Text>
+                {loadingConsultations && (
+                  <ActivityIndicator size="small" color="#887CBC" style={{ marginLeft: 8 }} />
+                )}
+              </View>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                <TouchableOpacity
+                  onPress={() => {
+                    console.log('🔄 [HOME] Recargando consultas manualmente...');
+                    loadActiveConsultations();
+                  }}
+                  style={{ padding: 4 }}
+                >
+                  <Ionicons name="refresh" size={18} color="#887CBC" />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => {
+                    analyticsService.logEvent('view_all_consultations_clicked', {
+                      from: 'home',
+                    });
+                    (navigation as any).navigate('MyConsultations');
+                  }}
+                >
+                  <Text style={styles.consultationsViewAll}>Ver todas</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {loadingConsultations && activeConsultations.length === 0 ? (
+              <View style={{ padding: 40, alignItems: 'center' }}>
+                <ActivityIndicator size="large" color="#887CBC" />
+                <Text style={{ marginTop: 12, color: '#6B7280', fontSize: 14 }}>
+                  Cargando consultas...
+                </Text>
+              </View>
+            ) : activeConsultations.length === 0 ? (
+              <View style={{ padding: 40, alignItems: 'center' }}>
+                <Text style={{ color: '#6B7280', fontSize: 14 }}>
+                  No hay consultas activas
+                </Text>
+              </View>
+            ) : (
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.consultationsScroll}
+              >
+                {activeConsultations.map((consultation) => (
+                  <TouchableOpacity
+                    key={consultation.consultationId}
+                    style={styles.consultationCard}
+                    onPress={() => {
+                      analyticsService.logEvent('active_consultation_clicked', {
+                        consultation_id: consultation.consultationId,
+                        status: consultation.status,
+                        from: 'home',
+                      });
+                      (navigation as any).navigate('ConsultationDetail', {
+                        consultationId: consultation.consultationId,
+                      });
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <View style={styles.consultationCardHeader}>
+                      <View style={[
+                        styles.consultationStatusBadge,
+                        consultation.status === 'in_progress' && { backgroundColor: '#DBEAFE' },
+                        consultation.status === 'accepted' && { backgroundColor: '#D1FAE5' },
+                        consultation.status === 'pending' && { backgroundColor: '#FEF3C7' },
+                        consultation.status === 'completed' && { backgroundColor: '#F3F4F6' },
+                      ]}>
+                        <View style={[
+                          styles.consultationStatusDot,
+                          consultation.status === 'in_progress' && styles.consultationStatusDotActive,
+                          consultation.status === 'accepted' && styles.consultationStatusDotAccepted,
+                          consultation.status === 'pending' && styles.consultationStatusDotPending,
+                          consultation.status === 'completed' && styles.consultationStatusDotCompleted,
+                        ]} />
+                        <Text style={[
+                          styles.consultationStatusText,
+                          consultation.status === 'in_progress' && { color: '#1E40AF' },
+                          consultation.status === 'accepted' && { color: '#065F46' },
+                          consultation.status === 'pending' && { color: '#78350F' },
+                          consultation.status === 'completed' && { color: '#4B5563' },
+                        ]}>
+                          {consultation.status === 'pending' && '⏳ Pendiente'}
+                          {consultation.status === 'accepted' && '✓ Aceptada'}
+                          {consultation.status === 'in_progress' && '💬 En curso'}
+                          {consultation.status === 'completed' && '✅ Completada'}
+                        </Text>
+                      </View>
+                      <View style={[
+                        styles.consultationTypeBadge,
+                        consultation.type === 'video' && styles.consultationTypeBadgeVideo,
+                      ]}>
+                        <Ionicons
+                          name={consultation.type === 'chat' ? 'chatbubble' : 'videocam'}
+                          size={18}
+                          color="#FFF"
+                        />
+                      </View>
+                    </View>
+
+                    <View style={styles.consultationSpecialistInfo}>
+                      <Text style={styles.consultationSpecialistName}>
+                        {consultation.specialistName || 'Especialista'}
+                      </Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <Ionicons name="person-outline" size={14} color="#887CBC" />
+                        <Text style={styles.consultationChildName}>
+                          Para: {consultation.childName}
+                        </Text>
+                      </View>
+                    </View>
+
+                    {consultation.request?.symptoms && consultation.request.symptoms.length > 0 && (
+                      <View style={{ marginBottom: 16 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+                          <Ionicons name="medkit-outline" size={14} color="#6B7280" />
+                          <Text style={{ fontSize: 12, color: '#6B7280', fontWeight: '600', marginLeft: 4 }}>
+                            Síntomas reportados
+                          </Text>
+                        </View>
+                        <View style={styles.consultationSymptoms}>
+                          {consultation.request.symptoms.slice(0, 3).map((symptomId: string, idx: number) => (
+                            <View key={idx} style={styles.consultationSymptomDot} />
+                          ))}
+                          {consultation.request.symptoms.length > 3 && (
+                            <Text style={styles.consultationSymptomMore}>
+                              +{consultation.request.symptoms.length - 3} más
+                            </Text>
+                          )}
+                        </View>
+                      </View>
+                    )}
+
+                    <View style={styles.consultationFooter}>
+                      <Ionicons name="time-outline" size={16} color="#887CBC" />
+                      <Text style={styles.consultationTime}>
+                        {consultation.status === 'completed' 
+                          ? `Completada ${formatTimeAgo(consultation.schedule?.completedAt)}`
+                          : formatTimeAgo(consultation.schedule?.requestedAt)
+                        }
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            )}
+          </View>
+        )}
 
         {/* Contenido principal */}
         {selectedChild && (
@@ -1870,6 +2124,163 @@ const styles = StyleSheet.create({
   quickActionOrange: {
     backgroundColor: "#FF9244",
   },
+  
+  // Consultas Activas
+  activeConsultationsContainer: {
+    backgroundColor: '#FFFFFF',
+    paddingVertical: 20,
+    paddingHorizontal: 20,
+    marginBottom: 8,
+  },
+  consultationsHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 18,
+  },
+  consultationsHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  consultationsTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#2D3748',
+    fontFamily: 'Montserrat',
+  },
+  consultationsViewAll: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#887CBC',
+  },
+  consultationsScroll: {
+    paddingRight: 20,
+  },
+  consultationCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    padding: 20,
+    marginRight: 16,
+    width: 300,
+    borderWidth: 2,
+    borderColor: '#F3F4F6',
+    shadowColor: '#887CBC',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 5,
+  },
+  consultationCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 16,
+  },
+  consultationStatusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FEF3C7',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 16,
+    gap: 6,
+    flex: 1,
+    marginRight: 8,
+  },
+  consultationStatusDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#9CA3AF',
+  },
+  consultationStatusDotPending: {
+    backgroundColor: '#F59E0B',
+  },
+  consultationStatusDotAccepted: {
+    backgroundColor: '#10B981',
+  },
+  consultationStatusDotActive: {
+    backgroundColor: '#3B82F6',
+  },
+  consultationStatusDotCompleted: {
+    backgroundColor: '#6B7280',
+  },
+  consultationStatusText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#78350F',
+  },
+  consultationTypeBadge: {
+    backgroundColor: '#887CBC',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#887CBC',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  consultationTypeBadgeVideo: {
+    backgroundColor: '#EC4899',
+  },
+  consultationSpecialistInfo: {
+    marginBottom: 16,
+    backgroundColor: '#F9FAFB',
+    padding: 14,
+    borderRadius: 14,
+  },
+  consultationSpecialistName: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1F2937',
+    marginBottom: 6,
+    fontFamily: 'Montserrat',
+  },
+  consultationChildName: {
+    fontSize: 14,
+    color: '#6B7280',
+    fontWeight: '600',
+  },
+  consultationSymptoms: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  consultationSymptomDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#887CBC',
+  },
+  consultationSymptomMore: {
+    fontSize: 12,
+    color: '#6B7280',
+    fontWeight: '600',
+    backgroundColor: '#F3F4F6',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  consultationFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingTop: 14,
+    borderTopWidth: 1.5,
+    borderTopColor: '#F3F4F6',
+  },
+  consultationTime: {
+    fontSize: 13,
+    color: '#6B7280',
+    fontWeight: '600',
+  },
+  
   bannerHome1Container: {
     marginTop: -15,
     marginBottom: -28,

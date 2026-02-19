@@ -7,6 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '../contexts/AuthContext';
 import { useMenu } from '../contexts/MenuContext';
+import { useViewMode } from '../contexts/ViewModeContext';
 import { useNavigation } from '@react-navigation/native';
 import GlobalMenu from '../components/GlobalMenu';
 import DouliChatOverlay from '../components/DouliChatOverlay';
@@ -67,6 +68,24 @@ import ServiceRequestScreen from '../screens/ServiceRequestScreen';
 import VaccineTrackerScreen from '../screens/VaccineTrackerScreen';
 import FeedingScreen from '../screens/FeedingScreen';
 import MilestonesScreen from '../screens/MilestonesScreen';
+import SpecialistsListScreen from '../screens/SpecialistsListScreen';
+import ConsultationRequestScreen from '../screens/ConsultationRequestScreen';
+import ConsultationDetailScreen from '../screens/ConsultationDetailScreen';
+import ConsultationVideoScreen from '../screens/ConsultationVideoScreen';
+import MyConsultationsScreen from '../screens/MyConsultationsScreen';
+import SpecialistDashboardScreen from '../screens/SpecialistDashboardScreen';
+import SpecialistHomeScreen from '../screens/SpecialistHomeScreen';
+import SpecialistScheduleScreen from '../screens/SpecialistScheduleScreen';
+import SpecialistStatsScreen from '../screens/SpecialistStatsScreen';
+import SpecialistConsultationsScreen from '../screens/SpecialistConsultationsScreen';
+import SpecialistProfileScreen from '../screens/SpecialistProfileScreen';
+import EditSpecialistProfileScreen from '../screens/EditSpecialistProfileScreen';
+import ManageDocumentsScreen from '../screens/ManageDocumentsScreen';
+import VendorProductsScreen from '../screens/VendorProductsScreen';
+import VendorCategoriesScreen from '../screens/VendorCategoriesScreen';
+import VendorDiscountsScreen from '../screens/VendorDiscountsScreen';
+import VendorCreateProductScreen from '../screens/VendorCreateProductScreen';
+import VendorPromotionsScreen from '../screens/VendorPromotionsScreen';
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -99,20 +118,11 @@ const ProfileButton = () => {
 
 // Componente para mostrar las caritas de los hijos en el header
 const ChildrenHeaderTitle = () => {
-  const { user, setUser } = useAuth();
+  const { user } = useAuth();
   const [children, setChildren] = React.useState<any[]>([]);
   const [selectedChildId, setSelectedChildId] = React.useState<string | null>(null);
-  const [profile, setProfile] = React.useState<any>(null);
   const [loading, setLoading] = React.useState(true);
   const [showSelector, setShowSelector] = React.useState(false);
-  const [showLocationModal, setShowLocationModal] = React.useState(false);
-  const [countries, setCountries] = React.useState<any[]>([]);
-  const [cities, setCities] = React.useState<any[]>([]);
-  const [selectedCountryId, setSelectedCountryId] = React.useState<string | null>(null);
-  const [selectedCityId, setSelectedCityId] = React.useState<string | null>(null);
-  const [loadingLocation, setLoadingLocation] = React.useState(false);
-  const [loadingCountries, setLoadingCountries] = React.useState(false);
-  const [loadingCities, setLoadingCities] = React.useState(false);
   const navigation = useNavigation<any>();
 
   React.useEffect(() => {
@@ -153,20 +163,6 @@ const ChildrenHeaderTitle = () => {
           setSelectedChildId(validChildren[0].id);
           await AsyncStorage.setItem('selectedChildId', validChildren[0].id);
         }
-
-        // Cargar perfil del usuario para ubicación
-        const profileResponse = await fetch('https://api.munpa.online/api/auth/profile', {
-          headers: {
-            'Authorization': `Bearer ${authToken}`,
-            'Content-Type': 'application/json'
-          }
-        });
-        const profileData = await profileResponse.json();
-        if (profileData.success && profileData.data) {
-          setProfile(profileData.data);
-        } else if (profileData.user) {
-          setProfile(profileData.user);
-        }
       } catch (error) {
         console.error('Error cargando hijos para header:', error);
       } finally {
@@ -202,148 +198,6 @@ const ChildrenHeaderTitle = () => {
       childrenCount: 1,
       gender: 'F',
     });
-  };
-
-  const handleLocationPress = () => {
-    setShowLocationModal(true);
-    loadCountries();
-  };
-
-  const loadCountries = async () => {
-    try {
-      setLoadingCountries(true);
-      const authToken = await AsyncStorage.getItem('authToken');
-      if (!authToken) return;
-
-      const response = await fetch('https://api.munpa.online/api/locations/countries', {
-        headers: {
-          'Authorization': `Bearer ${authToken}`,
-          'Content-Type': 'application/json'
-        }
-      });
-      const data = await response.json();
-      if (data.success && data.data) {
-        setCountries(data.data);
-      }
-    } catch (error) {
-      console.error('Error cargando países:', error);
-    } finally {
-      setLoadingCountries(false);
-    }
-  };
-
-  const loadCities = async (countryId: string) => {
-    try {
-      setLoadingCities(true);
-      const authToken = await AsyncStorage.getItem('authToken');
-      if (!authToken) return;
-
-      const response = await fetch(`https://api.munpa.online/api/locations/cities?countryId=${countryId}`, {
-        headers: {
-          'Authorization': `Bearer ${authToken}`,
-          'Content-Type': 'application/json'
-        }
-      });
-      const data = await response.json();
-      if (data.success && data.data) {
-        setCities(data.data);
-      }
-    } catch (error) {
-      console.error('Error cargando ciudades:', error);
-    } finally {
-      setLoadingCities(false);
-    }
-  };
-
-  const handleCountrySelect = (countryId: string) => {
-    setSelectedCountryId(countryId);
-    setSelectedCityId(null);
-    setCities([]);
-    loadCities(countryId);
-  };
-
-  const handleSaveLocation = async () => {
-    if (!selectedCountryId || !selectedCityId) {
-      Alert.alert('Error', 'Por favor selecciona país y ciudad');
-      return;
-    }
-
-    try {
-      setLoadingLocation(true);
-      const authToken = await AsyncStorage.getItem('authToken');
-      if (!authToken) return;
-
-      const selectedCountry = countries.find(c => c.id === selectedCountryId);
-      const selectedCity = cities.find(c => c.id === selectedCityId);
-
-      const response = await fetch('https://api.munpa.online/api/auth/location', {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${authToken}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          countryId: selectedCountryId,
-          cityId: selectedCityId,
-          country: selectedCountry?.name,
-          city: selectedCity?.name,
-        })
-      });
-
-      const data = await response.json();
-      if (data.success) {
-        const updatedProfile = {
-          ...profile,
-          countryId: selectedCountryId,
-          cityId: selectedCityId,
-          countryName: selectedCountry?.name,
-          cityName: selectedCity?.name,
-        };
-        
-        console.log('✅ Ubicación actualizada:', {
-          country: selectedCountry?.name,
-          city: selectedCity?.name,
-        });
-        
-        // Actualizar el perfil local
-        setProfile(updatedProfile);
-        
-        // Actualizar el contexto global de autenticación
-        // @ts-ignore
-        setUser((prevUser: any) => ({
-          ...prevUser,
-          countryId: selectedCountryId,
-          cityId: selectedCityId,
-          countryName: selectedCountry?.name,
-          cityName: selectedCity?.name,
-        }));
-        
-        setShowLocationModal(false);
-        Alert.alert('Éxito', 'Ubicación actualizada correctamente');
-        
-        // Forzar recarga completa del HomeScreen navegando de nuevo
-        // Esto hará que se recargue todo el contenido basado en la nueva ubicación
-        navigation.reset({
-          index: 0,
-          routes: [
-            {
-              name: 'MainTabs',
-              state: {
-                routes: [{ name: 'Home' }],
-                index: 0,
-              },
-            },
-          ],
-        });
-      } else {
-        Alert.alert('Error', 'No se pudo actualizar la ubicación');
-      }
-    } catch (error) {
-      console.error('Error guardando ubicación:', error);
-      Alert.alert('Error', 'No se pudo actualizar la ubicación');
-    } finally {
-      setLoadingLocation(false);
-    }
   };
 
   if (loading) {
@@ -402,27 +256,6 @@ const ChildrenHeaderTitle = () => {
           </Text>
           <Ionicons name="chevron-down" size={16} color="#4A5568" />
         </TouchableOpacity>
-
-        {/* Ubicación del usuario */}
-        {(profile?.cityName || profile?.countryName) && (
-          <TouchableOpacity 
-            style={styles.locationContainer}
-            onPress={handleLocationPress}
-            activeOpacity={0.8}
-          >
-            <Ionicons name="location-outline" size={14} color="#FFFFFF" />
-            <Text style={styles.locationText} numberOfLines={1}>
-              {profile.cityName && profile.cityName.length > 8 
-                ? `${profile.cityName.substring(0, 8)}...` 
-                : profile.cityName}
-              {profile.cityName && profile.countryName && ', '}
-              {profile.countryName && profile.countryName.length > 8
-                ? `${profile.countryName.substring(0, 8)}...`
-                : profile.countryName}
-            </Text>
-            <Ionicons name="chevron-down" size={12} color="#FFFFFF" />
-          </TouchableOpacity>
-        )}
       </View>
 
       <Modal
@@ -475,121 +308,6 @@ const ChildrenHeaderTitle = () => {
         </TouchableOpacity>
       </Modal>
 
-      {/* Modal para cambiar ubicación */}
-      <Modal
-        visible={showLocationModal}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setShowLocationModal(false)}
-      >
-        <View style={styles.locationModalOverlay}>
-          <View style={styles.locationModalCard}>
-            <View style={styles.locationModalHeader}>
-              <Text style={styles.locationModalTitle}>Cambiar ubicación</Text>
-              <TouchableOpacity onPress={() => setShowLocationModal(false)}>
-                <Ionicons name="close" size={24} color="#4A5568" />
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView style={styles.locationModalContent}>
-              {/* Selector de País */}
-              <Text style={styles.locationModalLabel}>País</Text>
-              <View style={styles.locationPickerContainer}>
-                {loadingCountries ? (
-                  // Skeleton para países
-                  <>
-                    {[1, 2, 3].map((i) => (
-                      <View key={`country-skeleton-${i}`} style={styles.locationSkeletonItem}>
-                        <View style={styles.locationSkeletonText} />
-                      </View>
-                    ))}
-                  </>
-                ) : countries.length > 0 ? (
-                  countries.map((country) => (
-                    <TouchableOpacity
-                      key={country.id}
-                      style={[
-                        styles.locationPickerItem,
-                        selectedCountryId === country.id && styles.locationPickerItemSelected
-                      ]}
-                      onPress={() => handleCountrySelect(country.id)}
-                    >
-                      <Text style={[
-                        styles.locationPickerItemText,
-                        selectedCountryId === country.id && styles.locationPickerItemTextSelected
-                      ]}>
-                        {country.name}
-                      </Text>
-                      {selectedCountryId === country.id && (
-                        <Ionicons name="checkmark-circle" size={18} color="#59C6C0" />
-                      )}
-                    </TouchableOpacity>
-                  ))
-                ) : (
-                  <Text style={styles.locationEmptyText}>No hay países disponibles</Text>
-                )}
-              </View>
-
-              {/* Selector de Ciudad */}
-              {selectedCountryId && (
-                <>
-                  <Text style={styles.locationModalLabel}>Ciudad</Text>
-                  <View style={styles.locationPickerContainer}>
-                    {loadingCities ? (
-                      // Skeleton para ciudades
-                      <>
-                        {[1, 2, 3, 4].map((i) => (
-                          <View key={`city-skeleton-${i}`} style={styles.locationSkeletonItem}>
-                            <View style={styles.locationSkeletonText} />
-                          </View>
-                        ))}
-                      </>
-                    ) : cities.length > 0 ? (
-                      cities.map((city) => (
-                        <TouchableOpacity
-                          key={city.id}
-                          style={[
-                            styles.locationPickerItem,
-                            selectedCityId === city.id && styles.locationPickerItemSelected
-                          ]}
-                          onPress={() => setSelectedCityId(city.id)}
-                        >
-                          <Text style={[
-                            styles.locationPickerItemText,
-                            selectedCityId === city.id && styles.locationPickerItemTextSelected
-                          ]}>
-                            {city.name}
-                          </Text>
-                          {selectedCityId === city.id && (
-                            <Ionicons name="checkmark-circle" size={18} color="#59C6C0" />
-                          )}
-                        </TouchableOpacity>
-                      ))
-                    ) : (
-                      <Text style={styles.locationEmptyText}>No hay ciudades disponibles</Text>
-                    )}
-                  </View>
-                </>
-              )}
-            </ScrollView>
-
-            <TouchableOpacity 
-              style={[
-                styles.locationModalSaveButton,
-                (!selectedCountryId || !selectedCityId) && styles.locationModalSaveButtonDisabled
-              ]}
-              onPress={handleSaveLocation}
-              disabled={!selectedCountryId || !selectedCityId || loadingLocation}
-            >
-              {loadingLocation ? (
-                <ActivityIndicator color="#FFFFFF" />
-              ) : (
-                <Text style={styles.locationModalSaveButtonText}>Guardar cambios</Text>
-              )}
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
     </>
   );
 };
@@ -946,7 +664,15 @@ const AuthenticatedNavigator = () => {
         name="CreateProduct"
         component={CreateProductScreen}
         options={{
-          headerShown: false,
+          title: 'Publicar Producto',
+          headerShown: true,
+          headerStyle: {
+            backgroundColor: '#96d2d3',
+          },
+          headerTintColor: 'white',
+          headerTitleStyle: {
+            fontWeight: 'bold',
+          },
         }}
       />
       <Stack.Screen
@@ -977,18 +703,155 @@ const AuthenticatedNavigator = () => {
           headerShown: false,
         }}
       />
+      <Stack.Screen
+        name="SpecialistsList"
+        component={SpecialistsListScreen}
+        options={{
+          headerShown: false,
+        }}
+      />
+      <Stack.Screen
+        name="EditSpecialistProfile"
+        component={EditSpecialistProfileScreen}
+        options={{
+          title: 'Editar Perfil',
+          headerStyle: {
+            backgroundColor: '#887CBC',
+          },
+          headerTintColor: 'white',
+          headerTitleStyle: {
+            fontWeight: 'bold',
+          },
+        }}
+      />
+      <Stack.Screen
+        name="ManageDocuments"
+        component={ManageDocumentsScreen}
+        options={{
+          title: 'Documentos Profesionales',
+          headerStyle: {
+            backgroundColor: '#887CBC',
+          },
+          headerTintColor: 'white',
+          headerTitleStyle: {
+            fontWeight: 'bold',
+          },
+        }}
+      />
+      <Stack.Screen
+        name="VendorCreateProduct"
+        component={VendorCreateProductScreen}
+        options={{
+          title: 'Publicar Producto',
+          headerStyle: {
+            backgroundColor: '#96d2d3',
+          },
+          headerTintColor: 'white',
+          headerTitleStyle: {
+            fontWeight: 'bold',
+          },
+        }}
+      />
+      <Stack.Screen
+        name="VendorCategories"
+        component={VendorCategoriesScreen}
+        options={{
+          title: 'Mis Categorías',
+          headerStyle: {
+            backgroundColor: '#96d2d3',
+          },
+          headerTintColor: 'white',
+          headerTitleStyle: {
+            fontWeight: 'bold',
+          },
+        }}
+      />
+      <Stack.Screen
+        name="VendorDiscounts"
+        component={VendorDiscountsScreen}
+        options={{
+          title: 'Mis Descuentos',
+          headerStyle: {
+            backgroundColor: '#96d2d3',
+          },
+          headerTintColor: 'white',
+          headerTitleStyle: {
+            fontWeight: 'bold',
+          },
+        }}
+      />
+      <Stack.Screen
+        name="VendorPromotions"
+        component={VendorPromotionsScreen}
+        options={{
+          title: 'Mis Promociones',
+          headerStyle: {
+            backgroundColor: '#96d2d3',
+          },
+          headerTintColor: 'white',
+          headerTitleStyle: {
+            fontWeight: 'bold',
+          },
+        }}
+      />
+      <Stack.Screen
+        name="ConsultationRequest"
+        component={ConsultationRequestScreen}
+        options={{
+          headerShown: false,
+        }}
+      />
+      <Stack.Screen
+        name="ConsultationDetail"
+        component={ConsultationDetailScreen}
+        options={{
+          headerShown: false,
+        }}
+      />
+      <Stack.Screen
+        name="ConsultationVideo"
+        component={ConsultationVideoScreen}
+        options={{
+          headerShown: false,
+        }}
+      />
+      <Stack.Screen
+        name="MyConsultations"
+        component={MyConsultationsScreen}
+        options={{
+          headerShown: false,
+        }}
+      />
+      <Stack.Screen
+        name="SpecialistDashboard"
+        component={SpecialistDashboardScreen}
+        options={{
+          headerShown: false,
+        }}
+      />
     </Stack.Navigator>
   );
 };
 
 // Stack Navigator para Home con sus sub-pantallas
 const HomeStackNavigator = () => {
+  const { isSpecialistMode } = useViewMode();
+  const { user } = useAuth();
+  
+  // Usar SpecialistHomeScreen si está en modo especialista
+  const HomeComponent = (isSpecialistMode && user?.professionalProfile?.isActive)
+    ? SpecialistHomeScreen
+    : HomeScreen;
+  
+  // Colores según el modo
+  const headerColor = isSpecialistMode ? '#887CBC' : '#96d2d3';
+  
   return (
     <Stack.Navigator
       screenOptions={{
         headerStyle: {
-          backgroundColor: '#96d2d3',
-          height: 100, // Altura moderada // Altura reducida
+          backgroundColor: headerColor,
+          height: 100,
         },
         headerTintColor: 'white',
         headerTitleStyle: {
@@ -1004,9 +867,10 @@ const HomeStackNavigator = () => {
     >
       <Stack.Screen
         name="HomeMain"
-        component={HomeScreen}
+        component={HomeComponent}
         options={{
-          headerTitleAlign: 'left', // Alineado a la izquierda en iOS
+          headerTitleAlign: 'left',
+          headerShown: isSpecialistMode ? false : true, // SpecialistHome tiene su propio header
         }}
       />
       <Stack.Screen
@@ -1285,7 +1149,252 @@ const RecommendationsStackNavigator = () => {
 // Navegador de tabs principal
 const MainTabNavigator = () => {
   const { user } = useAuth();
+  const { isSpecialistMode, isMedicalProfile, isServiceProfile } = useViewMode();
   
+  // Tabs completamente diferentes según el modo
+  if (isSpecialistMode && user?.professionalProfile?.isActive) {
+    // MODO PROFESIONAL - Tabs diferenciados por tipo
+    const tabColor = isMedicalProfile ? '#887CBC' : '#96d2d3'; // Morado para médico, teal para servicio
+    const tabColorLight = isMedicalProfile ? '#E9D5FF' : '#D1F2F2';
+    
+    return (
+      <View style={{ flex: 1 }}>
+        <Tab.Navigator
+          screenOptions={{
+            tabBarStyle: {
+              backgroundColor: tabColor,
+              borderTopWidth: 0,
+              paddingTop: Platform.OS === 'ios' ? 8 : 12,
+              paddingBottom: Platform.OS === 'ios' ? 30 : 22,
+              height: Platform.OS === 'ios' ? 95 : 105,
+            },
+            headerShown: false,
+            tabBarActiveTintColor: '#ffffff',
+            tabBarInactiveTintColor: tabColorLight,
+            tabBarLabelStyle: {
+              fontSize: Platform.OS === 'ios' ? 10 : 11,
+              fontWeight: '600',
+              marginTop: Platform.OS === 'ios' ? 4 : 6,
+              marginBottom: 0,
+            },
+          }}
+        >
+          {/* TABS PARA PERFIL MÉDICO */}
+          {isMedicalProfile && (
+            <>
+              <Tab.Screen
+                name="Home"
+                component={HomeStackNavigator}
+                options={{
+                  tabBarLabel: 'Dashboard',
+                  tabBarIcon: ({ color, size, focused }) => (
+                    <Ionicons 
+                      name="stats-chart" 
+                      size={28} 
+                      color={color}
+                    />
+                  ),
+                }}
+              />
+              <Tab.Screen
+                name="Consultations"
+                component={SpecialistConsultationsScreen}
+                options={{
+                  title: 'Mis Consultas',
+                  tabBarLabel: 'Consultas',
+                  headerShown: true,
+                  headerStyle: {
+                    backgroundColor: '#887CBC',
+                  },
+                  headerTintColor: 'white',
+                  headerTitleStyle: {
+                    fontWeight: 'bold',
+                  },
+                  headerRight: () => <ProfileButton />,
+                  tabBarIcon: ({ color, size, focused }) => (
+                    <Ionicons 
+                      name="chatbubbles" 
+                      size={28} 
+                      color={color}
+                    />
+                  ),
+                }}
+              />
+              <Tab.Screen
+                name="Analytics"
+                component={SpecialistStatsScreen}
+                options={{
+                  title: 'Estadísticas',
+                  tabBarLabel: 'Estadísticas',
+                  headerShown: true,
+                  headerStyle: {
+                    backgroundColor: '#887CBC',
+                  },
+                  headerTintColor: 'white',
+                  headerTitleStyle: {
+                    fontWeight: 'bold',
+                  },
+                  headerRight: () => <ProfileButton />,
+                  tabBarIcon: ({ color, size, focused }) => (
+                    <Ionicons 
+                      name="bar-chart" 
+                      size={28} 
+                      color={color}
+                    />
+                  ),
+                }}
+              />
+              <Tab.Screen
+                name="Schedule"
+                component={SpecialistScheduleScreen}
+                options={{
+                  title: 'Mi Horario',
+                  tabBarLabel: 'Horario',
+                  headerShown: true,
+                  headerStyle: {
+                    backgroundColor: '#887CBC',
+                  },
+                  headerTintColor: 'white',
+                  headerTitleStyle: {
+                    fontWeight: 'bold',
+                  },
+                  headerRight: () => <ProfileButton />,
+                  tabBarIcon: ({ color, size, focused }) => (
+                    <Ionicons 
+                      name="calendar" 
+                      size={28} 
+                      color={color}
+                    />
+                  ),
+                }}
+              />
+              <Tab.Screen
+                name="Profile"
+                component={SpecialistProfileScreen}
+                options={{
+                  title: 'Mi Perfil',
+                  tabBarLabel: 'Perfil',
+                  headerShown: true,
+                  headerStyle: {
+                    backgroundColor: '#887CBC',
+                  },
+                  headerTintColor: 'white',
+                  headerTitleStyle: {
+                    fontWeight: 'bold',
+                  },
+                  headerRight: () => <ProfileButton />,
+                  tabBarIcon: ({ color, size, focused }) => (
+                    <Ionicons 
+                      name="person-circle" 
+                      size={28} 
+                      color={color}
+                    />
+                  ),
+                }}
+              />
+            </>
+          )}
+
+          {/* TABS PARA PERFIL DE SERVICIO */}
+          {isServiceProfile && (
+            <>
+              <Tab.Screen
+                name="Home"
+                component={HomeStackNavigator}
+                options={{
+                  tabBarLabel: 'Dashboard',
+                  tabBarIcon: ({ color, size, focused }) => (
+                    <Ionicons 
+                      name="stats-chart" 
+                      size={28} 
+                      color={color}
+                    />
+                  ),
+                }}
+              />
+              <Tab.Screen
+                name="Products"
+                component={VendorProductsScreen}
+                options={{
+                  title: 'Mis Productos',
+                  tabBarLabel: 'Productos',
+                  headerShown: true,
+                  headerStyle: {
+                    backgroundColor: '#96d2d3',
+                  },
+                  headerTintColor: 'white',
+                  headerTitleStyle: {
+                    fontWeight: 'bold',
+                  },
+                  headerRight: () => <ProfileButton />,
+                  tabBarIcon: ({ color, size, focused }) => (
+                    <Ionicons 
+                      name="cube" 
+                      size={28} 
+                      color={color}
+                    />
+                  ),
+                }}
+              />
+              <Tab.Screen
+                name="Sales"
+                component={SpecialistDashboardScreen} // TODO: Crear pantalla de ventas
+                options={{
+                  tabBarLabel: 'Ventas',
+                  tabBarIcon: ({ color, size, focused }) => (
+                    <Ionicons 
+                      name="cash" 
+                      size={28} 
+                      color={color}
+                    />
+                  ),
+                }}
+              />
+              <Tab.Screen
+                name="Messages"
+                component={MarketplaceMessagesScreen}
+                options={{
+                  tabBarLabel: 'Mensajes',
+                  tabBarIcon: ({ color, size, focused }) => (
+                    <Ionicons 
+                      name="chatbubbles" 
+                      size={28} 
+                      color={color}
+                    />
+                  ),
+                }}
+              />
+              <Tab.Screen
+                name="Profile"
+                component={ProfileScreen}
+                options={{
+                  tabBarLabel: 'Perfil',
+                  headerShown: true,
+                  headerStyle: {
+                    backgroundColor: '#96d2d3',
+                  },
+                  headerTintColor: 'white',
+                  headerTitleStyle: {
+                    fontWeight: 'bold',
+                  },
+                  headerRight: () => <ProfileButton />,
+                  tabBarIcon: ({ color, size, focused }) => (
+                    <Ionicons 
+                      name="person-circle" 
+                      size={28} 
+                      color={color}
+                    />
+                  ),
+                }}
+              />
+            </>
+          )}
+        </Tab.Navigator>
+      </View>
+    );
+  }
+  
+  // MODO MUNPA - Tabs Celestes (originales)
   return (
     <View style={{ flex: 1 }}>
       <Tab.Navigator

@@ -15,7 +15,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import api from '../services/api';
 import recommendationAnalyticsService from '../services/recommendationAnalyticsService';
 
@@ -45,6 +45,7 @@ interface Recommendation {
 }
 
 const FavoritesScreen = ({ navigation }: any) => {
+  const insets = useSafeAreaInsets();
   const [favorites, setFavorites] = useState<Recommendation[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -323,7 +324,7 @@ const FavoritesScreen = ({ navigation }: any) => {
   );
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={[styles.container, Platform.OS === 'android' && { paddingTop: insets.top }]} edges={['top']}>
       <StatusBar barStyle="light-content" backgroundColor="#96d2d3" />
       <View style={styles.content}>
         {/* Header */}

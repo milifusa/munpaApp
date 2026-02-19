@@ -16,7 +16,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRoute, useNavigation, useFocusEffect } from '@react-navigation/native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { listsService } from '../services/api';
 import { ListComment } from '../types/lists';
 
@@ -34,6 +34,7 @@ const ItemCommentsScreen = () => {
   const route = useRoute<any>();
   const navigation = useNavigation<any>();
   const { listId, itemId, itemText } = route.params;
+  const insets = useSafeAreaInsets();
 
   const [comments, setComments] = useState<ListComment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -198,7 +199,7 @@ const ItemCommentsScreen = () => {
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={[styles.container, Platform.OS === 'android' && { paddingTop: insets.top }]} edges={['top']}>
       <StatusBar barStyle="light-content" backgroundColor="#96d2d3" />
       {/* Header */}
       <View style={styles.header}>

@@ -364,7 +364,7 @@ const NotificationsScreen = () => {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.safeArea}>
+      <SafeAreaView style={[styles.safeArea, Platform.OS === 'android' && { paddingTop: insets.top }]}>
         <View style={styles.container}>
           <StatusBar barStyle="light-content" backgroundColor="#96d2d3" />
           
@@ -389,7 +389,7 @@ const NotificationsScreen = () => {
   }
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={[styles.safeArea, Platform.OS === 'android' && { paddingTop: insets.top }]}>
       <View style={styles.container}>
         <StatusBar barStyle="light-content" backgroundColor="#96d2d3" />
         

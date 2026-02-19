@@ -76,12 +76,28 @@ const MunpaMarketScreen = () => {
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  const loadProducts = async (force: boolean = false) => {
+  const loadProducts = async (force: boolean = false, retryCount: number = 0) => {
     try {
       const coordsKey = userCoords ? `${userCoords.latitude.toFixed(4)}|${userCoords.longitude.toFixed(4)}` : 'na';
       const loadKey = `${selectedType}|${selectedCategory || ''}|${searchQuery}|${minPrice}|${maxPrice}|${selectedCondition || ''}|${orderBy}|${coordsKey}`;
-      if (loadInFlightRef.current) return;
-      if (!force && lastLoadKeyRef.current === loadKey) return;
+      
+      console.log('🔄 [MARKET] Cargando productos:', {
+        force,
+        retryCount,
+        loadKey,
+        inFlight: loadInFlightRef.current,
+        lastKey: lastLoadKeyRef.current,
+      });
+      
+      if (loadInFlightRef.current) {
+        console.log('⏸️ [MARKET] Carga ya en progreso, saltando...');
+        return;
+      }
+      if (!force && lastLoadKeyRef.current === loadKey) {
+        console.log('ℹ️ [MARKET] Mismos filtros que la última carga, saltando...');
+        return;
+      }
+      
       loadInFlightRef.current = true;
       lastLoadKeyRef.current = loadKey;
       setLoading(true);
@@ -114,8 +130,10 @@ const MunpaMarketScreen = () => {
       if (!coords && !locationRequestedRef.current) {
         locationRequestedRef.current = true;
         try {
+          console.log('📍 [MARKET] Solicitando permisos de ubicación...');
           const { status } = await Location.requestForegroundPermissionsAsync();
           if (status === 'granted') {
+            console.log('✅ [MARKET] Permisos concedidos, obteniendo ubicación...');
             const currentLocation = await Location.getCurrentPositionAsync({
               accuracy: Location.Accuracy.Balanced,
             });
@@ -124,9 +142,12 @@ const MunpaMarketScreen = () => {
               longitude: currentLocation.coords.longitude,
             };
             setUserCoords(coords);
+            console.log('✅ [MARKET] Ubicación obtenida:', coords);
+          } else {
+            console.log('⚠️ [MARKET] Permisos de ubicación denegados');
           }
         } catch (error) {
-          console.warn('⚠️ [MARKET] No se pudo obtener ubicación para ordenar por distancia');
+          console.warn('⚠️ [MARKET] Error obteniendo ubicación:', error);
         }
       }
 
@@ -146,14 +167,41 @@ const MunpaMarketScreen = () => {
         filters.orderBy = orderByMap[orderBy] as any || 'reciente';
       }
 
+      console.log('📤 [MARKET] Llamando API con filtros:', filters);
       const response = await marketplaceService.getProducts(filters);
+      console.log('📥 [MARKET] Respuesta recibida:', {
+        success: response?.success !== false,
+        productsCount: response?.products?.length || 0,
+        hasProducts: !!response?.products,
+        isArray: Array.isArray(response?.products),
+      });
       
       const fetchedProducts = response.products || [];
       
-      
-      setProducts(Array.isArray(fetchedProducts) ? fetchedProducts : []);
-    } catch (error) {
+      if (!Array.isArray(fetchedProducts)) {
+        console.error('❌ [MARKET] Respuesta inválida, products no es un array:', fetchedProducts);
+        setProducts([]);
+      } else {
+        console.log(`✅ [MARKET] ${fetchedProducts.length} productos cargados`);
+        setProducts(fetchedProducts);
+      }
+    } catch (error: any) {
       console.error('❌ [MARKET] Error cargando productos:', error);
+      console.error('❌ [MARKET] Error detallado:', {
+        message: error?.message,
+        status: error?.response?.status,
+        data: error?.response?.data,
+      });
+      
+      // Retry automático hasta 2 veces si falla
+      if (retryCount < 2) {
+        console.log(`🔄 [MARKET] Reintentando carga (intento ${retryCount + 1}/2)...`);
+        loadInFlightRef.current = false;
+        lastLoadKeyRef.current = null; // Reset para permitir retry
+        setTimeout(() => loadProducts(force, retryCount + 1), 1000 * (retryCount + 1)); // Esperar 1s, 2s
+        return;
+      }
+      
       setProducts([]);
     } finally {
       loadInFlightRef.current = false;
