@@ -13,7 +13,7 @@ import {
   Modal,
   ActivityIndicator,
 } from "react-native";
-import { useNavigation, useRoute, DrawerActions, useFocusEffect } from "@react-navigation/native";
+import { useNavigation, useRoute, DrawerActions } from "@react-navigation/native";
 import { Ionicons, FontAwesome5 } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import * as Notifications from "expo-notifications";
@@ -38,6 +38,7 @@ import notificationService from "../services/notificationService";
 import analyticsService from "../services/analyticsService";
 import learningService from "../services/learning-service";
 import consultationsService from "../services/consultationsService";
+import nutritionService from "../services/nutritionService";
 import {
   colors,
   typography,
@@ -48,6 +49,7 @@ import {
 import { useFonts } from "../hooks/useFonts";
 import { useLocation } from "../hooks/useLocation";
 import BannerCarousel from "../components/BannerCarousel";
+import RecipeCard from "../components/RecipeCard";
 import { LinearGradient } from "expo-linear-gradient";
 
 const WHITE_NOISE_LOCAL = require("../../assets/whitenoise.mp3");
@@ -130,10 +132,39 @@ interface TodayRecommendation {
   country?: string;
   averageRating?: number;
   rating?: number;
+  totalReviews?: number;
   stats?: {
     averageRating?: number;
+    totalReviews?: number;
   };
 }
+
+// Helper function para calcular recomendaciones (reviews de 4-5 estrellas)
+const calculateRecommendations = (totalReviews: number, averageRating: number): number => {
+  if (totalReviews === 0) return 0;
+  
+  // Estimación: Si el promedio es X, calculamos cuántas son de 4-5 estrellas
+  // Por ejemplo: promedio 4.5 con 10 reviews -> ~9 son de 4-5 estrellas
+  // Fórmula aproximada: (avgRating - 2.5) / 2.5 * totalReviews
+  // Esto da una estimación razonable del % de reviews positivas
+  
+  if (averageRating >= 4.5) {
+    // Si el promedio es 4.5+, casi todas son positivas (90-100%)
+    return Math.round(totalReviews * 0.95);
+  } else if (averageRating >= 4.0) {
+    // Si es 4.0-4.5, ~70-90% son positivas
+    return Math.round(totalReviews * 0.8);
+  } else if (averageRating >= 3.5) {
+    // Si es 3.5-4.0, ~50-70% son positivas
+    return Math.round(totalReviews * 0.6);
+  } else if (averageRating >= 3.0) {
+    // Si es 3.0-3.5, ~30-50% son positivas
+    return Math.round(totalReviews * 0.4);
+  } else {
+    // Menos de 3.0, muy pocas positivas
+    return Math.round(totalReviews * 0.2);
+  }
+};
 
 interface TodayProduct {
   id: string;
@@ -209,6 +240,9 @@ const HomeScreen: React.FC = () => {
   const [todayFaqQuestions, setTodayFaqQuestions] = useState<string[]>([]);
   const [loadingTodayFaq, setLoadingTodayFaq] = useState(false);
 
+  const [todayRecipe, setTodayRecipe] = useState<any>(null);
+  const [loadingTodayRecipe, setLoadingTodayRecipe] = useState(false);
+
   const [activeConsultations, setActiveConsultations] = useState<any[]>([]);
   const [loadingConsultations, setLoadingConsultations] = useState(false);
 
@@ -271,6 +305,9 @@ const HomeScreen: React.FC = () => {
   const lastActivitySuggestionsChildRef = useRef<string | null>(null);
   const loadDataInFlightRef = useRef(false);
   const lastLoadDataAtRef = useRef(0);
+  const loadProfileInFlightRef = useRef(false);
+  const lastFocusReloadRef = useRef(0);
+  const lastForceReloadRef = useRef<number | null>(null);
 
   useEffect(() => {
     loadData();
@@ -284,31 +321,41 @@ const HomeScreen: React.FC = () => {
     };
   }, []);
 
-  // Recargar datos cuando la pantalla reciba foco (ej: después de cambiar ubicación)
-  useFocusEffect(
-    useCallback(() => {
-      console.log('🔄 Home screen focused, reloading data...');
-      loadData();
-      loadUserProfile();
-    }, [])
-  );
-
   useEffect(() => {
     const interval = setInterval(() => setNow(new Date()), 60000);
     return () => clearInterval(interval);
   }, []);
 
-  // Refrescar datos cuando se regrese a esta pantalla
+  // Refrescar datos cuando se regrese a esta pantalla o cuando cambie la ubicación
   useEffect(() => {
     const unsubscribe = navigation.addListener("focus", () => {
-      console.log('🏠 [HOME] Pantalla enfocada, recargando datos...');
-      loadData();
+      const now = Date.now();
       
-      // Registrar token de notificaciones cada vez que se regrese al home
-      console.log('🔔 [HOME] Registrando token de notificaciones...');
-      notificationService.registerToken().catch((error) => {
-        console.error('❌ [HOME] Error registrando token:', error);
-      });
+      // Evitar múltiples recargas si se ejecuta muy rápido (debounce de 2 segundos)
+      if (now - lastFocusReloadRef.current < 2000) {
+        console.log('⏭️ [HOME] Saltando recarga, muy pronto desde la última');
+        return;
+      }
+      
+      lastFocusReloadRef.current = now;
+      console.log('🏠 [HOME] Pantalla enfocada, recargando datos...');
+      
+      // Ejecutar cargas de forma no-bloqueante
+      setTimeout(() => {
+        loadData();
+      }, 0);
+      
+      setTimeout(() => {
+        loadUserProfile();
+      }, 100);
+      
+      // Registrar token de notificaciones después de un delay
+      setTimeout(() => {
+        console.log('🔔 [HOME] Registrando token de notificaciones...');
+        notificationService.registerToken().catch((error) => {
+          console.error('❌ [HOME] Error registrando token:', error);
+        });
+      }, 500);
     });
 
     return unsubscribe;
@@ -343,10 +390,46 @@ const HomeScreen: React.FC = () => {
       }
     };
 
-    if (route?.params?.refresh || route?.params?.selectedChildId) {
+    // Recargar cuando se reciban parámetros de navegación
+    const forceReload = route?.params?.forceReload;
+    const locationChanged = route?.params?.locationChanged;
+    
+    // Evitar ejecutar múltiples veces con el mismo forceReload
+    if (forceReload && lastForceReloadRef.current === forceReload) {
+      return;
+    }
+    
+    if (route?.params?.refresh || route?.params?.selectedChildId || forceReload || locationChanged) {
+      console.log('🔄 [HOME] Parámetros de recarga detectados:', route.params);
+      
+      // Marcar este forceReload como procesado
+      if (forceReload) {
+        lastForceReloadRef.current = forceReload;
+      }
+      
+      if (locationChanged) {
+        console.log('📍 [HOME] Ubicación cambió, recargando perfil y datos...');
+        // Resetear el debounce para permitir recarga inmediata
+        lastFocusReloadRef.current = 0;
+        
+        // Resetear la clave de carga de "Hoy" para forzar recarga en el próximo ciclo
+        lastTodayLoadKeyRef.current = null;
+        todayLoadInFlightRef.current = false;
+        
+        // Recargar perfil
+        setTimeout(() => {
+          loadUserProfile();
+        }, 100);
+        
+        // Recargar datos de hijos
+        setTimeout(() => {
+          loadData();
+        }, 200);
+      }
+      
       handleHeaderSelection();
     }
-  }, [route?.params?.refresh, route?.params?.selectedChildId, children, selectedChild?.id]);
+  }, [route?.params?.refresh, route?.params?.selectedChildId, route?.params?.forceReload, route?.params?.locationChanged, children]);
 
   // 🔔 Iniciar verificaciones periódicas de notificaciones cuando hay hijo seleccionado
   useEffect(() => {
@@ -396,7 +479,7 @@ const HomeScreen: React.FC = () => {
       setIsLocationReady(true);
     };
     run();
-  }, [selectedChild, todayLat, todayLon, todayLocationLoading, todayLocationGranted, todayLocationError]);
+  }, [selectedChild, todayLat, todayLon, todayLocationLoading, todayLocationGranted, todayLocationError, profile?.cityName, profile?.countryName]);
 
   useEffect(() => {
     if (!selectedChild || !isLocationReady) return;
@@ -408,20 +491,47 @@ const HomeScreen: React.FC = () => {
       try {
         todayLoadInFlightRef.current = true;
         lastTodayLoadKeyRef.current = loadKey;
+        
+        console.log('🔄 [HOME] Cargando datos de sección "Hoy"...');
+        
+        // Ejecutar las cargas con un timeout de 15 segundos cada una
+        // Esto evita que la app se congele si alguna API no responde
+        const timeout = (ms: number) => new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Timeout')), ms)
+        );
+        
+        const withTimeout = (promise: Promise<any>, name: string) => 
+          Promise.race([
+            promise,
+            timeout(15000)
+          ]).catch(error => {
+            console.warn(`⚠️ [HOME] ${name} falló o timeout:`, error.message);
+            return null;
+          });
+        
         await Promise.allSettled([
-          loadTodayRecommendations(),
-          loadTodayMarket(),
-          loadTodayCommunityPosts(),
-          loadActivitySuggestions(selectedChild.id),
-          loadTodayGuide(selectedChild),
-          loadTodayFaq(selectedChild.id),
-          loadActiveConsultations(),
+          withTimeout(loadTodayRecommendations(), 'Recomendaciones'),
+          withTimeout(loadTodayMarket(), 'Market'),
+          withTimeout(loadTodayCommunityPosts(), 'Posts'),
+          withTimeout(loadActivitySuggestions(selectedChild.id), 'Actividades'),
+          withTimeout(loadTodayGuide(selectedChild), 'Guía'),
+          withTimeout(loadTodayFaq(selectedChild.id), 'FAQ'),
+          withTimeout(loadTodayRecipe(selectedChild), 'Receta'),
+          withTimeout(loadActiveConsultations(), 'Consultas'),
         ]);
+        
+        console.log('✅ [HOME] Datos de sección "Hoy" cargados');
+      } catch (error) {
+        console.error('❌ [HOME] Error cargando datos:', error);
       } finally {
         todayLoadInFlightRef.current = false;
       }
     };
-    loadAll();
+    
+    // Ejecutar con un pequeño delay para no bloquear el render
+    setTimeout(() => {
+      loadAll();
+    }, 100);
   }, [selectedChild, todayLat, todayLon, todayLocationLoading, isLocationReady]);
 
   const loadData = async () => {
@@ -474,26 +584,47 @@ const HomeScreen: React.FC = () => {
   };
 
   const loadUserProfile = async () => {
+    if (loadProfileInFlightRef.current) {
+      console.log('⏳ [PROFILE] Ya hay una carga de perfil en progreso, saltando...');
+      return;
+    }
+    
     try {
+      loadProfileInFlightRef.current = true;
+      
       if (user?.id) {
         const profileResponse = await profileService.getProfile();
         if (profileResponse.success && profileResponse.data) {
-          console.log('📍 Perfil cargado en Home:', {
+          console.log('📍 [PROFILE] Perfil cargado:', {
             city: profileResponse.data.cityName,
             country: profileResponse.data.countryName,
           });
-          // Actualizar el contexto de usuario
-          // @ts-ignore
-          setUser((prevUser: any) => ({
-            ...prevUser!,
-            ...profileResponse.data,
-          }));
-          // Actualizar el estado local del perfil
+          
+          // Actualizar el estado local del perfil primero
           setProfile(profileResponse.data);
+          
+          // Solo actualizar el contexto de usuario si hay cambios significativos
+          // Esto evita loops infinitos
+          if (
+            profileResponse.data.cityName !== user.cityName ||
+            profileResponse.data.countryName !== user.countryName
+          ) {
+            console.log('🔄 [PROFILE] Ubicación cambió, actualizando contexto');
+            // @ts-ignore
+            setUser((prevUser: any) => ({
+              ...prevUser!,
+              cityName: profileResponse.data.cityName,
+              countryName: profileResponse.data.countryName,
+              cityId: profileResponse.data.cityId,
+              countryId: profileResponse.data.countryId,
+            }));
+          }
         }
       }
     } catch (error) {
-      console.error("Error cargando perfil:", error);
+      console.error("❌ [PROFILE] Error cargando perfil:", error);
+    } finally {
+      loadProfileInFlightRef.current = false;
     }
   };
 
@@ -636,6 +767,46 @@ const HomeScreen: React.FC = () => {
       setTodayGuideError('No se pudo cargar la guía de hoy');
     } finally {
       setLoadingTodayGuide(false);
+    }
+  };
+
+  const loadTodayRecipe = async (child: Child) => {
+    try {
+      setLoadingTodayRecipe(true);
+
+      if (!child.id) {
+        setTodayRecipe(null);
+        return;
+      }
+
+      // Determinar qué tipo de comida mostrar basado en la hora
+      const currentHour = new Date().getHours();
+      let mealType: 'breakfast' | 'lunch' | 'dinner';
+      
+      if (currentHour < 11) {
+        mealType = 'breakfast';
+      } else if (currentHour < 17) {
+        mealType = 'lunch';
+      } else {
+        mealType = 'dinner';
+      }
+
+      console.log('🍽️ [HOME RECIPE] Cargando receta del día:', {
+        childId: child.id,
+        name: child.name,
+        mealType,
+        hour: currentHour,
+      });
+
+      const recipe = await nutritionService.getTodayRecipe(child.id, mealType);
+
+      console.log('✅ [HOME RECIPE] Receta obtenida:', recipe?.name);
+      setTodayRecipe(recipe);
+    } catch (error: any) {
+      console.error('❌ [HOME RECIPE] Error cargando receta del día:', error);
+      setTodayRecipe(null);
+    } finally {
+      setLoadingTodayRecipe(false);
     }
   };
 
@@ -1542,6 +1713,26 @@ const HomeScreen: React.FC = () => {
               )}
             </View>
 
+            {/* Sección de Receta del día */}
+            {todayRecipe && (
+              <View style={styles.recipeSection}>
+                <View style={styles.recipeSectionHeader}>
+                  <Text style={styles.recipeSectionTitle}>🍽️ Receta del día</Text>
+                  <TouchableOpacity onPress={() => {
+                    analyticsService.logEvent('nutrition_view_more_clicked', {
+                      child_id: selectedChild?.id,
+                      recipe_name: todayRecipe.name,
+                      from: 'home',
+                    });
+                    (navigation as any).navigate('Feeding');
+                  }}>
+                    <Text style={styles.recipeSectionLink}>Ver más</Text>
+                  </TouchableOpacity>
+                </View>
+                <RecipeCard recipe={todayRecipe} />
+              </View>
+            )}
+
             <Text style={styles.todaySectionTitle}>Herramientas</Text>
 
             {/* Banner Home 2 - Debajo del título Herramientas */}
@@ -1652,13 +1843,14 @@ const HomeScreen: React.FC = () => {
                           {rec.distance != null ? `${Number(rec.distance).toFixed(2)} km` : 'Cerca de ti'}
                         </Text>
                         <Text style={styles.todayNearbyRating}>
-                          {rec.stats?.averageRating
-                            ? `⭐ ${rec.stats.averageRating.toFixed(1)}`
-                            : rec.averageRating
-                            ? `⭐ ${Number(rec.averageRating).toFixed(1)}`
-                            : rec.rating
-                            ? `⭐ ${Number(rec.rating).toFixed(1)}`
-                            : '⭐ N/A'}
+                          {(() => {
+                            const total = rec.totalReviews || rec.stats?.totalReviews || 0;
+                            const avg = rec.averageRating || rec.stats?.averageRating || 0;
+                            const recommendations = calculateRecommendations(total, avg);
+                            return recommendations > 0
+                              ? `👥 ${recommendations} ${recommendations === 1 ? 'mamá lo recomienda' : 'mamás lo recomiendan'}`
+                              : '👥 Sin recomendaciones';
+                          })()}
                         </Text>
                       </View>
                       {(rec.cityName || rec.city || rec.countryName || rec.country) && (
@@ -4864,6 +5056,27 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: "#2D3748",
     marginBottom: 10,
+  },
+  
+  // Estilos para sección de Receta
+  recipeSection: {
+    marginBottom: 20,
+  },
+  recipeSectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  recipeSectionTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#2D3748',
+  },
+  recipeSectionLink: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#59C6C0',
   },
   todayToolsRow: {
     flexDirection: "row",

@@ -67,6 +67,7 @@ import TeethingGuideScreen from '../screens/TeethingGuideScreen';
 import ServiceRequestScreen from '../screens/ServiceRequestScreen';
 import VaccineTrackerScreen from '../screens/VaccineTrackerScreen';
 import FeedingScreen from '../screens/FeedingScreen';
+import RecipeDetailScreen from '../screens/RecipeDetailScreen';
 import MilestonesScreen from '../screens/MilestonesScreen';
 import SpecialistsListScreen from '../screens/SpecialistsListScreen';
 import ConsultationRequestScreen from '../screens/ConsultationRequestScreen';
@@ -80,7 +81,10 @@ import SpecialistStatsScreen from '../screens/SpecialistStatsScreen';
 import SpecialistConsultationsScreen from '../screens/SpecialistConsultationsScreen';
 import SpecialistProfileScreen from '../screens/SpecialistProfileScreen';
 import EditSpecialistProfileScreen from '../screens/EditSpecialistProfileScreen';
+import EditRecommendationScreen from '../screens/EditRecommendationScreen';
 import ManageDocumentsScreen from '../screens/ManageDocumentsScreen';
+import ManageBannersScreen from '../screens/ManageBannersScreen';
+import RecommendationProductsScreen from '../screens/RecommendationProductsScreen';
 import VendorProductsScreen from '../screens/VendorProductsScreen';
 import VendorCategoriesScreen from '../screens/VendorCategoriesScreen';
 import VendorDiscountsScreen from '../screens/VendorDiscountsScreen';
@@ -600,6 +604,13 @@ const AuthenticatedNavigator = () => {
         }}
       />
       <Stack.Screen
+        name="RecipeDetail"
+        component={RecipeDetailScreen}
+        options={{
+          headerShown: false,
+        }}
+      />
+      <Stack.Screen
         name="Milestones"
         component={MilestonesScreen}
         options={{
@@ -722,6 +733,30 @@ const AuthenticatedNavigator = () => {
           headerTitleStyle: {
             fontWeight: 'bold',
           },
+        }}
+      />
+      <Stack.Screen
+        name="EditRecommendation"
+        component={EditRecommendationScreen}
+        options={{
+          title: 'Editar Recomendado',
+          headerStyle: {
+            backgroundColor: '#887CBC',
+          },
+          headerTintColor: 'white',
+          headerTitleStyle: {
+            fontWeight: 'bold',
+          },
+        }}
+      />
+      <Stack.Screen
+        name="ManageBanners"
+        component={ManageBannersScreen}
+        options={{
+          title: 'Mis Banners',
+          headerStyle: { backgroundColor: '#887CBC' },
+          headerTintColor: 'white',
+          headerTitleStyle: { fontWeight: 'bold' },
         }}
       />
       <Stack.Screen
@@ -1085,6 +1120,11 @@ const RecommendationsStackNavigator = () => {
           title: 'Detalle',
           headerShown: false, // Usamos header personalizado en la pantalla
         }}
+      />
+      <Stack.Screen
+        name="RecommendationProducts"
+        component={RecommendationProductsScreen}
+        options={{ headerShown: false }}
       />
       <Stack.Screen
         name="AddRecommendation"
@@ -1678,14 +1718,25 @@ const AppNavigator = () => {
   // Configurar función global para navegación desde notificaciones
   React.useEffect(() => {
     (global as any).handleNotificationNavigation = ({ type, screen, data }: any) => {
-      if (!navigationRef.current) {
-        console.warn('⚠️ [NAV] Navigation ref no está disponible');
-        return;
-      }
+      const doNavigate = (attemptsLeft: number) => {
+        if (!navigationRef.current || !navigationRef.current.isReady()) {
+          if (attemptsLeft > 0) {
+            console.warn(`⚠️ [NAV] Navigation ref no listo, reintentando (${attemptsLeft} intentos)...`);
+            setTimeout(() => doNavigate(attemptsLeft - 1), 300);
+          } else {
+            console.error('❌ [NAV] Navigation ref nunca estuvo listo.');
+          }
+          return;
+        }
 
-      console.log('🧭 [NAV] Navegando desde notificación:', { type, screen, data });
+        console.log('🧭 [NAV] Navegando desde notificación:', { type, screen, data });
 
       try {
+        // Log adicional para debugging
+        console.log('🔍 [NAV DEBUG] Type recibido:', type, 'Tipo:', typeof type);
+        console.log('🔍 [NAV DEBUG] Screen:', screen);
+        console.log('🔍 [NAV DEBUG] Data completa:', JSON.stringify(data));
+
         switch (type) {
           case 'new_message':
             // Navegar a MarketplaceMessagesScreen
@@ -1702,13 +1753,22 @@ const AppNavigator = () => {
             navigationRef.current.navigate('MyProducts');
             break;
 
+          case 'medication_reminder':
+            // Navegar a la pantalla de medicamentos
+            navigationRef.current.navigate('Medications');
+            break;
+
         case 'post_comment':
         case 'post_like':
         case 'community_post':
-          // Prioridad: Si hay postId, navegar directamente al post
+          // Navegar al detalle del post
           if (data?.postId) {
-            console.log('🚀 [NAV] Navegando directamente al post:', data.postId);
-            Linking.openURL(`munpa://post/${data.postId}`);
+            console.log('🚀 [NAV] Navegando a PostDetail:', data.postId);
+            navigationRef.current.navigate('PostDetail', {
+              postId: data.postId,
+              communityId: data?.communityId,
+              communityName: data?.communityName,
+            });
           } else if (data?.communityId) {
             // Si no hay postId pero sí communityId, navegar a la comunidad
             console.log('🚀 [NAV] Navegando a CommunityPosts:', data.communityId);
@@ -1727,6 +1787,47 @@ const AppNavigator = () => {
             console.log('🚀 [NAV] Sin postId ni communityId, navegando a Communities');
             navigationRef.current.navigate('MainTabs', {
               screen: 'Communities',
+            });
+          }
+          break;
+
+        case 'consultation_accepted':
+        case 'consultation_pending':
+        case 'consultation_cancelled':
+        case 'consultation_completed':
+        case 'consultation_in_progress':
+        case 'consultation_message':
+        case 'new_consultation_message':
+          if (data?.consultationId) {
+            navigationRef.current.navigate('ConsultationDetail', {
+              consultationId: data.consultationId,
+            });
+          } else {
+            navigationRef.current.navigate('MyConsultations');
+          }
+          break;
+
+        case 'consultation_request':
+          // Para especialistas: ir a sus consultas pendientes
+          navigationRef.current.navigate('MyConsultations');
+          break;
+
+        case 'recipe':
+        case 'daily_recipe':
+        case 'recipe_daily_reminder':
+          // Navegar a la pantalla de detalle de receta si hay recipeId
+          if (data?.recipeId) {
+            console.log('🍽️ [NAV] ✅ CASO RECIPE DETECTADO - Navegando a RecipeDetail');
+            console.log('🍽️ [NAV] recipeId:', data.recipeId);
+            navigationRef.current.navigate('RecipeDetail', {
+              recipeId: data.recipeId,
+            });
+          } else {
+            // Si no hay recipeId, navegar a Feeding
+            console.log('🍽️ [NAV] ✅ CASO RECIPE DETECTADO - Navegando a Feeding');
+            console.log('🍽️ [NAV] mealType:', data?.mealType);
+            navigationRef.current.navigate('Feeding', {
+              mealType: data?.mealType,
             });
           }
           break;
@@ -1772,11 +1873,16 @@ const AppNavigator = () => {
 
           default:
             // Navegar a MainTabs por defecto (que tiene Home como tab por defecto)
+            console.log('⚠️ [NAV] Tipo de notificación no reconocido:', type);
+            console.log('⚠️ [NAV] Navegando a MainTabs por defecto');
             navigationRef.current.navigate('MainTabs');
         }
       } catch (error) {
         console.error('❌ [NAV] Error navegando desde notificación:', error);
       }
+      }; // fin doNavigate
+
+      doNavigate(20); // hasta 20 × 300ms = 6s de espera
     };
 
     return () => {

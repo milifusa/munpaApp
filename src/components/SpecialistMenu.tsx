@@ -223,6 +223,17 @@ const SpecialistMenu: React.FC<SpecialistMenuProps> = ({ visible, onClose, onSwi
       },
     },
     {
+      id: 'banners',
+      title: 'Mis Banners',
+      icon: 'images',
+      onPress: () => {
+        onClose();
+        analyticsService.logEvent('specialist_menu_banners');
+        // @ts-ignore
+        navigation.navigate('ManageBanners');
+      },
+    },
+    {
       id: 'notifications',
       title: 'Notificaciones',
       icon: 'notifications',
@@ -256,6 +267,28 @@ const SpecialistMenu: React.FC<SpecialistMenuProps> = ({ visible, onClose, onSwi
   // Menú para perfil de SERVICIO (productos/vendedor)
   const serviceMenuItems: MenuItem[] = [
     {
+      id: 'profile',
+      title: 'Mi Negocio',
+      icon: 'storefront',
+      onPress: () => {
+        onClose();
+        analyticsService.logEvent('service_menu_business_profile');
+        // @ts-ignore
+        navigation.navigate('EditRecommendation');
+      },
+    },
+    {
+      id: 'banners',
+      title: 'Mis Banners',
+      icon: 'images',
+      onPress: () => {
+        onClose();
+        analyticsService.logEvent('service_menu_banners');
+        // @ts-ignore
+        navigation.navigate('ManageBanners');
+      },
+    },
+    {
       id: 'create-product',
       title: 'Publicar Producto',
       icon: 'add-circle',
@@ -274,7 +307,7 @@ const SpecialistMenu: React.FC<SpecialistMenuProps> = ({ visible, onClose, onSwi
         onClose();
         analyticsService.logEvent('service_menu_my_products');
         // @ts-ignore
-        navigation.navigate('MainTabs', { screen: 'MunpaMarket' });
+        navigation.navigate('MainTabs', { screen: 'Products' });
       },
     },
     {
@@ -297,6 +330,17 @@ const SpecialistMenu: React.FC<SpecialistMenuProps> = ({ visible, onClose, onSwi
         analyticsService.logEvent('service_menu_discounts');
         // @ts-ignore
         navigation.navigate('VendorDiscounts');
+      },
+    },
+    {
+      id: 'promotions',
+      title: 'Promociones',
+      icon: 'gift',
+      onPress: () => {
+        onClose();
+        analyticsService.logEvent('service_menu_promotions');
+        // @ts-ignore
+        navigation.navigate('VendorPromotions');
       },
     },
     {
@@ -330,28 +374,6 @@ const SpecialistMenu: React.FC<SpecialistMenuProps> = ({ visible, onClose, onSwi
         analyticsService.logEvent('service_menu_hours');
         // @ts-ignore - TODO: Navegar a horario de apertura
         // navigation.navigate('BusinessHours');
-      },
-    },
-    {
-      id: 'promotions',
-      title: 'Promociones',
-      icon: 'gift',
-      onPress: () => {
-        onClose();
-        analyticsService.logEvent('service_menu_promotions');
-        // @ts-ignore
-        navigation.navigate('VendorPromotions');
-      },
-    },
-    {
-      id: 'profile',
-      title: 'Mi Negocio',
-      icon: 'storefront',
-      onPress: () => {
-        onClose();
-        analyticsService.logEvent('service_menu_business_profile');
-        // @ts-ignore - TODO: Navegar a perfil del negocio
-        // navigation.navigate('BusinessProfile');
       },
     },
     {

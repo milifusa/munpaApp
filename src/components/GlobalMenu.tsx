@@ -203,13 +203,25 @@ const GlobalMenu: React.FC<GlobalMenuProps> = ({ visible, onClose }) => {
       setLoadingLocation(true);
       const selectedCountry = countries.find(c => c.id === selectedCountryId);
       const selectedCity = cities.find(c => c.id === selectedCityId);
+      
+      console.log('🌍 [LOCATION] Actualizando ubicación:', {
+        countryId: selectedCountryId,
+        cityId: selectedCityId,
+        countryName: selectedCountry?.name,
+        cityName: selectedCity?.name,
+      });
+      
       const response = await authService.updateLocation({
         latitude: 0,
         longitude: 0,
         countryId: selectedCountryId,
         cityId: selectedCityId,
       });
+      
       if (response?.success && user) {
+        console.log('✅ [LOCATION] Ubicación actualizada exitosamente');
+        
+        // Actualizar el usuario en el contexto
         setUser({
           ...user,
           countryId: selectedCountryId,
@@ -217,20 +229,51 @@ const GlobalMenu: React.FC<GlobalMenuProps> = ({ visible, onClose }) => {
           countryName: selectedCountry?.name,
           cityName: selectedCity?.name,
         });
+        
+        console.log('🔄 [LOCATION] Cerrando modales y recargando...');
+        
+        // Primero limpiar el estado de loading
+        setLoadingLocation(false);
+        console.log('✅ [LOCATION] Loading desactivado');
+        
+        // Cerrar el modal de ubicación inmediatamente
         setShowLocationModal(false);
-        onClose();
-        Alert.alert('Éxito', 'Ubicación actualizada correctamente');
-        (navigation as any).reset({
-          index: 0,
-          routes: [{ name: 'MainTabs', state: { routes: [{ name: 'Home' }], index: 0 } }],
-        });
+        console.log('✅ [LOCATION] Modal de ubicación cerrado');
+        
+        // Cerrar el menú principal después de un pequeño delay
+        setTimeout(() => {
+          onClose();
+          console.log('✅ [LOCATION] Menú principal cerrado');
+        }, 100);
+        
+        // Navegar al Home con parámetro de recarga
+        setTimeout(() => {
+          try {
+            console.log('📍 [LOCATION] Navegando al Home...');
+            // @ts-ignore - Navegar al stack principal y luego al Home
+            navigation.navigate('MainTabs', {
+              screen: 'Home',
+              params: {
+                screen: 'HomeMain',
+                params: {
+                  forceReload: Date.now(),
+                  locationChanged: true
+                }
+              }
+            });
+            console.log('✅ [LOCATION] Navegación completada');
+          } catch (error) {
+            console.error('❌ [LOCATION] Error navegando:', error);
+          }
+        }, 300);
       } else {
+        console.error('❌ [LOCATION] Error en respuesta del servidor:', response);
         Alert.alert('Error', 'No se pudo actualizar la ubicación');
+        setLoadingLocation(false);
       }
     } catch (error) {
-      console.error('Error guardando ubicación:', error);
-      Alert.alert('Error', 'No se pudo actualizar la ubicación');
-    } finally {
+      console.error('❌ [LOCATION] Error guardando ubicación:', error);
+      Alert.alert('Error', 'No se pudo actualizar la ubicación. Por favor intenta de nuevo.');
       setLoadingLocation(false);
     }
   };

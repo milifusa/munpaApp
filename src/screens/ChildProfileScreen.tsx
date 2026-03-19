@@ -1149,7 +1149,7 @@ const ChildProfileScreen: React.FC = () => {
             🧠 Desarrollo
           </Text>
         </TouchableOpacity>
-        <TouchableOpacity
+        {/* <TouchableOpacity
           style={[styles.tab, activeTab === 'health' && styles.activeTab]}
           onPress={() => {
             setActiveTab('health');
@@ -1181,7 +1181,7 @@ const ChildProfileScreen: React.FC = () => {
           <Text style={[styles.tabText, activeTab === 'milestones' && styles.activeTabText]}>
             🎉 Hitos
           </Text>
-        </TouchableOpacity>
+        </TouchableOpacity> */}
         <TouchableOpacity
           style={[styles.tab, activeTab === 'photos' && styles.activeTab]}
           onPress={() => setActiveTab('photos')}

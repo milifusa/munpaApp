@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -13,7 +13,7 @@ import {
   Switch,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation, useRoute } from '@react-navigation/native';
+import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { axiosInstance as api } from '../services/api';
@@ -77,6 +77,14 @@ const VendorCreateProductScreen = () => {
     analyticsService.logScreenView('vendor_create_product');
     loadInitialData();
   }, []);
+
+  // Recargar categorías cada vez que la pantalla vuelve al foco
+  // (ej: el usuario creó una nueva categoría y regresó)
+  useFocusEffect(
+    useCallback(() => {
+      loadVendorCategories();
+    }, [])
+  );
 
   useEffect(() => {
     if (isEditing && product) {

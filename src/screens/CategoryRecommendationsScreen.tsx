@@ -72,6 +72,23 @@ interface Category {
   icon?: string;
 }
 
+// Helper function para calcular recomendaciones (reviews de 4-5 estrellas)
+const calculateRecommendations = (totalReviews: number, averageRating: number): number => {
+  if (totalReviews === 0) return 0;
+  
+  if (averageRating >= 4.5) {
+    return Math.round(totalReviews * 0.95);
+  } else if (averageRating >= 4.0) {
+    return Math.round(totalReviews * 0.8);
+  } else if (averageRating >= 3.5) {
+    return Math.round(totalReviews * 0.6);
+  } else if (averageRating >= 3.0) {
+    return Math.round(totalReviews * 0.4);
+  } else {
+    return Math.round(totalReviews * 0.2);
+  }
+};
+
 const CategoryRecommendationsScreen = ({ route, navigation }: any) => {
   const { categoryId, categoryName } = route.params;
   const insets = useSafeAreaInsets();
@@ -592,18 +609,16 @@ const CategoryRecommendationsScreen = ({ route, navigation }: any) => {
         
         {/* Rating y Reviews */}
         <View style={styles.ratingContainer}>
-          <View style={styles.starsRow}>
-            {[1, 2, 3, 4, 5].map((star) => (
-              <Ionicons
-                key={star}
-                name={star <= Math.round(recommendation.stats?.averageRating || 0) ? 'star' : 'star-outline'}
-                size={16}
-                color="#FFD700"
-              />
-            ))}
-          </View>
+          <Ionicons name="people" size={16} color="#59C6C0" />
           <Text style={styles.ratingText}>
-            {(recommendation.stats?.averageRating || 0).toFixed(1)} ({recommendation.stats?.totalReviews || 0})
+            {(() => {
+              const total = recommendation.stats?.totalReviews || 0;
+              const avg = recommendation.stats?.averageRating || 0;
+              const recommendations = calculateRecommendations(total, avg);
+              return recommendations > 0
+                ? `${recommendations} ${recommendations === 1 ? 'mamá lo recomienda' : 'mamás lo recomiendan'}`
+                : 'Sin recomendaciones';
+            })()}
           </Text>
         </View>
 

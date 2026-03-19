@@ -39,6 +39,23 @@ interface Recommendation {
   priority?: 'low' | 'medium' | 'high';
 }
 
+// Helper function para calcular recomendaciones (reviews de 4-5 estrellas)
+const calculateRecommendations = (totalReviews: number, averageRating: number): number => {
+  if (totalReviews === 0) return 0;
+  
+  if (averageRating >= 4.5) {
+    return Math.round(totalReviews * 0.95);
+  } else if (averageRating >= 4.0) {
+    return Math.round(totalReviews * 0.8);
+  } else if (averageRating >= 3.5) {
+    return Math.round(totalReviews * 0.6);
+  } else if (averageRating >= 3.0) {
+    return Math.round(totalReviews * 0.4);
+  } else {
+    return Math.round(totalReviews * 0.2);
+  }
+};
+
 const WishlistScreen = ({ navigation }: any) => {
   const insets = useSafeAreaInsets();
   const [wishlist, setWishlist] = useState<Recommendation[]>([]);
@@ -197,18 +214,17 @@ const WishlistScreen = ({ navigation }: any) => {
         {/* Rating */}
         {item.stats && item.stats.totalReviews > 0 && (
           <View style={styles.ratingContainer}>
-            <View style={styles.starsRow}>
-              {[1, 2, 3, 4, 5].map((star) => (
-                <Ionicons
-                  key={star}
-                  name={star <= Math.round(item.stats?.averageRating || 0) ? 'star' : 'star-outline'}
-                  size={14}
-                  color="#FFD700"
-                />
-              ))}
-            </View>
+            <Ionicons name="people" size={14} color="#59C6C0" />
             <Text style={styles.ratingText}>
-              {(item.stats.averageRating || 0).toFixed(1)} ({item.stats.totalReviews})
+              {(() => {
+                const recommendations = calculateRecommendations(
+                  item.stats.totalReviews,
+                  item.stats.averageRating
+                );
+                return recommendations > 0
+                  ? `${recommendations} ${recommendations === 1 ? 'mamá lo recomienda' : 'mamás lo recomiendan'}`
+                  : 'Sin recomendaciones';
+              })()}
             </Text>
           </View>
         )}

@@ -21,7 +21,7 @@ import notificationService from '../services/notificationService';
 
 interface Notification {
   id: string;
-  type: 'new_message' | 'purchase' | 'reservation' | 'interest' | 'admin_notification' | 'broadcast' | 'post_comment' | 'post_like' | 'community_post';
+  type: 'new_message' | 'purchase' | 'reservation' | 'interest' | 'admin_notification' | 'broadcast' | 'post_comment' | 'post_like' | 'community_post' | 'recipe' | 'daily_recipe' | 'recipe_daily_reminder' | 'medication_reminder' | 'consultation_accepted' | 'consultation_pending' | 'consultation_cancelled' | 'consultation_completed' | 'consultation_in_progress' | 'consultation_message' | 'new_consultation_message' | 'consultation_request' | string;
   title: string;
   body: string;
   imageUrl?: string;
@@ -33,6 +33,8 @@ interface Notification {
     postId?: string;
     communityId?: string;
     communityName?: string;
+    recipeId?: string;
+    mealType?: string;
     [key: string]: any;
   };
   read: boolean;
@@ -140,9 +142,19 @@ const NotificationsScreen = () => {
       return;
     }
 
-    // Navegar según el tipo
-    const data = notification.data || {};
-    const type = notification.type || data.type;
+    // Navegar según el tipo — normalizar data por si viene anidada
+    const rawData: any = notification.data || {};
+    const nestedData: any = rawData.data || {};
+    const type: string =
+      notification.type ||
+      rawData.type ||
+      rawData.notificationType ||
+      nestedData.type ||
+      nestedData.notificationType ||
+      '';
+    const data: any = { ...nestedData, ...rawData, type };
+
+    console.log('🔍 [NOTIFICATIONS] Navegando desde notificación:', { type, data });
 
     try {
       switch (type) {
@@ -161,11 +173,36 @@ const NotificationsScreen = () => {
           navigation.navigate('MyProducts');
           break;
 
+        case 'recipe':
+        case 'daily_recipe':
+        case 'recipe_daily_reminder':
+          // Navegar a la pantalla de detalle de receta si hay recipeId
+          if (data.recipeId) {
+            console.log('🍽️ [NOTIFICATIONS] Navegando a RecipeDetail con ID:', data.recipeId);
+            navigation.navigate('RecipeDetail', {
+              recipeId: data.recipeId,
+            });
+          } else {
+            // Si no hay recipeId, navegar a Feeding
+            console.log('🍽️ [NOTIFICATIONS] Navegando a Feeding para ver recetas');
+            navigation.navigate('Feeding', {
+              mealType: data.mealType,
+            });
+          }
+          break;
+
         case 'post_comment':
         case 'post_like':
         case 'community_post':
-          // Navegar a la pantalla de posts de la comunidad
-          if (data.communityId) {
+          // Navegar al detalle del post
+          if (data.postId) {
+            console.log('🚀 [NOTIFICATIONS] Navegando a PostDetail:', data.postId);
+            navigation.navigate('PostDetail', {
+              postId: data.postId,
+              communityId: data.communityId,
+              communityName: data.communityName || 'Comunidad',
+            });
+          } else if (data.communityId) {
             console.log('🚀 [NOTIFICATIONS] Navegando a CommunityPosts:', data.communityId);
             navigation.navigate('MainTabs', {
               screen: 'Communities',
@@ -177,17 +214,32 @@ const NotificationsScreen = () => {
                 },
               },
             });
-          } else if (data.postId) {
-            // Si solo tenemos el postId, usar el deep link handler
-            console.log('🚀 [NOTIFICATIONS] Navegando a post usando deep link:', data.postId);
-            const { Linking } = require('react-native');
-            Linking.openURL(`munpa://post/${data.postId}`);
           } else {
             // Sin datos suficientes, ir a Communities
             navigation.navigate('MainTabs', {
               screen: 'Communities',
             });
           }
+          break;
+
+        case 'consultation_accepted':
+        case 'consultation_pending':
+        case 'consultation_cancelled':
+        case 'consultation_completed':
+        case 'consultation_in_progress':
+        case 'consultation_message':
+        case 'new_consultation_message':
+          if (data.consultationId) {
+            navigation.navigate('ConsultationDetail', {
+              consultationId: data.consultationId,
+            });
+          } else {
+            navigation.navigate('MyConsultations');
+          }
+          break;
+
+        case 'consultation_request':
+          navigation.navigate('MyConsultations');
           break;
 
         case 'admin_notification':
@@ -290,6 +342,10 @@ const NotificationsScreen = () => {
         return 'bookmark';
       case 'interest':
         return 'eye';
+      case 'recipe':
+      case 'daily_recipe':
+      case 'recipe_daily_reminder':
+        return 'restaurant';
       case 'admin_notification':
       case 'broadcast':
         return 'megaphone';
@@ -308,6 +364,10 @@ const NotificationsScreen = () => {
         return '#887CBC';
       case 'interest':
         return '#FFA500';
+      case 'recipe':
+      case 'daily_recipe':
+      case 'recipe_daily_reminder':
+        return '#FF9244';
       case 'admin_notification':
       case 'broadcast':
         return '#FF6B6B';

@@ -40,6 +40,24 @@ const EditSpecialistProfileScreen = () => {
   const [yearsExperience, setYearsExperience] = useState('');
   const [photoURL, setPhotoURL] = useState('');
 
+  // Datos del recomendado vinculado
+  const [recNombre, setRecNombre] = useState('');
+  const [recDescripcion, setRecDescripcion] = useState('');
+  const [recDireccion, setRecDireccion] = useState('');
+  const [recUbicacion, setRecUbicacion] = useState('');
+  const [recTelefono, setRecTelefono] = useState('');
+  const [recEmail, setRecEmail] = useState('');
+  const [recWeb, setRecWeb] = useState('');
+  const [recWhatsapp, setRecWhatsapp] = useState('');
+  const [recInstagram, setRecInstagram] = useState('');
+  const [recFacebook, setRecFacebook] = useState('');
+  const [recImagen, setRecImagen] = useState('');
+  const [uploadingRecImagen, setUploadingRecImagen] = useState(false);
+
+  // Determinar si el usuario es de perfil de servicio
+  const accountType = user?.professionalProfile?.accountType || 'specialist';
+  const isServiceProfile = accountType === 'service';
+
   useEffect(() => {
     analyticsService.logScreenView('edit_specialist_profile');
     loadProfileData();
@@ -59,6 +77,25 @@ const EditSpecialistProfileScreen = () => {
       setUniversity(profile?.professional?.university || '');
       setYearsExperience(profile?.professional?.yearsExperience?.toString() || '');
       setPhotoURL(user?.photoURL || '');
+
+      // Cargar datos del recomendado
+      try {
+        const recResponse = await axiosInstance.get('/api/professionals/me/recommendation');
+        const rec = recResponse.data?.data || recResponse.data;
+        setRecNombre(rec?.name || '');
+        setRecDescripcion(rec?.description || '');
+        setRecDireccion(rec?.address || '');
+        setRecUbicacion(rec?.cityName || '');
+        setRecTelefono(rec?.phone || '');
+        setRecEmail(rec?.email || '');
+        setRecWeb(rec?.website || '');
+        setRecWhatsapp(rec?.whatsapp || '');
+        setRecInstagram(rec?.instagram || '');
+        setRecFacebook(rec?.facebook || '');
+        setRecImagen(rec?.imageUrl || '');
+      } catch {
+        // No hay recomendado vinculado, se puede crear uno
+      }
     } catch (error) {
       console.error('❌ [EDIT PROFILE] Error cargando perfil:', error);
       Alert.alert('Error', 'No se pudo cargar tu perfil');
@@ -152,6 +189,35 @@ const EditSpecialistProfileScreen = () => {
     );
   };
 
+  const pickRecImagen = async () => {
+    try {
+      const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permissionResult.granted) {
+        Alert.alert('Permiso Requerido', 'Necesitamos acceso a tu galería');
+        return;
+      }
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 0.8,
+      });
+      if (!result.canceled && result.assets && result.assets[0]) {
+        try {
+          setUploadingRecImagen(true);
+          const uploadedUrl = await imageUploadService.uploadProfileImage(result.assets[0].uri);
+          setRecImagen(uploadedUrl);
+        } catch {
+          Alert.alert('Error', 'No se pudo subir la imagen');
+        } finally {
+          setUploadingRecImagen(false);
+        }
+      }
+    } catch (error) {
+      Alert.alert('Error', 'No se pudo seleccionar la imagen');
+    }
+  };
+
   const addSpecialty = () => {
     if (specialtyInput.trim()) {
       setSpecialties([...specialties, specialtyInput.trim()]);
@@ -202,6 +268,24 @@ const EditSpecialistProfileScreen = () => {
 
       const response = await axiosInstance.put('/api/profile/professional', requestData);
       console.log('✅ [EDIT PROFILE] Perfil actualizado:', response.data);
+
+      // Guardar datos del recomendado
+      if (recNombre.trim()) {
+        const recData: any = {
+          name: recNombre.trim(),
+          description: recDescripcion.trim(),
+          address: recDireccion.trim(),
+          phone: recTelefono.trim(),
+          email: recEmail.trim(),
+          website: recWeb.trim(),
+          whatsapp: recWhatsapp.trim(),
+          instagram: recInstagram.trim(),
+          facebook: recFacebook.trim(),
+        };
+        if (recImagen) recData.imageUrl = recImagen;
+        await axiosInstance.put('/api/professionals/me/recommendation', recData);
+        console.log('✅ [EDIT PROFILE] Recomendado actualizado');
+      }
 
       analyticsService.logEvent('specialist_profile_updated', {
         has_bio: !!bio,
@@ -383,6 +467,156 @@ const EditSpecialistProfileScreen = () => {
               placeholder="10"
               placeholderTextColor="#9CA3AF"
               keyboardType="numeric"
+            />
+          </View>
+        </View>
+
+        {/* Recomendado Vinculado */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Recomendado Vinculado</Text>
+
+          {/* Imagen del recomendado */}
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Imagen</Text>
+            <TouchableOpacity
+              style={styles.recImageContainer}
+              onPress={pickRecImagen}
+              disabled={uploadingRecImagen}
+            >
+              {recImagen ? (
+                <Image source={{ uri: recImagen }} style={styles.recImage} />
+              ) : (
+                <View style={styles.recImagePlaceholder}>
+                  <Ionicons name="image" size={32} color="#887CBC" />
+                  <Text style={styles.recImagePlaceholderText}>Agregar imagen</Text>
+                </View>
+              )}
+              {uploadingRecImagen && (
+                <View style={styles.recImageOverlay}>
+                  <ActivityIndicator color="#FFFFFF" />
+                </View>
+              )}
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Nombre del Negocio / Servicio</Text>
+            <TextInput
+              style={styles.input}
+              value={recNombre}
+              onChangeText={setRecNombre}
+              placeholder="Ej: Clínica Salud Mamá"
+              placeholderTextColor="#9CA3AF"
+            />
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Descripción</Text>
+            <TextInput
+              style={[styles.input, styles.textArea]}
+              value={recDescripcion}
+              onChangeText={setRecDescripcion}
+              placeholder="Describe brevemente el servicio..."
+              placeholderTextColor="#9CA3AF"
+              multiline
+              numberOfLines={3}
+              textAlignVertical="top"
+            />
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Dirección</Text>
+            <TextInput
+              style={styles.input}
+              value={recDireccion}
+              onChangeText={setRecDireccion}
+              placeholder="Av. Principal 123"
+              placeholderTextColor="#9CA3AF"
+            />
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Ciudad</Text>
+            <TextInput
+              style={styles.input}
+              value={recUbicacion}
+              onChangeText={setRecUbicacion}
+              placeholder="Quito"
+              placeholderTextColor="#9CA3AF"
+            />
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Teléfono</Text>
+            <TextInput
+              style={styles.input}
+              value={recTelefono}
+              onChangeText={setRecTelefono}
+              placeholder="+593999999999"
+              placeholderTextColor="#9CA3AF"
+              keyboardType="phone-pad"
+            />
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>WhatsApp</Text>
+            <TextInput
+              style={styles.input}
+              value={recWhatsapp}
+              onChangeText={setRecWhatsapp}
+              placeholder="+593999999999"
+              placeholderTextColor="#9CA3AF"
+              keyboardType="phone-pad"
+            />
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Email</Text>
+            <TextInput
+              style={styles.input}
+              value={recEmail}
+              onChangeText={setRecEmail}
+              placeholder="contacto@negocio.com"
+              placeholderTextColor="#9CA3AF"
+              keyboardType="email-address"
+              autoCapitalize="none"
+            />
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Sitio Web</Text>
+            <TextInput
+              style={styles.input}
+              value={recWeb}
+              onChangeText={setRecWeb}
+              placeholder="https://www.negocio.com"
+              placeholderTextColor="#9CA3AF"
+              keyboardType="url"
+              autoCapitalize="none"
+            />
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Instagram</Text>
+            <TextInput
+              style={styles.input}
+              value={recInstagram}
+              onChangeText={setRecInstagram}
+              placeholder="@mi_negocio"
+              placeholderTextColor="#9CA3AF"
+              autoCapitalize="none"
+            />
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Facebook</Text>
+            <TextInput
+              style={styles.input}
+              value={recFacebook}
+              onChangeText={setRecFacebook}
+              placeholder="facebook.com/mi_negocio"
+              placeholderTextColor="#9CA3AF"
+              autoCapitalize="none"
             />
           </View>
         </View>
@@ -573,6 +807,41 @@ const styles = StyleSheet.create({
   },
   bottomSpacing: {
     height: 40,
+  },
+  recImageContainer: {
+    width: '100%',
+    height: 160,
+    borderRadius: 12,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    backgroundColor: '#FFFFFF',
+  },
+  recImage: {
+    width: '100%',
+    height: '100%',
+  },
+  recImagePlaceholder: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 8,
+  },
+  recImagePlaceholderText: {
+    fontSize: 14,
+    color: '#887CBC',
+    fontWeight: '500',
+  },
+  recImageOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });
 

@@ -221,7 +221,7 @@ const ArticleDetailScreen: React.FC<ArticleDetailScreenProps> = ({ route, naviga
   return (
     <>
       <StatusBar barStyle="light-content" backgroundColor="#59C6C0" />
-      <View style={[styles.headerWrapper, Platform.OS === 'android' && { paddingTop: insets.top }]}>
+      <View style={[styles.headerWrapper, { paddingTop: insets.top }]}>
         <View style={styles.headerSafeArea}>
           {/* Header */}
           <View style={styles.header}>

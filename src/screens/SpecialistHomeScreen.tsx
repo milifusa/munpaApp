@@ -51,6 +51,9 @@ const SpecialistHomeScreen = () => {
   const [recentProducts, setRecentProducts] = useState<any[]>([]);
   const [recentMessages, setRecentMessages] = useState<any[]>([]);
 
+  // Nombre del recomendado vinculado al perfil
+  const [recommendationName, setRecommendationName] = useState('');
+
   useEffect(() => {
     analyticsService.logScreenView(isMedicalProfile ? 'specialist_home' : 'service_home');
   }, [isMedicalProfile]);
@@ -62,6 +65,12 @@ const SpecialistHomeScreen = () => {
   );
 
   const loadData = async () => {
+    // Cargar nombre del recomendado en paralelo
+    axiosInstance.get('/api/professionals/me/recommendation').then((res) => {
+      const rec = res.data?.data || res.data;
+      if (rec?.name) setRecommendationName(rec.name);
+    }).catch(() => {});
+
     if (isMedicalProfile) {
       await loadMedicalData();
     } else {
@@ -233,7 +242,7 @@ const SpecialistHomeScreen = () => {
           <View>
             <Text style={styles.greeting}>{getGreeting()}</Text>
             <Text style={styles.userName}>
-              {user?.displayName || (isMedicalProfile ? 'Profesional' : 'Negocio')}
+              {recommendationName || user?.displayName || (isMedicalProfile ? 'Profesional' : 'Negocio')}
             </Text>
           </View>
           <TouchableOpacity
@@ -339,7 +348,7 @@ const SpecialistHomeScreen = () => {
                 style={[styles.actionCard, { backgroundColor: '#FEF3C7' }]}
                 onPress={() => {
                   analyticsService.logEvent('specialist_quick_action', { action: 'pending' });
-                  // TODO: Navegar a pendientes
+                  (navigation as any).navigate('MyConsultations');
                 }}
               >
                 <Ionicons name="time" size={32} color="#F59E0B" />
@@ -352,7 +361,7 @@ const SpecialistHomeScreen = () => {
                 style={[styles.actionCard, { backgroundColor: '#DBEAFE' }]}
                 onPress={() => {
                   analyticsService.logEvent('specialist_quick_action', { action: 'active' });
-                  // TODO: Navegar a activas
+                  (navigation as any).navigate('MyConsultations');
                 }}
               >
                 <Ionicons name="chatbubbles" size={32} color="#3B82F6" />
@@ -364,26 +373,26 @@ const SpecialistHomeScreen = () => {
               <TouchableOpacity
                 style={[styles.actionCard, { backgroundColor: '#EDE9FE' }]}
                 onPress={() => {
-                  analyticsService.logEvent('specialist_quick_action', { action: 'dashboard' });
-                  (navigation as any).navigate('SpecialistDashboard');
+                  analyticsService.logEvent('specialist_quick_action', { action: 'banners' });
+                  (navigation as any).navigate('ManageBanners');
                 }}
               >
-                <Ionicons name="stats-chart" size={32} color="#887CBC" />
+                <Ionicons name="images" size={32} color="#887CBC" />
                 <Text style={[styles.actionText, { color: '#5B21B6' }]}>
-                  Dashboard
+                  Mis Banners
                 </Text>
               </TouchableOpacity>
 
               <TouchableOpacity
                 style={[styles.actionCard, { backgroundColor: '#D1FAE5' }]}
                 onPress={() => {
-                  analyticsService.logEvent('specialist_quick_action', { action: 'schedule' });
-                  // TODO: Navegar a horario
+                  analyticsService.logEvent('specialist_quick_action', { action: 'profile' });
+                  (navigation as any).navigate('EditSpecialistProfile');
                 }}
               >
-                <Ionicons name="calendar" size={32} color="#10B981" />
+                <Ionicons name="person-circle" size={32} color="#10B981" />
                 <Text style={[styles.actionText, { color: '#065F46' }]}>
-                  Mi Horario
+                  Mi Perfil
                 </Text>
               </TouchableOpacity>
             </View>
@@ -412,7 +421,7 @@ const SpecialistHomeScreen = () => {
                 style={[styles.actionCard, { backgroundColor: '#DBEAFE' }]}
                 onPress={() => {
                   analyticsService.logEvent('service_quick_action', { action: 'my_products' });
-                  (navigation as any).navigate('MainTabs', { screen: 'MunpaMarket' });
+                  (navigation as any).navigate('MainTabs', { screen: 'Products' });
                 }}
               >
                 <Ionicons name="cube" size={32} color="#3B82F6" />
@@ -424,13 +433,13 @@ const SpecialistHomeScreen = () => {
               <TouchableOpacity
                 style={[styles.actionCard, { backgroundColor: '#EDE9FE' }]}
                 onPress={() => {
-                  analyticsService.logEvent('service_quick_action', { action: 'messages' });
-                  // TODO: Navegar a mensajes
+                  analyticsService.logEvent('service_quick_action', { action: 'banners' });
+                  (navigation as any).navigate('ManageBanners');
                 }}
               >
-                <Ionicons name="chatbubbles" size={32} color="#887CBC" />
+                <Ionicons name="images" size={32} color="#887CBC" />
                 <Text style={[styles.actionText, { color: '#5B21B6' }]}>
-                  Mensajes
+                  Mis Banners
                 </Text>
               </TouchableOpacity>
 
@@ -456,9 +465,7 @@ const SpecialistHomeScreen = () => {
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>Consultas Pendientes</Text>
               <TouchableOpacity
-                onPress={() => {
-                  // TODO: Ver todas las pendientes
-                }}
+                onPress={() => (navigation as any).navigate('MyConsultations')}
               >
                 <Text style={styles.seeAll}>Ver todas</Text>
               </TouchableOpacity>

@@ -48,6 +48,23 @@ interface RecentRecommendation {
   createdAt: Date;
 }
 
+// Helper function para calcular recomendaciones (reviews de 4-5 estrellas)
+const calculateRecommendations = (totalReviews: number, averageRating: number): number => {
+  if (totalReviews === 0) return 0;
+  
+  if (averageRating >= 4.5) {
+    return Math.round(totalReviews * 0.95);
+  } else if (averageRating >= 4.0) {
+    return Math.round(totalReviews * 0.8);
+  } else if (averageRating >= 3.5) {
+    return Math.round(totalReviews * 0.6);
+  } else if (averageRating >= 3.0) {
+    return Math.round(totalReviews * 0.4);
+  } else {
+    return Math.round(totalReviews * 0.2);
+  }
+};
+
 const RecommendationsScreen = ({ navigation }: any) => {
   const insets = useSafeAreaInsets();
   const [searchQuery, setSearchQuery] = useState('');
@@ -304,20 +321,15 @@ const RecommendationsScreen = ({ navigation }: any) => {
                   </Text>
                 )}
                 <View style={styles.recentItemRating}>
-                  {/* Mostrar estrellas */}
-                  {[1, 2, 3, 4, 5].map((star) => (
-                    <Ionicons 
-                      key={star}
-                      name={star <= Math.round(recommendation.averageRating) ? 'star' : 'star-outline'} 
-                      size={12} 
-                      color="#FFD700" 
-                    />
-                  ))}
+                  {/* Mostrar número de mamás que lo recomiendan */}
+                  <Ionicons name="people" size={14} color="#59C6C0" />
                   <Text style={styles.ratingText}>
-                    {recommendation.averageRating.toFixed(1)}
-                  </Text>
-                  <Text style={styles.reviewsText}>
-                    ({recommendation.totalReviews} {recommendation.totalReviews === 1 ? 'reseña' : 'reseñas'})
+                    {(() => {
+                      const recommendations = calculateRecommendations(recommendation.totalReviews, recommendation.averageRating);
+                      return recommendations > 0
+                        ? `${recommendations} ${recommendations === 1 ? 'mamá lo recomienda' : 'mamás lo recomiendan'}`
+                        : 'Sin recomendaciones';
+                    })()}
                   </Text>
                 </View>
               </View>

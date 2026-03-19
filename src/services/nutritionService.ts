@@ -33,6 +33,24 @@ export interface Recipe {
   generatedAt: string;
 }
 
+export interface NutritionSponsor {
+  id: string;
+  brandName: string;
+  logoUrl?: string;
+  bannerImageUrl?: string;
+  tagline?: string;
+  accentColor?: string;
+  sectionTitle?: string;
+  sectionTagline?: string;
+  targetKeywords: string[];
+  ctaLabel?: string;
+  ctaType?: 'external' | 'product' | 'article';
+  ctaUrl?: string;
+  ctaProductId?: string;
+  ctaArticleId?: string;
+  active: boolean;
+}
+
 export interface RecipesResponse {
   success: boolean;
   data: Recipe[];
@@ -50,6 +68,86 @@ export interface RecipesResponse {
 }
 
 class NutritionService {
+  /**
+   * Obtener una receta del día para el home
+   * GET /api/home/recipe?childId=xxx&mealType=xxx
+   */
+  async getTodayRecipe(
+    childId: string,
+    mealType: 'breakfast' | 'lunch' | 'dinner'
+  ): Promise<Recipe | null> {
+    try {
+      console.log('🍽️ [NUTRITION] Obteniendo receta del día:', { childId, mealType });
+
+      const token = await AsyncStorage.getItem('authToken');
+      
+      if (!token) {
+        throw new Error('Token de autenticación no encontrado');
+      }
+
+      const response = await axiosInstance.get(
+        `/api/home/recipe`,
+        {
+          params: {
+            childId,
+            mealType,
+          },
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      console.log('✅ [NUTRITION] Receta del día obtenida:', response.data.data?.name);
+
+      return response.data.data || null;
+    } catch (error: any) {
+      console.error('❌ [NUTRITION] Error obteniendo receta del día:', error);
+      
+      if (error.response?.status === 400 && error.response?.data?.message?.includes('6 meses')) {
+        // Bebé menor de 6 meses - lactancia exclusiva
+        console.log('ℹ️ [NUTRITION] Bebé menor de 6 meses, lactancia exclusiva');
+        return null;
+      }
+      
+      throw new Error(error.response?.data?.message || 'Error al obtener receta del día');
+    }
+  }
+
+  /**
+   * Obtener una receta por ID
+   * GET /api/recipes/{recipeId}
+   */
+  async getRecipeById(recipeId: string): Promise<Recipe | null> {
+    try {
+      console.log('🍽️ [NUTRITION] Obteniendo receta por ID:', recipeId);
+
+      const token = await AsyncStorage.getItem('authToken');
+      
+      if (!token) {
+        throw new Error('Token de autenticación no encontrado');
+      }
+
+      const response = await axiosInstance.get(
+        `/api/recipes/${recipeId}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      console.log('✅ [NUTRITION] Receta obtenida:', response.data.data?.name);
+
+      return response.data.data || response.data || null;
+    } catch (error: any) {
+      console.error('❌ [NUTRITION] Error obteniendo receta por ID:', error);
+      throw new Error(error.response?.data?.message || 'Error al obtener la receta');
+    }
+  }
+
   /**
    * Obtener recetas personalizadas para un niño
    */
@@ -183,6 +281,25 @@ class NutritionService {
   async getDinners(childId: string, regenerate: boolean = false): Promise<Recipe[]> {
     const response = await this.getRecipes(childId, 'dinner', regenerate);
     return response.data;
+  }
+
+  /**
+   * Obtener sponsor activo de nutrición
+   * GET /api/nutrition/sponsors/active
+   */
+  async getNutritionSponsor(): Promise<NutritionSponsor | null> {
+    try {
+      const token = await AsyncStorage.getItem('authToken');
+      if (!token) return null;
+      const response = await axiosInstance.get('/api/nutrition/sponsors/active', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const raw = response.data?.data ?? response.data;
+      if (Array.isArray(raw)) return raw.length > 0 ? raw[0] : null;
+      return raw || null;
+    } catch {
+      return null;
+    }
   }
 
   /**

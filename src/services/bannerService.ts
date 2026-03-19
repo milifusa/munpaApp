@@ -16,6 +16,7 @@ export type BannerSection =
   | 'vacunas'
   | 'denticion'
   | 'hitos'
+  | 'nutricion'
   | 'menu-lateral';
 
 export interface Banner {

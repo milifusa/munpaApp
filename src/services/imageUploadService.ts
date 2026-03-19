@@ -170,5 +170,21 @@ export const imageUploadService = {
   // Subir imagen para marketplace
   uploadMarketplaceImage: async (uri: string) => {
     return await imageUploadService.uploadImage(uri, 'marketplace');
-  }
+  },
+
+  // Subir imagen de banner profesional (endpoint dedicado)
+  uploadBannerImage: async (uri: string): Promise<string> => {
+    const { mimeType, fileName } = getImageTypeAndExtension(uri);
+    const formData = new FormData();
+    formData.append('image', { uri, type: mimeType, name: fileName } as any);
+    const authToken = await AsyncStorage.getItem('authToken');
+    const response = await axiosInstance.post(
+      '/api/professionals/me/banners/upload-image',
+      formData,
+      { headers: { 'Content-Type': 'multipart/form-data', Authorization: `Bearer ${authToken}` } }
+    );
+    const url = response.data?.data?.imageUrl || response.data?.imageUrl || response.data?.url || response.data?.data?.url;
+    if (!url) throw new Error('No se recibió URL de imagen del banner');
+    return url;
+  },
 };

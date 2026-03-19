@@ -27,6 +27,7 @@ const SpecialistProfileScreen = () => {
   const [profileData, setProfileData] = useState<any>(null);
   const [stats, setStats] = useState<any>(null);
   const [showPricingModal, setShowPricingModal] = useState(false);
+  const [recommendationData, setRecommendationData] = useState<any>(null);
 
   useEffect(() => {
     analyticsService.logScreenView('specialist_profile');
@@ -53,6 +54,14 @@ const SpecialistProfileScreen = () => {
       } catch (error) {
         console.log('⚠️ [PROFILE] No se pudieron cargar estadísticas');
       }
+
+      // Cargar datos del recomendado vinculado
+      try {
+        const recResponse = await axiosInstance.get('/api/professionals/me/recommendation');
+        setRecommendationData(recResponse.data?.data || recResponse.data);
+      } catch (error) {
+        console.log('⚠️ [PROFILE] No se pudieron cargar datos del recomendado');
+      }
     } catch (error: any) {
       console.error('❌ [PROFILE] Error cargando perfil:', error);
       Alert.alert('Error', 'No se pudo cargar tu perfil profesional');
@@ -77,6 +86,10 @@ const SpecialistProfileScreen = () => {
 
   const handleManageDocuments = () => {
     navigation.navigate('ManageDocuments');
+  };
+
+  const handleEditRecommendation = () => {
+    navigation.navigate('EditRecommendation');
   };
 
   const handleLogout = () => {
@@ -304,6 +317,66 @@ const SpecialistProfileScreen = () => {
           </>
         )}
 
+        {/* Recomendado vinculado */}
+        {recommendationData?.name && (
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Recomendado Vinculado</Text>
+              <TouchableOpacity onPress={handleEditRecommendation}>
+                <Ionicons name="create" size={20} color="#887CBC" />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.infoCard}>
+              <Ionicons name="storefront" size={20} color="#6B7280" />
+              <View style={styles.infoContent}>
+                <Text style={styles.infoLabel}>Nombre</Text>
+                <Text style={styles.infoValue}>{recommendationData.name}</Text>
+              </View>
+            </View>
+
+            {recommendationData.description ? (
+              <View style={styles.infoCard}>
+                <Ionicons name="information-circle" size={20} color="#6B7280" />
+                <View style={styles.infoContent}>
+                  <Text style={styles.infoLabel}>Descripción</Text>
+                  <Text style={styles.infoValue}>{recommendationData.description}</Text>
+                </View>
+              </View>
+            ) : null}
+
+            {recommendationData.address ? (
+              <View style={styles.infoCard}>
+                <Ionicons name="location" size={20} color="#6B7280" />
+                <View style={styles.infoContent}>
+                  <Text style={styles.infoLabel}>Dirección</Text>
+                  <Text style={styles.infoValue}>{recommendationData.address}</Text>
+                </View>
+              </View>
+            ) : null}
+
+            {recommendationData.phone ? (
+              <View style={styles.infoCard}>
+                <Ionicons name="call" size={20} color="#6B7280" />
+                <View style={styles.infoContent}>
+                  <Text style={styles.infoLabel}>Teléfono</Text>
+                  <Text style={styles.infoValue}>{recommendationData.phone}</Text>
+                </View>
+              </View>
+            ) : null}
+
+            {recommendationData.website ? (
+              <View style={styles.infoCard}>
+                <Ionicons name="globe" size={20} color="#6B7280" />
+                <View style={styles.infoContent}>
+                  <Text style={styles.infoLabel}>Sitio Web</Text>
+                  <Text style={styles.infoValue}>{recommendationData.website}</Text>
+                </View>
+              </View>
+            ) : null}
+          </View>
+        )}
+
         {/* Acciones */}
         <View style={styles.section}>
           <TouchableOpacity style={styles.actionButton} onPress={handleEditProfile}>
@@ -311,6 +384,13 @@ const SpecialistProfileScreen = () => {
             <Text style={styles.actionButtonText}>Editar Perfil</Text>
             <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
           </TouchableOpacity>
+
+          <TouchableOpacity style={styles.actionButton} onPress={handleEditRecommendation}>
+            <Ionicons name="storefront-outline" size={20} color="#887CBC" />
+            <Text style={styles.actionButtonText}>Editar Recomendado</Text>
+            <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
+          </TouchableOpacity>
+
 
           <TouchableOpacity 
             style={styles.actionButton}

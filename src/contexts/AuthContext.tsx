@@ -88,51 +88,48 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             // Verificar token con el backend
             try {
               await authService.verifyToken();
-              
-              // Si los datos locales no tienen countryId/cityId, obtener perfil completo del backend
-              if (!userData.countryId || !userData.cityId) {
-                console.log('🔄 [AUTH] Datos de ubicación faltantes, obteniendo perfil completo...');
-                
-                try {
-                  const profileResponse = await authService.getProfile();
-                  const profileData = profileResponse?.data || profileResponse;
-                  
-                  console.log('📋 [AUTH] Perfil obtenido:', profileData);
-                  
-                  // Actualizar con datos del backend
-                  const updatedUserData: User = {
-                    ...userData,
-                    countryId: profileData.countryId || userData.countryId,
-                    cityId: profileData.cityId || userData.cityId,
-                    countryName: profileData.countryName || userData.countryName,
-                    cityName: profileData.cityName || userData.cityName,
-                    gender: profileData.gender || userData.gender,
-                    childrenCount: profileData.childrenCount !== undefined ? profileData.childrenCount : userData.childrenCount,
-                    isPregnant: profileData.isPregnant !== undefined ? profileData.isPregnant : userData.isPregnant,
-                    gestationWeeks: profileData.gestationWeeks !== undefined ? profileData.gestationWeeks : userData.gestationWeeks,
-                    photoURL: profileData.photoURL || userData.photoURL,
-                  };
-                  
-                  console.log('✅ [AUTH] Datos sincronizados:', {
-                    countryId: updatedUserData.countryId,
-                    cityId: updatedUserData.cityId,
-                    countryName: updatedUserData.countryName,
-                    cityName: updatedUserData.cityName,
-                  });
-                  
-                  await AsyncStorage.setItem('userData', JSON.stringify(updatedUserData));
-                  setUser(updatedUserData);
-                } catch (profileError) {
-                  console.error('❌ [AUTH] Error obteniendo perfil:', profileError);
-                  // Si falla, usar los datos locales
-                  setUser(userData);
-                }
-              } else {
-                // Datos completos, usar directamente
-                console.log('✅ [AUTH] Datos de usuario completos');
+
+              // Siempre obtener el perfil completo del backend para tener
+              // professionalProfile, ubicación y demás campos actualizados
+              try {
+                console.log('🔄 [AUTH] Sincronizando perfil completo del backend...');
+                const profileResponse = await authService.getProfile();
+                const profileData = profileResponse?.data || profileResponse;
+
+                console.log('📋 [AUTH] Perfil obtenido:', profileData);
+
+                const updatedUserData: User = {
+                  ...userData,
+                  countryId: profileData.countryId || userData.countryId,
+                  cityId: profileData.cityId || userData.cityId,
+                  countryName: profileData.countryName || userData.countryName,
+                  cityName: profileData.cityName || userData.cityName,
+                  gender: profileData.gender || userData.gender,
+                  childrenCount: profileData.childrenCount !== undefined ? profileData.childrenCount : userData.childrenCount,
+                  isPregnant: profileData.isPregnant !== undefined ? profileData.isPregnant : userData.isPregnant,
+                  gestationWeeks: profileData.gestationWeeks !== undefined ? profileData.gestationWeeks : userData.gestationWeeks,
+                  photoURL: profileData.photoURL || userData.photoURL,
+                  professionalProfile: profileData.professionalProfile ?? userData.professionalProfile ?? null,
+                };
+
+                console.log('✅ [AUTH] Perfil sincronizado:', {
+                  countryId: updatedUserData.countryId,
+                  cityId: updatedUserData.cityId,
+                  hasProfessionalProfile: !!updatedUserData.professionalProfile?.isActive,
+                });
+
+                await AsyncStorage.setItem('userData', JSON.stringify(updatedUserData));
+                setUser(updatedUserData);
+              } catch (profileError) {
+                console.error('❌ [AUTH] Error obteniendo perfil, usando datos locales:', profileError);
                 setUser(userData);
               }
-              
+
+              // Inicializar notificaciones en auto-login (el flag isInitialized evita doble init)
+              notificationService.initialize().catch((error) => {
+                console.error('❌ [AUTH] Error inicializando notificaciones en auto-login:', error);
+              });
+
             } catch (verifyError) {
               console.log('❌ Token inválido o expirado, limpiando datos');
               await AsyncStorage.removeItem('authToken');
@@ -205,15 +202,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         cityId,
         countryName,
         cityName,
+        professionalProfile,
       } = data;
-      
+
       console.log('🔑 Token extraído:', customToken ? 'Sí' : 'No');
       console.log('👤 Datos del usuario extraídos:', { displayName: userName, email: userEmail, uid, countryId, cityId });
-      
+
       if (!customToken) {
         throw new Error('No se recibió token del servidor');
       }
-      
+
       // Crear objeto de usuario compatible
       const user: User = {
         id: uid,
@@ -225,14 +223,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         cityId: cityId ?? undefined,
         countryName: countryName ?? undefined,
         cityName: cityName ?? undefined,
+        professionalProfile: professionalProfile ?? null,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
-      
+
       console.log('💾 Guardando token y datos del usuario...');
       await AsyncStorage.setItem('authToken', customToken);
       await AsyncStorage.setItem('userData', JSON.stringify(user));
-      
+
       console.log('✅ Login completado, actualizando estado...');
       setUser(user);
       
@@ -362,16 +361,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       }
       
       const data = getAuthPayload(response);
-      const { customToken, displayName: userName, email: userEmail, uid, photoUrl, countryId, cityId, countryName, cityName } = data;
-      
+      const { customToken, displayName: userName, email: userEmail, uid, photoUrl, countryId, cityId, countryName, cityName, professionalProfile } = data;
+
       console.log('🔑 Token extraído:', customToken ? 'Sí' : 'No');
       console.log('👤 Datos del usuario extraídos:', { displayName: userName, email: userEmail, uid, countryId, cityId });
       console.log('🆕 Usuario nuevo:', (response as any)?.isNewUser ? 'Sí' : 'No');
-      
+
       if (!customToken) {
         throw new Error('No se recibió token del servidor');
       }
-      
+
       // Crear objeto de usuario compatible
       const user: User = {
         id: uid,
@@ -382,14 +381,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         cityId: cityId ?? undefined,
         countryName: countryName ?? undefined,
         cityName: cityName ?? undefined,
+        professionalProfile: professionalProfile ?? null,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
-      
+
       console.log('💾 Guardando token y datos del usuario...');
       await AsyncStorage.setItem('authToken', customToken);
       await AsyncStorage.setItem('userData', JSON.stringify(user));
-      
+
       console.log('✅ Login con Google completado, actualizando estado...');
       setUser(user);
       
@@ -542,12 +542,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       }
       
       const data = getAuthPayload(response);
-      const { customToken, displayName: userName, email: userEmail, uid, photoURL, countryId, cityId, countryName, cityName } = data;
-      
+      const { customToken, displayName: userName, email: userEmail, uid, photoURL, countryId, cityId, countryName, cityName, professionalProfile } = data;
+
       console.log('🔑 Token extraído:', customToken ? 'Sí' : 'No');
       console.log('👤 Datos del usuario extraídos:', { displayName: userName, email: userEmail, uid, countryId, cityId });
       console.log('🆕 Usuario nuevo:', (response as any)?.isNewUser ? 'Sí' : 'No');
-      
+
       if (!customToken) {
         throw new Error('No se recibió token del servidor');
       }
@@ -562,6 +562,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         cityId: cityId ?? undefined,
         countryName: countryName ?? undefined,
         cityName: cityName ?? undefined,
+        professionalProfile: professionalProfile ?? null,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };

@@ -1304,6 +1304,26 @@ export const recommendationsService = {
     }
   },
 
+  // Obtener productos/servicios del profesional vinculado a una recomendación
+  getRecommendationProducts: async (
+    recommendationId: string,
+    options?: { serviceType?: string; limit?: number }
+  ) => {
+    console.log('🛍️ [RECOMMENDATIONS] Obteniendo productos del profesional:', recommendationId);
+
+    try {
+      const response = await api.get(`/api/recommendations/${recommendationId}/products`, {
+        params: { ...options },
+      });
+
+      console.log('✅ [RECOMMENDATIONS] Productos del profesional obtenidos');
+      return response.data; // { hasProfessional, professional?, products? }
+    } catch (error: any) {
+      console.error('❌ [RECOMMENDATIONS] Error obteniendo productos del profesional:', error.response?.data || error.message);
+      throw error;
+    }
+  },
+
   // Obtener recomendaciones cercanas mejor calificadas
   getNearbyTop: async (params: {
     latitude: number;

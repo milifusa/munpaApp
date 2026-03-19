@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
+  FlatList,
   TouchableOpacity,
   Image,
   RefreshControl,
@@ -15,7 +16,10 @@ import {
   KeyboardAvoidingView,
   Platform,
   StatusBar,
+  Dimensions,
 } from 'react-native';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -62,6 +66,7 @@ interface Recommendation {
   twitter?: string;
   whatsapp?: string;
   imageUrl?: string;
+  professionalId?: string;
   category?: {
     id: string;
     name: string;
@@ -101,15 +106,41 @@ const RecommendationDetailScreen = ({ route, navigation }: any) => {
   const { recommendationId } = route.params;
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
-  
+
   const [recommendation, setRecommendation] = useState<Recommendation | null>(null);
   const [reviews, setReviews] = useState<Review[]>([]);
   const [myReview, setMyReview] = useState<Review | null>(null);
   const [stats, setStats] = useState({ totalReviews: 0, averageRating: 0 });
-  
+
+  // Helper function para calcular recomendaciones (reviews de 4-5 estrellas)
+  const calculateRecommendations = (totalReviews: number, averageRating: number): number => {
+    if (totalReviews === 0) return 0;
+    
+    if (averageRating >= 4.5) {
+      return Math.round(totalReviews * 0.95);
+    } else if (averageRating >= 4.0) {
+      return Math.round(totalReviews * 0.8);
+    } else if (averageRating >= 3.5) {
+      return Math.round(totalReviews * 0.6);
+    } else if (averageRating >= 3.0) {
+      return Math.round(totalReviews * 0.4);
+    } else {
+      return Math.round(totalReviews * 0.2);
+    }
+  };
+
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingReviews, setIsLoadingReviews] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Banners del recomendado
+  const [banners, setBanners] = useState<any[]>([]);
+  const [activeBannerIndex, setActiveBannerIndex] = useState(0);
+
+  // Productos/servicios del profesional vinculado
+  const [professionalProducts, setProfessionalProducts] = useState<any[]>([]);
+  const [professional, setProfessional] = useState<any>(null);
+  const [loadingProfProducts, setLoadingProfProducts] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   
   // Modal de review
@@ -135,11 +166,82 @@ const RecommendationDetailScreen = ({ route, navigation }: any) => {
         loadRecommendation(),
         loadReviews(),
         loadMyReview(),
+        loadProfessionalProducts(),
       ]);
     } catch (error) {
       console.error('❌ [DETAIL] Error cargando datos:', error);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const loadProfessionalProducts = async () => {
+    try {
+      setLoadingProfProducts(true);
+      const response = await api.getRecommendationProducts(recommendationId, { limit: 20 });
+      console.log('🛍️ [DETAIL] Respuesta productos:', JSON.stringify(response)?.slice(0, 300));
+
+      // Normalizar respuesta — varios formatos posibles
+      let products: any[] = [];
+      let prof: any = null;
+
+      if (Array.isArray(response)) {
+        products = response;
+      } else if (response?.hasProfessional && Array.isArray(response?.products)) {
+        products = response.products;
+        prof = response.professional || null;
+      } else if (Array.isArray(response?.products)) {
+        products = response.products;
+        prof = response.professional || null;
+      } else if (Array.isArray(response?.data)) {
+        products = response.data;
+      }
+
+      // Normalizar campo de imágenes: photos[] o imageUrls[] o imageUrl
+      products = products.map((p: any) => ({
+        ...p,
+        imageUrls: p.imageUrls || p.photos || (p.imageUrl ? [p.imageUrl] : []),
+      }));
+
+      setProfessionalProducts(products);
+      setProfessional(prof);
+      console.log('✅ [DETAIL] Productos normalizados:', products.length);
+    } catch (error: any) {
+      if (error.response?.status !== 404 && error.status !== 404) {
+        console.error('❌ [DETAIL] Error cargando productos:', error);
+      }
+      setProfessionalProducts([]);
+      setProfessional(null);
+    } finally {
+      setLoadingProfProducts(false);
+    }
+  };
+
+  const handleBannerPress = (banner: any) => {
+    if (!banner.linkType || banner.linkType === 'none') return;
+    if (banner.linkType === 'product' && banner.productId) {
+      navigation.navigate('ProductDetail', { productId: banner.productId });
+    } else if (banner.linkType === 'products' && Array.isArray(banner.products) && banner.products.length > 0) {
+      navigation.navigate('RecommendationProducts', {
+        recommendationId,
+        recommendationName: recommendation?.name,
+        preloadedProducts: banner.products,
+        filterCategoryName: banner.title,
+      });
+    } else if (banner.linkType === 'product-category' && (banner.productCategoryId || Array.isArray(banner.products))) {
+      navigation.navigate('RecommendationProducts', {
+        recommendationId,
+        recommendationName: recommendation?.name,
+        preloadedProducts: Array.isArray(banner.products) && banner.products.length > 0 ? banner.products : null,
+        filterCategoryName: banner.productCategoryName || banner.productCategoryId,
+      });
+    } else if (banner.linkType === 'article' && banner.articleId) {
+      navigation.navigate('ArticleDetail', { articleId: banner.articleId });
+    } else if (banner.linkType === 'appointment') {
+      const specialistId = recommendation?.professionalId;
+      if (specialistId) {
+        navigation.navigate('ConsultationRequest', { specialistId });
+      }
     }
   };
 
@@ -152,6 +254,12 @@ const RecommendationDetailScreen = ({ route, navigation }: any) => {
       if (response.success && response.data) {
         console.log('✅ [DETAIL] Recomendación cargada');
         setRecommendation(response.data);
+
+        // Extraer banners si vienen en la respuesta
+        if (response.data.hasBanners && Array.isArray(response.data.banners)) {
+          const sorted = [...response.data.banners].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+          setBanners(sorted);
+        }
         
         // Trackear vista de recomendación
         recommendationAnalyticsService.trackView(recommendationId, {
@@ -709,12 +817,20 @@ const RecommendationDetailScreen = ({ route, navigation }: any) => {
         <Text style={styles.headerTitle} numberOfLines={1}>
           {recommendation.name}
         </Text>
-        <TouchableOpacity 
-          onPress={() => shareContentHelper.shareRecommendation(recommendationId)}
-          style={styles.shareButton}
-        >
-          <Ionicons name="share-outline" size={24} color="white" />
-        </TouchableOpacity>
+        <View style={styles.headerActions}>
+          <TouchableOpacity
+            onPress={handleOpenReviewModal}
+            style={styles.reviewHeaderButton}
+          >
+            <Ionicons name="star-outline" size={22} color="white" />
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => shareContentHelper.shareRecommendation(recommendationId)}
+            style={styles.shareButton}
+          >
+            <Ionicons name="share-outline" size={24} color="white" />
+          </TouchableOpacity>
+        </View>
       </LinearGradient>
 
       <ScrollView
@@ -753,11 +869,93 @@ const RecommendationDetailScreen = ({ route, navigation }: any) => {
 
           {/* Rating */}
           <View style={styles.ratingSection}>
-            {renderStars(Math.round(stats.averageRating), 20)}
+            <Ionicons name="people" size={20} color="#59C6C0" />
             <Text style={styles.ratingText}>
-              {stats.averageRating.toFixed(1)} ({stats.totalReviews} {stats.totalReviews === 1 ? 'reseña' : 'reseñas'})
+              {(() => {
+                const recommendations = calculateRecommendations(stats.totalReviews, stats.averageRating);
+                return recommendations > 0
+                  ? `${recommendations} ${recommendations === 1 ? 'mamá lo recomienda' : 'mamás lo recomiendan'}`
+                  : 'Sin recomendaciones';
+              })()}
             </Text>
           </View>
+
+          {/* Banners del recomendado */}
+          {banners.length > 0 && (
+            <View style={styles.bannersContainer}>
+              <FlatList
+                data={banners}
+                horizontal
+                pagingEnabled
+                showsHorizontalScrollIndicator={false}
+                keyExtractor={item => item.id}
+                onMomentumScrollEnd={e => {
+                  const idx = Math.round(e.nativeEvent.contentOffset.x / (SCREEN_WIDTH - 32));
+                  setActiveBannerIndex(idx);
+                }}
+                renderItem={({ item }) => (
+                  <TouchableOpacity
+                    style={styles.bannerSlide}
+                    activeOpacity={item.linkType === 'none' || !item.linkType ? 1 : 0.85}
+                    onPress={() => handleBannerPress(item)}
+                  >
+                    <Image source={{ uri: item.imageUrl }} style={styles.bannerSlideImage} />
+                    {/* Overlay con título y badge de acción */}
+                    {(item.title || (item.linkType && item.linkType !== 'none')) && (
+                      <View style={styles.bannerSlideOverlay}>
+                        {item.title ? (
+                          <Text style={styles.bannerSlideTitle} numberOfLines={2}>
+                            {item.title}
+                          </Text>
+                        ) : null}
+                        {item.linkType === 'product' && (
+                          <View style={styles.bannerActionBadge}>
+                            <Ionicons name="cube-outline" size={12} color="#FFF" />
+                            <Text style={styles.bannerActionText}>Ver producto</Text>
+                          </View>
+                        )}
+                        {item.linkType === 'products' && (
+                          <View style={[styles.bannerActionBadge, { backgroundColor: '#059669' }]}>
+                            <Ionicons name="grid-outline" size={12} color="#FFF" />
+                            <Text style={styles.bannerActionText}>Ver productos</Text>
+                          </View>
+                        )}
+                        {item.linkType === 'product-category' && (
+                          <View style={[styles.bannerActionBadge, { backgroundColor: '#F59E0B' }]}>
+                            <Ionicons name="folder-open-outline" size={12} color="#FFF" />
+                            <Text style={styles.bannerActionText}>Ver categoría</Text>
+                          </View>
+                        )}
+                        {item.linkType === 'article' && (
+                          <View style={[styles.bannerActionBadge, { backgroundColor: '#3B82F6' }]}>
+                            <Ionicons name="newspaper-outline" size={12} color="#FFF" />
+                            <Text style={styles.bannerActionText}>Leer artículo</Text>
+                          </View>
+                        )}
+                        {item.linkType === 'appointment' && (
+                          <View style={[styles.bannerActionBadge, { backgroundColor: '#887CBC' }]}>
+                            <Ionicons name="calendar-outline" size={12} color="#FFF" />
+                            <Text style={styles.bannerActionText}>Agendar cita</Text>
+                          </View>
+                        )}
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                )}
+              />
+              {/* Indicadores de página */}
+              {banners.length > 1 && (
+                <View style={styles.bannerDots}>
+                  {banners.map((_, i) => (
+                    <View
+                      key={i}
+                      style={[styles.bannerDot, i === activeBannerIndex && styles.bannerDotActive]}
+                    />
+                  ))}
+                </View>
+              )}
+            </View>
+          )}
 
           {/* Descripción */}
           {recommendation.description && (
@@ -1003,6 +1201,75 @@ const RecommendationDetailScreen = ({ route, navigation }: any) => {
             </View>
           )}
 
+          {/* Productos del comercio */}
+          {loadingProfProducts ? (
+            <View style={styles.section}>
+              <ActivityIndicator color="#59C6C0" style={{ marginVertical: 12 }} />
+            </View>
+          ) : professionalProducts.length > 0 && (
+            <View style={styles.section}>
+              <View style={styles.sectionHeaderRow}>
+                <Text style={styles.sectionTitle}>Productos</Text>
+                {professionalProducts.length > 3 && (
+                  <TouchableOpacity
+                    onPress={() => navigation.navigate('RecommendationProducts', {
+                      recommendationId: recommendation?.id,
+                      recommendationName: recommendation?.name,
+                    })}
+                  >
+                    <Text style={styles.seeAllLink}>Ver todos</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.profProductsList}
+              >
+                {professionalProducts.slice(0, 3).map((product: any) => (
+                  <TouchableOpacity
+                    key={product.id}
+                    style={styles.profProductCard}
+                    onPress={() => navigation.navigate('ProductDetail', { productId: product.id })}
+                    activeOpacity={0.85}
+                  >
+                    {product.imageUrls?.[0] ? (
+                      <Image source={{ uri: product.imageUrls[0] }} style={styles.profProductImage} />
+                    ) : (
+                      <View style={[styles.profProductImage, styles.profProductImagePlaceholder]}>
+                        <Ionicons name="cube-outline" size={28} color="#9CA3AF" />
+                      </View>
+                    )}
+                    <View style={styles.profProductInfo}>
+                      <Text style={styles.profProductTitle} numberOfLines={2}>{product.title}</Text>
+                      {product.price != null && (
+                        <Text style={styles.profProductPrice}>
+                          {product.currency || '$'}{Number(product.price).toLocaleString()}
+                        </Text>
+                      )}
+                    </View>
+                  </TouchableOpacity>
+                ))}
+
+                {professionalProducts.length > 3 && (
+                  <TouchableOpacity
+                    style={styles.seeMoreCard}
+                    onPress={() => navigation.navigate('RecommendationProducts', {
+                      recommendationId: recommendation?.id,
+                      recommendationName: recommendation?.name,
+                    })}
+                    activeOpacity={0.85}
+                  >
+                    <Ionicons name="grid-outline" size={28} color="#59C6C0" />
+                    <Text style={styles.seeMoreCardText}>Ver más</Text>
+                    <Text style={styles.seeMoreCardCount}>+{professionalProducts.length - 3}</Text>
+                  </TouchableOpacity>
+                )}
+              </ScrollView>
+            </View>
+          )}
+
           {/* Mi reseña */}
           <View style={styles.section}>
             <View style={styles.myReviewHeader}>
@@ -1193,8 +1460,16 @@ const styles = StyleSheet.create({
     marginRight: 15,
     padding: 5,
   },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  reviewHeaderButton: {
+    padding: 5,
+  },
   shareButton: {
-    marginLeft: 15,
+    marginLeft: 4,
     padding: 5,
   },
   headerTitle: {
@@ -1274,6 +1549,40 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#333',
     marginBottom: 12,
+  },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  seeAllLink: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#59C6C0',
+  },
+  seeMoreCard: {
+    width: 110,
+    height: 160,
+    borderRadius: 12,
+    backgroundColor: '#F0FDFA',
+    borderWidth: 1.5,
+    borderColor: '#59C6C0',
+    borderStyle: 'dashed',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 6,
+    marginRight: 4,
+  },
+  seeMoreCardText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#59C6C0',
+  },
+  seeMoreCardCount: {
+    fontSize: 12,
+    color: '#59C6C0',
+    fontWeight: '600',
   },
   description: {
     fontSize: 16,
@@ -1848,6 +2157,154 @@ const styles = StyleSheet.create({
   },
   finalSpacing: {
     height: 30,
+  },
+
+  // Banners carousel
+  bannersContainer: {
+    marginHorizontal: -16,
+    marginBottom: 8,
+  },
+  bannerSlide: {
+    width: SCREEN_WIDTH - 32,
+    height: 180,
+    marginHorizontal: 16,
+    borderRadius: 14,
+    overflow: 'hidden',
+    backgroundColor: '#E5E7EB',
+  },
+  bannerSlideImage: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
+  },
+  bannerSlideOverlay: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    padding: 12,
+    paddingTop: 24,
+    background: 'transparent',
+    backgroundImage: 'linear-gradient(transparent, rgba(0,0,0,0.55))',
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    justifyContent: 'flex-end',
+    gap: 6,
+  },
+  bannerSlideTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    textShadowColor: 'rgba(0,0,0,0.5)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
+  },
+  bannerActionBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    backgroundColor: '#59C6C0',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 20,
+    gap: 5,
+  },
+  bannerActionText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  bannerDots: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 10,
+    gap: 6,
+  },
+  bannerDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#D1D5DB',
+  },
+  bannerDotActive: {
+    width: 18,
+    backgroundColor: '#59C6C0',
+  },
+
+  // Professional products section
+  professionalCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F0FAFA',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#D1F0EE',
+  },
+  professionalPhoto: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    marginRight: 10,
+  },
+  professionalPhotoPlaceholder: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#E8F8F7',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+  },
+  professionalInfo: {
+    flex: 1,
+  },
+  professionalName: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#1F2937',
+  },
+  professionalHeadline: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginTop: 2,
+  },
+  profProductsList: {
+    paddingVertical: 4,
+    gap: 12,
+  },
+  profProductCard: {
+    width: 150,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  profProductImage: {
+    width: 150,
+    height: 100,
+  },
+  profProductImagePlaceholder: {
+    backgroundColor: '#F3F4F6',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  profProductInfo: {
+    padding: 8,
+  },
+  profProductTitle: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#374151',
+    lineHeight: 18,
+  },
+  profProductPrice: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#59C6C0',
+    marginTop: 4,
   },
 });
 

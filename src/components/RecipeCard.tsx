@@ -6,20 +6,41 @@ import {
   TouchableOpacity,
   ScrollView,
   Modal,
+  Image,
+  Linking,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Recipe } from '../services/nutritionService';
+import { useNavigation } from '@react-navigation/native';
+import { Recipe, NutritionSponsor } from '../services/nutritionService';
 import analyticsService from '../services/analyticsService';
 
 interface RecipeCardProps {
   recipe: Recipe;
+  sponsor?: NutritionSponsor | null;
 }
 
 const MUNPA_PRIMARY = '#96d2d3';
 const MUNPA_ORANGE = '#FF9244';
 
-const RecipeCard: React.FC<RecipeCardProps> = ({ recipe }) => {
+const RecipeCard: React.FC<RecipeCardProps> = ({ recipe, sponsor }) => {
   const [showDetails, setShowDetails] = useState(false);
+  const navigation = useNavigation<any>();
+
+
+  const handleSponsorCta = () => {
+    if (!sponsor) return;
+    analyticsService.logEvent('nutrition_sponsor_cta_tapped', {
+      sponsor_id: sponsor.id,
+      recipe_id: recipe.id,
+    });
+    if (sponsor.ctaType === 'product' && sponsor.ctaProductId) {
+      navigation.navigate('ProductDetail', { productId: sponsor.ctaProductId });
+    } else if (sponsor.ctaType === 'article' && sponsor.ctaArticleId) {
+      navigation.navigate('ArticleDetail', { articleId: sponsor.ctaArticleId });
+    } else if (sponsor.ctaUrl) {
+      Linking.openURL(sponsor.ctaUrl);
+    }
+  };
 
   const getMealIcon = (mealType: string) => {
     switch (mealType) {
@@ -173,6 +194,33 @@ const RecipeCard: React.FC<RecipeCardProps> = ({ recipe }) => {
                 <Text style={styles.emptyText}>No hay ingredientes disponibles</Text>
               )}
             </View>
+
+            {/* Sponsor banner */}
+            {sponsor && (sponsor.bannerImageUrl || sponsor.logoUrl) && (
+              <TouchableOpacity
+                activeOpacity={0.92}
+                style={styles.sponsorBanner}
+                onPress={handleSponsorCta}
+                disabled={!sponsor.ctaUrl && !sponsor.ctaProductId && !sponsor.ctaArticleId}
+              >
+                <Image
+                  source={{ uri: (sponsor as any).bannerImageUrl || sponsor.logoUrl }}
+                  style={styles.sponsorBannerImage}
+                  resizeMode="cover"
+                />
+                <View style={styles.sponsorBannerOverlay}>
+                  <View style={[styles.sponsorBannerBadge, sponsor.accentColor ? { backgroundColor: sponsor.accentColor } : null]}>
+                    <Text style={styles.sponsorBannerBadgeText}>Patrocinado</Text>
+                  </View>
+                  {sponsor.ctaLabel && (sponsor.ctaUrl || sponsor.ctaProductId || sponsor.ctaArticleId) ? (
+                    <View style={styles.sponsorBannerCta}>
+                      <Text style={styles.sponsorBannerCtaText}>{sponsor.ctaLabel}</Text>
+                      <Ionicons name="arrow-forward" size={14} color="#FFFFFF" />
+                    </View>
+                  ) : null}
+                </View>
+              </TouchableOpacity>
+            )}
 
             {/* Instrucciones */}
             <View style={styles.section}>
@@ -507,6 +555,128 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#9CA3AF',
     fontStyle: 'italic',
+  },
+  // Sponsor banner
+  sponsorBanner: {
+    width: '100%',
+    height: 160,
+    borderRadius: 16,
+    overflow: 'hidden',
+    marginBottom: 24,
+  },
+  sponsorBannerImage: {
+    width: '100%',
+    height: '100%',
+  },
+  sponsorBannerOverlay: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+  },
+  sponsorBannerBadge: {
+    backgroundColor: '#22C55E',
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  sponsorBannerBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  sponsorBannerCta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  sponsorBannerCtaText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  // Sponsor callout (legacy)
+  sponsorCallout: {
+    backgroundColor: '#F0FDF4',
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: '#22C55E',
+    padding: 14,
+    marginBottom: 24,
+  },
+  sponsorHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  sponsorHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flex: 1,
+  },
+  sponsorLogo: {
+    width: 40,
+    height: 40,
+    borderRadius: 8,
+    resizeMode: 'contain',
+  },
+  sponsorLogoPlaceholder: {
+    width: 40,
+    height: 40,
+    borderRadius: 8,
+    backgroundColor: '#22C55E',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  sponsorLabel: {
+    fontSize: 11,
+    color: '#6B7280',
+    fontWeight: '500',
+  },
+  sponsorBrandName: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#1F2937',
+  },
+  sponsorBadge: {
+    backgroundColor: '#22C55E',
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  sponsorBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  sponsorTagline: {
+    fontSize: 13,
+    color: '#374151',
+    fontStyle: 'italic',
+    lineHeight: 18,
+    marginBottom: 12,
+  },
+  sponsorCtaBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#22C55E',
+    borderRadius: 10,
+    paddingVertical: 10,
+    gap: 6,
+  },
+  sponsorCtaText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#FFFFFF',
   },
 });
 

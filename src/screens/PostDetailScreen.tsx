@@ -31,21 +31,44 @@ const PostDetailScreen: React.FC = () => {
   const route = useRoute<any>();
   const navigation = useNavigation<any>();
   const { user } = useAuth();
-  const { post, onLike, formatDate, communityName, likingPostId } = route.params || {};
+  const { post: postParam, onLike, formatDate, likingPostId, postId } = route.params || {};
 
+  const [currentPost, setCurrentPost] = useState<Post | null>(postParam || null);
+  const [isLoadingPost, setIsLoadingPost] = useState(!postParam && !!postId);
+
+  const post = currentPost;
   const isOwner = user?.id === post?.authorId;
 
   // Estados para comentarios
   const [comments, setComments] = useState<Comment[]>([]);
-  const [isLoadingComments, setIsLoadingComments] = useState(true);
+  const [isLoadingComments, setIsLoadingComments] = useState(false);
   const [newComment, setNewComment] = useState('');
   const [isCreatingComment, setIsCreatingComment] = useState(false);
   const [likingCommentId, setLikingCommentId] = useState<string | null>(null);
 
+  // Si llegamos desde una notificación sin el objeto post, lo descargamos por postId
+  useEffect(() => {
+    if (!postParam && postId) {
+      const fetchPost = async () => {
+        try {
+          setIsLoadingPost(true);
+          const result = await communitiesService.getPost(postId);
+          const fetched = result?.data || result;
+          setCurrentPost(fetched);
+        } catch (error) {
+          console.error('❌ [PostDetail] Error cargando post por ID:', error);
+        } finally {
+          setIsLoadingPost(false);
+        }
+      };
+      fetchPost();
+    }
+  }, [postId]);
+
   useEffect(() => {
     if (post?.id) {
       loadComments();
-      
+
       // ✅ Analytics: Post detalle visto
       analyticsService.logEvent('post_detail_viewed', {
         post_id: post.id,
@@ -61,7 +84,7 @@ const PostDetailScreen: React.FC = () => {
   const loadComments = async () => {
     try {
       setIsLoadingComments(true);
-      const result = await communitiesService.getPostComments(post.id);
+      const result = await communitiesService.getPostComments(post!.id);
       
       if (result.success) {
         const commentsData = result.data || [];
@@ -85,18 +108,18 @@ const PostDetailScreen: React.FC = () => {
 
     try {
       setIsCreatingComment(true);
-      const result = await communitiesService.createComment(post.id, newComment.trim());
-      
+      const result = await communitiesService.createComment(post!.id, newComment.trim());
+
       if (result.success) {
         const newCommentData = result.data as Comment;
         setComments(prevComments => [newCommentData, ...prevComments]);
         setNewComment('');
-        
+
         // ✅ Analytics: Comentario creado
         analyticsService.logEvent('comment_created', {
-          post_id: post.id,
-          post_type: post.postType || 'normal',
-          community_id: post.communityId,
+          post_id: post!.id,
+          post_type: post!.postType || 'normal',
+          community_id: post!.communityId,
           comment_length: newComment.trim().length,
         });
       }
@@ -129,10 +152,13 @@ const PostDetailScreen: React.FC = () => {
     }
   };
 
-  if (!post) {
+  if (isLoadingPost || !post) {
     return (
-      <View style={styles.container}>
-        <Text>Post no encontrado</Text>
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        {isLoadingPost
+          ? <ActivityIndicator size="large" color="#59C6C0" />
+          : <Text>Post no encontrado</Text>
+        }
       </View>
     );
   }

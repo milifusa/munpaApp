@@ -76,6 +76,9 @@ const notificationService = {
       await this.configureNotificationCategories();
       this.configureNotificationListeners();
       
+      // Verificar si la app se abrió desde una notificación
+      await this.checkInitialNotification();
+      
       isInitialized = true;
       console.log('✅ [NOTIF] Servicio de notificaciones inicializado.');
     } catch (error) {
@@ -85,9 +88,57 @@ const notificationService = {
   },
 
   /**
+   * Verifica si la app se abrió desde una notificación
+   */
+  async checkInitialNotification() {
+    try {
+      console.log('🔍 [NOTIF] Verificando si hay notificación inicial...');
+      const response = await Notifications.getLastNotificationResponseAsync();
+      
+      if (response) {
+        console.log('🎯 [NOTIF] ===== APP ABIERTA DESDE NOTIFICACIÓN =====');
+        console.log('🎯 [NOTIF] Título:', response.notification.request.content.title);
+        console.log('🎯 [NOTIF] Data:', JSON.stringify(response.notification.request.content.data));
+        
+        const rawData: any = response.notification.request.content.data || {};
+        const nestedData: any = rawData.data || {};
+        const type: string =
+          rawData.type ||
+          rawData.notificationType ||
+          nestedData.type ||
+          nestedData.notificationType ||
+          '';
+        const data: any = { ...nestedData, ...rawData, type };
+
+        console.log('🔍 [NOTIF] Type extraído:', type);
+        
+        // Esperar a que handleNotificationNavigation esté disponible (hasta 8 segundos)
+        const tryNavigate = (attempts: number) => {
+          if (typeof (global as any).handleNotificationNavigation === 'function') {
+            console.log('🚀 [NOTIF] Navegando desde notificación inicial...');
+            (global as any).handleNotificationNavigation({ type, screen: data.screen, data });
+          } else if (attempts > 0) {
+            console.warn(`⚠️ [NOTIF] handleNotificationNavigation no disponible, reintentando (${attempts} intentos restantes)...`);
+            setTimeout(() => tryNavigate(attempts - 1), 500);
+          } else {
+            console.error('❌ [NOTIF] handleNotificationNavigation nunca estuvo disponible, navegación perdida.');
+          }
+        };
+        setTimeout(() => tryNavigate(15), 300);
+      } else {
+        console.log('ℹ️ [NOTIF] No hay notificación inicial');
+      }
+    } catch (error) {
+      console.error('❌ [NOTIF] Error verificando notificación inicial:', error);
+    }
+  },
+
+  /**
    * Configura los listeners para notificaciones recibidas y respuestas
    */
   configureNotificationListeners() {
+    console.log('🎯 [NOTIF] Configurando listeners de notificaciones...');
+    
     // Listener para notificaciones recibidas mientras la app está abierta
     Notifications.addNotificationReceivedListener((notification) => {
       console.log('📨 [NOTIF] Notificación recibida:', notification.request.content.title);
@@ -104,9 +155,11 @@ const notificationService = {
     });
 
     // Listener para cuando el usuario interactúa con una notificación
-    Notifications.addNotificationResponseReceivedListener((response) => {
+    const responseListener = Notifications.addNotificationResponseReceivedListener((response) => {
+      console.log('👆👆👆 [NOTIF] ===== CLICK EN NOTIFICACIÓN DETECTADO =====');
       console.log('👆 [NOTIF] Usuario interactuó con notificación:', response.notification.request.content.title);
-      console.log('👆 [NOTIF] Notification data:', response.notification.request.content.data);
+      console.log('👆 [NOTIF] Notification data:', JSON.stringify(response.notification.request.content.data));
+      console.log('👆 [NOTIF] Action identifier:', response.actionIdentifier);
       
       // Manejar acciones de medicamentos
       if (response.actionIdentifier === 'MED_TAKEN') {
@@ -117,17 +170,32 @@ const notificationService = {
       }
       
       // Manejar navegación basada en la notificación
-      const data: any = response.notification.request.content.data || {};
-      const type = data.type;
-      
+      const rawData: any = response.notification.request.content.data || {};
+      // Normalizar: el type puede estar en data.type, data.data.type, o data.notificationType
+      const nestedData: any = rawData.data || {};
+      const type: string =
+        rawData.type ||
+        rawData.notificationType ||
+        nestedData.type ||
+        nestedData.notificationType ||
+        '';
+      // Merge de campos para que lleguen al switch correctamente
+      const data: any = { ...nestedData, ...rawData, type };
+
+      console.log('🔍 [NOTIF] Type extraído de data:', type);
+      console.log('🔍 [NOTIF] Screen extraído de data:', data.screen);
+      console.log('🔍 [NOTIF] Data normalizada:', JSON.stringify(data));
+
       // Usar la función global de navegación si está disponible
       if (typeof (global as any).handleNotificationNavigation === 'function') {
-        console.log('🚀 [NOTIF] Llamando a handleNotificationNavigation con:', { type, data });
+        console.log('🚀 [NOTIF] Llamando a handleNotificationNavigation con:', { type, screen: data.screen, data });
         (global as any).handleNotificationNavigation({ type, screen: data.screen, data });
       } else {
         console.warn('⚠️ [NOTIF] handleNotificationNavigation no está disponible');
       }
     });
+    
+    console.log('✅ [NOTIF] Listener de respuestas registrado:', responseListener);
   },
 
   /**

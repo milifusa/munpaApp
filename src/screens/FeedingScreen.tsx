@@ -11,15 +11,17 @@ import {
   Alert,
   Platform,
   TextInput,
+  Image,
+  Linking,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { childrenService } from '../services/api';
 import analyticsService from '../services/analyticsService';
 import BannerCarousel from '../components/BannerCarousel';
-import nutritionService, { Recipe } from '../services/nutritionService';
+import nutritionService, { Recipe, NutritionSponsor } from '../services/nutritionService';
 import RecipeCard from '../components/RecipeCard';
 
 interface Child {
@@ -40,6 +42,7 @@ const MUNPA_ORANGE = '#FF9244';
 
 const FeedingScreen: React.FC = () => {
   const navigation = useNavigation<any>();
+  const route = useRoute<any>();
   const insets = useSafeAreaInsets();
   const [children, setChildren] = useState<Child[]>([]);
   const [selectedChild, setSelectedChild] = useState<Child | null>(null);
@@ -50,6 +53,7 @@ const FeedingScreen: React.FC = () => {
   const [ingredientsText, setIngredientsText] = useState('');
   const [loadingFromIngredients, setLoadingFromIngredients] = useState(false);
   const [showingFromIngredients, setShowingFromIngredients] = useState(false);
+  const [sponsor, setSponsor] = useState<NutritionSponsor | null>(null);
   
   // Determinar el tipo de comida según la hora actual
   const getMealTypeByHour = (): 'breakfast' | 'lunch' | 'dinner' => {
@@ -100,7 +104,11 @@ const FeedingScreen: React.FC = () => {
 
   useEffect(() => {
     loadChildren();
-    
+    nutritionService.getNutritionSponsor().then(s => {
+      console.log('🎯 [SPONSOR]', JSON.stringify(s));
+      setSponsor(s);
+    });
+
     // Log de la selección automática
     const initialMealType = getMealTypeByHour();
     console.log('🍽️ [NUTRITION] Tipo de comida automático según hora:', {
@@ -108,6 +116,14 @@ const FeedingScreen: React.FC = () => {
       mealType: initialMealType,
     });
   }, []);
+
+  // Manejar parámetros de navegación (cuando viene desde notificación)
+  useEffect(() => {
+    if (route.params?.mealType) {
+      console.log('🍽️ [NUTRITION] mealType recibido desde notificación:', route.params.mealType);
+      setSelectedMealType(route.params.mealType);
+    }
+  }, [route.params?.mealType]);
 
   useEffect(() => {
     if (selectedChild) {
@@ -310,6 +326,33 @@ const FeedingScreen: React.FC = () => {
                 </TouchableOpacity>
               </View>
 
+              {/* Banner patrocinado full-width */}
+              {sponsor && !showingFromIngredients && (
+                <TouchableOpacity
+                  activeOpacity={0.92}
+                  style={styles.sponsorBanner}
+                  onPress={() => sponsor.ctaUrl ? Linking.openURL(sponsor.ctaUrl) : null}
+                  disabled={!sponsor.ctaUrl}
+                >
+                  <Image
+                    source={{ uri: sponsor.bannerImageUrl || sponsor.logoUrl }}
+                    style={styles.sponsorBannerImage}
+                    resizeMode="cover"
+                  />
+                  <View style={styles.sponsorBannerOverlay}>
+                    <View style={[styles.sponsorBannerBadge, sponsor.accentColor ? { backgroundColor: sponsor.accentColor } : null]}>
+                      <Text style={styles.sponsorBannerBadgeText}>Patrocinado</Text>
+                    </View>
+                    {sponsor.ctaLabel && sponsor.ctaUrl ? (
+                      <View style={styles.sponsorBannerCta}>
+                        <Text style={styles.sponsorBannerCtaText}>{sponsor.ctaLabel}</Text>
+                        <Ionicons name="arrow-forward" size={14} color="#FFFFFF" />
+                      </View>
+                    ) : null}
+                  </View>
+                </TouchableOpacity>
+              )}
+
               {/* Lista de recetas */}
               {(loadingRecipes || loadingFromIngredients) ? (
                 <View style={styles.loadingRecipes}>
@@ -333,7 +376,7 @@ const FeedingScreen: React.FC = () => {
                   </View>
                   
                   {recipes.map((recipe) => (
-                    <RecipeCard key={recipe.id} recipe={recipe} />
+                    <RecipeCard key={recipe.id} recipe={recipe} sponsor={sponsor} />
                   ))}
 
                   <TouchableOpacity
@@ -576,6 +619,106 @@ const styles = StyleSheet.create({
     color: '#6B7280',
     marginTop: 8,
     textAlign: 'center',
+  },
+  // Sponsor section
+  sponsorSection: {
+    backgroundColor: '#F0FDF4',
+    borderRadius: 16,
+    borderWidth: 1.5,
+    borderColor: '#22C55E',
+    padding: 16,
+    marginBottom: 24,
+  },
+  sponsorSectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 16,
+  },
+  sponsorSectionLogo: {
+    width: 44,
+    height: 44,
+    borderRadius: 10,
+    resizeMode: 'contain',
+  },
+  sponsorSectionTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#1F2937',
+  },
+  sponsorSectionTagline: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginTop: 2,
+  },
+  sponsorSectionBadge: {
+    backgroundColor: '#22C55E',
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  sponsorSectionBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  sponsorBanner: {
+    width: '100%',
+    height: 160,
+    borderRadius: 16,
+    overflow: 'hidden',
+    marginBottom: 20,
+  },
+  sponsorBannerImage: {
+    width: '100%',
+    height: '100%',
+  },
+  sponsorBannerOverlay: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+  },
+  sponsorBannerBadge: {
+    backgroundColor: '#22C55E',
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  sponsorBannerBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  sponsorBannerCta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  sponsorBannerCtaText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  sponsorCtaBtn: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    backgroundColor: '#22C55E',
+    borderRadius: 10,
+    paddingVertical: 10,
+    gap: 6,
+  },
+  sponsorCtaBtnText: {
+    fontSize: 14,
+    fontWeight: '700' as const,
+    color: '#FFFFFF',
   },
 });
 
