@@ -4,7 +4,7 @@ module.exports = ({ config }) => ({
   ...config,
   name: 'Munpa',
   slug: 'munpaApp',
-  version: '2.0.9',
+  version: '2.0.10',
   orientation: 'portrait',
   icon: './assets/icon.png',
   userInterfaceStyle: 'light',
@@ -18,7 +18,7 @@ module.exports = ({ config }) => ({
   ios: {
     supportsTablet: true,
     bundleIdentifier: 'com.munpa.app',
-    buildNumber: '2.0.9',
+    buildNumber: '2.0.10',
     icon: './assets/icon.png',
     infoPlist: {
       ITSAppUsesNonExemptEncryption: false,
@@ -124,8 +124,12 @@ module.exports = ({ config }) => ({
   },
   web: {
     favicon: './assets/favicon.png',
-    name: 'Munpa - Tu compañera de maternidad',
-    shortName: 'Munpa'
+    name: 'Munpa - App para mamás, bebés y maternidad',
+    shortName: 'Munpa',
+    description: 'Munpa es la app para mamás y papás. Seguimiento del bebé, hitos de desarrollo, recetas para bebés, alimentación complementaria, registro de dientes, comunidades de madres, recomendaciones y más.',
+    lang: 'es',
+    themeColor: '#96d2d3',
+    backgroundColor: '#887CBC',
   },
   plugins: [
     'expo-font',
@@ -158,7 +162,7 @@ module.exports = ({ config }) => ({
         // 1. Crea un archivo .env en la raíz del proyecto
         // 2. Agrega: GOOGLE_MAPS_API_KEY=tu_api_key_aqui
         // 3. O reemplaza directamente el string vacío con tu API key
-        googleMapsApiKey: process.env.GOOGLE_MAPS_API_KEY || ''
+        googleMapsApiKey: process.env.GOOGLE_MAPS_API_KEY || undefined
       }
     ],
     [
