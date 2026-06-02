@@ -1,0 +1,40 @@
+{
+  "expo": {
+    "apple": {
+      "categories": ["HEALTH_AND_FITNESS", "LIFESTYLE"],
+      "appStoreLocales": {
+        "es-MX": {
+          "title": "Munpa - App para mamás y bebés",
+          "subtitle": "Maternidad, bebés y crianza",
+          "description": "Munpa es la app perfecta para mamás, papás y familias en crecimiento. Acompaña cada etapa del embarazo, la lactancia y el desarrollo de tu bebé con herramientas pensadas para ti.\n\n¿Qué puedes hacer en Munpa?\n• Seguimiento del crecimiento y hitos de desarrollo de tu bebé\n• Recetas personalizadas para alimentación complementaria\n• Registro de primeros dientes\n• Actividades de estimulación según la edad\n• Comunidades de mamás y papás\n• Recomendaciones de lugares y servicios para familias\n• Mercado de productos para bebés y niños\n• Artículos sobre maternidad, paternidad y gestación\n• Seguimiento de vacunas\n\nMunpa es tu compañera desde el embarazo hasta los primeros años de vida. Únete a miles de mamás y papás que ya confían en Munpa para la crianza de sus hijos.",
+          "keywords": "bebés,embarazo,lactancia,maternidad,hijos,desarrollo,alimentación,estimulación,mamás,gestación",
+          "marketingUrl": "https://www.munpa.app",
+          "supportUrl": "https://www.munpa.app/soporte",
+          "privacyPolicyUrl": "https://www.munpa.app/privacidad",
+          "releases": {
+            "submit": {
+              "releaseType": "AFTER_APPROVAL"
+            }
+          }
+        },
+        "es-ES": {
+          "title": "Munpa - App para mamás y bebés",
+          "subtitle": "Maternidad, bebés y crianza",
+          "description": "Munpa es la app perfecta para mamás, papás y familias en crecimiento. Acompaña cada etapa del embarazo, la lactancia y el desarrollo de tu bebé.\n\n• Seguimiento del crecimiento y hitos de desarrollo\n• Recetas para alimentación complementaria\n• Registro de dientes\n• Actividades de estimulación\n• Comunidades de madres y padres\n• Recomendaciones de lugares para familias\n• Mercado de productos para bebés\n• Artículos sobre maternidad y paternidad\n• Seguimiento de vacunas",
+          "keywords": "bebés,embarazo,lactancia,maternidad,hijos,desarrollo,alimentación,estimulación,mamás,gestación"
+        }
+      }
+    },
+    "googlePlay": {
+      "categories": ["HEALTH_AND_FITNESS"],
+      "appStoreLocales": {
+        "es-419": {
+          "title": "Munpa - App para mamás y bebés",
+          "shortDescription": "App de maternidad: bebés, embarazo, lactancia, hitos, recetas y comunidades de mamás.",
+          "fullDescription": "Munpa es la app para mamás, papás y familias. Acompaña cada etapa del embarazo, la lactancia y el crecimiento de tu bebé con herramientas pensadas para ti.\n\n🍼 SEGUIMIENTO DE TU BEBÉ\nRegistra el crecimiento, peso, talla y los hitos de desarrollo de tu hijo. Sabe qué esperar en cada etapa de su crecimiento.\n\n🥣 ALIMENTACIÓN COMPLEMENTARIA\nRecetas personalizadas para bebés, adaptadas a la edad de tu hijo. Introducción de alimentos, papillas y comidas saludables para bebés.\n\n🦷 REGISTRO DE DIENTES\nSeguimiento de la dentición de tu bebé. Registra cuándo aparece cada diente.\n\n🧸 ESTIMULACIÓN Y ACTIVIDADES\nActividades de estimulación temprana según la edad de tu bebé para potenciar su desarrollo.\n\n👩‍👧 COMUNIDADES DE MAMÁS Y PAPÁS\nConéctate con otras mamás y papás. Comparte experiencias de maternidad y paternidad, haz preguntas y recibe apoyo de una comunidad que te entiende.\n\n📍 RECOMENDACIONES PARA FAMILIAS\nDescubre y recomienda pediatras, hospitales, guarderías, tiendas de bebés y lugares pet-friendly para familias cerca de ti.\n\n🛍️ MERCADO DE BEBÉS\nCompra, vende o dona productos para bebés y niños. Encuentra ropa, carriolas, cunas y más.\n\n💉 VACUNAS\nRegistro del calendario de vacunas de tu bebé.\n\n📚 ARTÍCULOS\nContenido de calidad sobre embarazo, lactancia, gestación, crianza respetuosa y maternidad.\n\nKeywords: bebés, embarazo, lactancia, mamás, maternidad, hijos, crecimiento del bebé, hitos de desarrollo, alimentación complementaria, recetas bebés, registro de dientes, actividades bebés, estimulación, gestación, comunidades, madres, papás, paternidad, munpa",
+          "video": null
+        }
+      }
+    }
+  }
+}
