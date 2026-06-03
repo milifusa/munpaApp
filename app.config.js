@@ -4,7 +4,7 @@ module.exports = ({ config }) => ({
   ...config,
   name: 'Munpa',
   slug: 'munpaApp',
-  version: '2.0.10',
+  version: '2.1.0',
   orientation: 'portrait',
   icon: './assets/icon.png',
   userInterfaceStyle: 'light',
