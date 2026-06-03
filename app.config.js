@@ -18,7 +18,7 @@ module.exports = ({ config }) => ({
   ios: {
     supportsTablet: true,
     bundleIdentifier: 'com.munpa.app',
-    buildNumber: '2.0.10',
+    buildNumber: '88',
     icon: './assets/icon.png',
     infoPlist: {
       ITSAppUsesNonExemptEncryption: false,
@@ -33,6 +33,7 @@ module.exports = ({ config }) => ({
   },
   android: {
     package: 'com.munpa.app',
+    versionCode: 88,
     permissions: [
       "com.google.android.gms.permission.AD_ID"
     ],

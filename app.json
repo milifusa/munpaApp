@@ -2,7 +2,7 @@
   "expo": {
     "name": "Munpa",
     "slug": "munpaApp",
-    "version": "2.0.10",
+    "version": "2.1.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -15,7 +15,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.munpa.app",
-      "buildNumber": "1.0.46",
+      "buildNumber": "88",
       "icon": "./assets/icon.png",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
@@ -29,7 +29,7 @@
     },
     "android": {
       "package": "com.munpa.app",
-      "versionCode": 10,
+      "versionCode": 88,
       "adaptiveIcon": {
         "foregroundImage": "./assets/icon.png",
         "backgroundColor": "#887CBC"
