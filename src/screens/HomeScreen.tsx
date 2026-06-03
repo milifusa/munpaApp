@@ -12,6 +12,8 @@ import {
   StatusBar,
   Modal,
   ActivityIndicator,
+  DeviceEventEmitter,
+  TextInput,
 } from "react-native";
 import { useNavigation, useRoute, DrawerActions } from "@react-navigation/native";
 import { Ionicons, FontAwesome5 } from "@expo/vector-icons";
@@ -59,6 +61,7 @@ const WHITE_NOISE_URLS = [
 ];
 const WHITE_NOISE_LOAD_TIMEOUT_MS = 20000;
 const POPULAR_POST_CARD_WIDTH = Dimensions.get('window').width * 0.8;
+const PREGNANCY_SIZE_IMAGE_HEIGHT = Math.min(Dimensions.get('window').width - 40, 390);
 
 // Función helper para formatear duración en minutos
 const formatDuration = (totalMinutes: number, showSeconds: boolean = false): string => {
@@ -196,6 +199,448 @@ interface TodayGuide {
   source?: string;
 }
 
+interface PregnancySizeComparison {
+  week: number;
+  name: string;
+  emoji: string;
+  detail: string;
+  noComparison?: boolean;
+}
+
+interface PregnancyWeekDetail {
+  baby: string;
+  momBody: string;
+  feelings: string;
+  prepare: string;
+  important: string;
+}
+
+interface PregnancyApproxMeasurement {
+  length: string;
+  weight: string;
+  note?: string;
+}
+
+interface PregnancyContractionRecord {
+  startedAt: number;
+  endedAt: number;
+  durationSeconds: number;
+}
+
+const PREGNANCY_SIZE_BY_WEEK: PregnancySizeComparison[] = [
+  { week: 1, name: 'Sin comparativo', emoji: '✨', detail: 'Aún no hay embrión medible.', noComparison: true },
+  { week: 2, name: 'Sin comparativo', emoji: '✨', detail: 'Semana de ovulación o fecundación aproximada.', noComparison: true },
+  { week: 3, name: 'una semilla muy pequeña', emoji: '🌱', detail: 'Célula en desarrollo.' },
+  { week: 4, name: 'una semilla de amapola', emoji: '🌱', detail: 'Pequeñito, pero creciendo cada día.' },
+  { week: 5, name: 'una semilla de sésamo', emoji: '🌱', detail: 'También conocida como ajonjolí.' },
+  { week: 6, name: 'una lenteja', emoji: '🫘', detail: 'Su corazón y órganos principales se están formando.' },
+  { week: 7, name: 'un arándano', emoji: '🫐', detail: 'Cada semana suma nuevos detalles.' },
+  { week: 8, name: 'una frambuesa', emoji: '🍇', detail: 'Sus rasgos empiezan a definirse poco a poco.' },
+  { week: 9, name: 'una uva', emoji: '🍇', detail: 'Sus movimientos comienzan aunque aún no los sientas.' },
+  { week: 10, name: 'un dátil', emoji: '🟤', detail: 'También se compara con un kumquat.' },
+  { week: 11, name: 'una lima pequeña', emoji: '🍋', detail: 'Sus manitos y piecitos siguen tomando forma.' },
+  { week: 12, name: 'una ciruela', emoji: '🍑', detail: 'Termina una etapa clave de formación.' },
+  { week: 13, name: 'un kiwi', emoji: '🥝', detail: 'Crece con energía al iniciar el segundo trimestre.' },
+  { week: 14, name: 'un durazno', emoji: '🍑', detail: 'Su cuerpo empieza a estirarse más.' },
+  { week: 15, name: 'una pera', emoji: '🍐', detail: 'Sus sentidos continúan desarrollándose.' },
+  { week: 16, name: 'un aguacate', emoji: '🥑', detail: 'Puede empezar una etapa de movimientos sutiles.' },
+  { week: 17, name: 'una naranja', emoji: '🍊', detail: 'Sus huesitos se fortalecen.' },
+  { week: 18, name: 'una granada', emoji: '🔴', detail: 'Sus movimientos pueden sentirse más cerca.' },
+  { week: 19, name: 'una toronja', emoji: '🍊', detail: 'Crece largo y activo dentro de ti.' },
+  { week: 20, name: 'un mango', emoji: '🥭', detail: 'Mitad del camino para muchas familias.' },
+  { week: 21, name: 'un melón pequeño', emoji: '🍈', detail: 'Sigue practicando movimientos y reflejos.' },
+  { week: 22, name: 'una berenjena pequeña', emoji: '🍆', detail: 'Su piel y sentidos maduran semana a semana.' },
+  { week: 23, name: 'una berenjena', emoji: '🍆', detail: 'Sus pulmones siguen preparándose.' },
+  { week: 24, name: 'una mazorca de maíz', emoji: '🌽', detail: 'Crece con más fuerza y presencia.' },
+  { week: 25, name: 'una papaya pequeña', emoji: '🍈', detail: 'Sus rutinas de sueño y actividad se notan más.' },
+  { week: 26, name: 'una lechuga', emoji: '🥬', detail: 'Sus sentidos están cada vez más despiertos.' },
+  { week: 27, name: 'una coliflor', emoji: '🥦', detail: 'Se acerca el tercer trimestre.' },
+  { week: 28, name: 'una berenjena grande', emoji: '🍆', detail: 'Su cerebro sigue creciendo intensamente.' },
+  { week: 29, name: 'una calabaza pequeña', emoji: '🎃', detail: 'Gana peso y reserva energía.' },
+  { week: 30, name: 'un repollo', emoji: '🥬', detail: 'Cada patadita cuenta una historia.' },
+  { week: 31, name: 'un coco', emoji: '🥥', detail: 'Va tomando más espacio dentro de ti.' },
+  { week: 32, name: 'una jícama', emoji: '🍠', detail: 'También se compara con una calabaza mediana.' },
+  { week: 33, name: 'una piña', emoji: '🍍', detail: 'Está afinando movimientos y reflejos.' },
+  { week: 34, name: 'un melón cantalupo', emoji: '🍈', detail: 'Su cuerpo se prepara para el encuentro.' },
+  { week: 35, name: 'un melón grande', emoji: '🍈', detail: 'Sigue ganando peso y fuerza.' },
+  { week: 36, name: 'una lechuga romana', emoji: '🥬', detail: 'Ya se acerca la recta final.' },
+  { week: 37, name: 'un manojo de acelga', emoji: '🥬', detail: 'También se compara con hojas verdes.' },
+  { week: 38, name: 'una sandía pequeña', emoji: '🍉', detail: 'Todo se prepara para conocerse.' },
+  { week: 39, name: 'una calabaza grande', emoji: '🎃', detail: 'La espera se siente cada vez más real.' },
+  { week: 40, name: 'una sandía', emoji: '🍉', detail: 'Tu bebé está listo para el gran encuentro.' },
+  { week: 41, name: 'una sandía grande', emoji: '🍉', detail: 'Puede seguir ganando peso mientras esperan el momento.' },
+  { week: 42, name: 'una sandía grande', emoji: '🍉', detail: 'Tu equipo médico puede acompañar más de cerca esta etapa.' },
+];
+
+const PREGNANCY_WEEKS = Array.from({ length: 42 }, (_, index) => index + 1);
+const PREGNANCY_SIZE_IMAGES: Record<number, any> = {
+  3: require("../../assets/pregnancy-sizes/week-03.png"),
+  4: require("../../assets/pregnancy-sizes/week-04.png"),
+  5: require("../../assets/pregnancy-sizes/week-05.png"),
+  6: require("../../assets/pregnancy-sizes/week-06.png"),
+  7: require("../../assets/pregnancy-sizes/week-07.png"),
+  8: require("../../assets/pregnancy-sizes/week-08.png"),
+  9: require("../../assets/pregnancy-sizes/week-09.png"),
+  10: require("../../assets/pregnancy-sizes/week-10.png"),
+  11: require("../../assets/pregnancy-sizes/week-11.png"),
+  12: require("../../assets/pregnancy-sizes/week-12.png"),
+  13: require("../../assets/pregnancy-sizes/week-13.png"),
+  14: require("../../assets/pregnancy-sizes/week-14.png"),
+  15: require("../../assets/pregnancy-sizes/week-15.png"),
+  16: require("../../assets/pregnancy-sizes/week-16.png"),
+  17: require("../../assets/pregnancy-sizes/week-17.png"),
+  18: require("../../assets/pregnancy-sizes/week-18.png"),
+  19: require("../../assets/pregnancy-sizes/week-19.png"),
+  20: require("../../assets/pregnancy-sizes/week-20.png"),
+  21: require("../../assets/pregnancy-sizes/week-21.png"),
+  22: require("../../assets/pregnancy-sizes/week-22.png"),
+  23: require("../../assets/pregnancy-sizes/week-23.png"),
+  24: require("../../assets/pregnancy-sizes/week-24.png"),
+  25: require("../../assets/pregnancy-sizes/week-25.png"),
+  26: require("../../assets/pregnancy-sizes/week-26.png"),
+  27: require("../../assets/pregnancy-sizes/week-27.png"),
+  28: require("../../assets/pregnancy-sizes/week-28.png"),
+  29: require("../../assets/pregnancy-sizes/week-29.png"),
+  30: require("../../assets/pregnancy-sizes/week-30.png"),
+  31: require("../../assets/pregnancy-sizes/week-31.png"),
+  32: require("../../assets/pregnancy-sizes/week-32.png"),
+  33: require("../../assets/pregnancy-sizes/week-33.png"),
+  34: require("../../assets/pregnancy-sizes/week-34.png"),
+  35: require("../../assets/pregnancy-sizes/week-35.png"),
+  36: require("../../assets/pregnancy-sizes/week-36.png"),
+  37: require("../../assets/pregnancy-sizes/week-37.png"),
+  38: require("../../assets/pregnancy-sizes/week-38.png"),
+  39: require("../../assets/pregnancy-sizes/week-39.png"),
+  40: require("../../assets/pregnancy-sizes/week-40.png"),
+  41: require("../../assets/pregnancy-sizes/week-41.png"),
+  42: require("../../assets/pregnancy-sizes/week-42.png"),
+};
+
+const PREGNANCY_APPROX_MEASUREMENTS: Record<number, PregnancyApproxMeasurement> = {
+  1: { length: 'No medible', weight: 'No medible', note: 'Aún no hay embrión formado.' },
+  2: { length: 'No medible', weight: 'No medible', note: 'Semana de ovulación/fecundación aproximada.' },
+  3: { length: 'Microscópico', weight: 'No medible', note: 'Está en etapa celular inicial.' },
+  4: { length: 'Menos de 1 mm', weight: 'No medible' },
+  5: { length: '1 a 2 mm', weight: 'No medible' },
+  6: { length: '4 a 7 mm', weight: 'Menos de 1 g' },
+  7: { length: '8 a 14 mm', weight: 'Menos de 1 g' },
+  8: { length: '1.4 a 2 cm', weight: '1 a 2 g' },
+  9: { length: '2 a 3 cm', weight: '2 a 3 g' },
+  10: { length: '3 a 4 cm', weight: '3 a 5 g' },
+  11: { length: '4 a 5 cm', weight: '6 a 9 g' },
+  12: { length: '5 a 6.5 cm', weight: '10 a 18 g' },
+  13: { length: '7 a 8 cm', weight: '20 a 30 g' },
+  14: { length: '8 a 10 cm', weight: '35 a 50 g' },
+  15: { length: '10 a 11 cm', weight: '60 a 80 g' },
+  16: { length: '11 a 13 cm', weight: '90 a 120 g' },
+  17: { length: '12 a 14 cm', weight: '120 a 160 g' },
+  18: { length: '14 a 16 cm', weight: '170 a 220 g' },
+  19: { length: '15 a 17 cm', weight: '220 a 280 g' },
+  20: { length: '24 a 27 cm', weight: '280 a 340 g', note: 'Desde esta etapa suele estimarse de cabeza a pies.' },
+  21: { length: '26 a 28 cm', weight: '330 a 400 g' },
+  22: { length: '27 a 30 cm', weight: '400 a 480 g' },
+  23: { length: '28 a 31 cm', weight: '470 a 560 g' },
+  24: { length: '29 a 32 cm', weight: '550 a 680 g' },
+  25: { length: '33 a 36 cm', weight: '620 a 750 g' },
+  26: { length: '34 a 37 cm', weight: '700 a 850 g' },
+  27: { length: '35 a 38 cm', weight: '800 a 980 g' },
+  28: { length: '36 a 39 cm', weight: '900 g a 1.1 kg' },
+  29: { length: '37 a 40 cm', weight: '1.0 a 1.3 kg' },
+  30: { length: '39 a 41 cm', weight: '1.2 a 1.5 kg' },
+  31: { length: '40 a 42 cm', weight: '1.4 a 1.7 kg' },
+  32: { length: '41 a 44 cm', weight: '1.6 a 1.9 kg' },
+  33: { length: '42 a 45 cm', weight: '1.8 a 2.1 kg' },
+  34: { length: '44 a 46 cm', weight: '2.0 a 2.3 kg' },
+  35: { length: '45 a 47 cm', weight: '2.2 a 2.6 kg' },
+  36: { length: '46 a 48 cm', weight: '2.4 a 2.8 kg' },
+  37: { length: '47 a 49 cm', weight: '2.7 a 3.1 kg' },
+  38: { length: '48 a 50 cm', weight: '2.9 a 3.3 kg' },
+  39: { length: '49 a 51 cm', weight: '3.1 a 3.6 kg' },
+  40: { length: '50 a 52 cm', weight: '3.2 a 3.8 kg' },
+  41: { length: '50 a 53 cm', weight: '3.3 a 4.0 kg' },
+  42: { length: '51 a 54 cm', weight: '3.4 a 4.2 kg', note: 'Si llegas a esta semana, tu equipo médico suele acompañar más de cerca los controles.' },
+};
+
+const normalizePregnancyWeek = (weeks?: number | null): number | null => {
+  if (!weeks || Number.isNaN(Number(weeks))) return null;
+  return Math.max(1, Math.min(42, Math.round(Number(weeks))));
+};
+
+const getPregnancySizeComparison = (weeks?: number | null): PregnancySizeComparison | null => {
+  const normalizedWeek = normalizePregnancyWeek(weeks);
+  if (!normalizedWeek) return null;
+  return (
+    PREGNANCY_SIZE_BY_WEEK.find((item) => item.week === normalizedWeek) ||
+    PREGNANCY_SIZE_BY_WEEK[PREGNANCY_SIZE_BY_WEEK.length - 1]
+  );
+};
+
+const getPregnancyWeekDetail = (
+  week: number,
+  size?: PregnancySizeComparison | null
+): PregnancyWeekDetail => {
+  const sizeText = size && !size.noComparison
+    ? `Esta semana se compara con ${size.name}.`
+    : 'Aún no hay un tamaño de bebé medible para comparar.';
+
+  if (week <= 2) {
+    return {
+      baby: 'Todavía no hay embrión medible. Estas semanas cuentan desde la fecha de la última menstruación.',
+      momBody: 'Tu cuerpo está preparando la ovulación y el revestimiento del útero para una posible implantación.',
+      feelings: 'Puede sentirse como un ciclo normal: cólicos leves, cambios de flujo o sensibilidad mamaria.',
+      prepare: 'Ten a mano fecha de última menstruación, hábitos actuales y medicamentos que usas. Si estás buscando embarazo, pregunta por prenatal o ácido fólico.',
+      important: 'Si hay retraso menstrual, un test de embarazo suele ser más útil cerca o después de la fecha esperada de la regla.',
+    };
+  }
+
+  if (week <= 4) {
+    return {
+      baby: `${sizeText} La implantación puede estar ocurriendo y comienza la producción de hCG.`,
+      momBody: 'El útero empieza a responder a hormonas del embarazo, aunque externamente casi no hay cambios.',
+      feelings: 'Puedes notar cansancio, sueño, sensibilidad en senos, flujo distinto o cólicos muy leves.',
+      prepare: 'Confirma el embarazo, agenda la primera consulta y anota síntomas, sangrados, dolor o antecedentes importantes.',
+      important: 'Consulta de inmediato si hay sangrado abundante, dolor fuerte de un lado, mareo intenso o desmayo.',
+    };
+  }
+
+  if (week <= 8) {
+    return {
+      baby: `${sizeText} Se forman estructuras clave como corazón, tubo neural, brotes de brazos y piernas.`,
+      momBody: 'Suben las hormonas, aumenta el volumen sanguíneo y el cuerpo empieza a adaptarse al embarazo.',
+      feelings: 'Son frecuentes náuseas, cansancio, sueño, más ganas de orinar, sensibilidad a olores y cambios de apetito.',
+      prepare: 'Prepara tu primera cita: lista de medicamentos, suplementos, antecedentes, alergias y fecha de última regla. Ten agua y snacks suaves si hay náuseas.',
+      important: 'Entre semanas 6 y 10 algunos profesionales indican ecografía temprana para confirmar ubicación, latido y edad gestacional, según cada caso.',
+    };
+  }
+
+  if (week <= 13) {
+    return {
+      baby: `${sizeText} Termina la etapa embrionaria y el bebé pasa a etapa fetal; órganos y rasgos siguen madurando.`,
+      momBody: 'El útero crece y algunas molestias digestivas pueden aumentar por cambios hormonales.',
+      feelings: 'Puede haber náuseas, cansancio, estreñimiento, acidez, cambios de humor o algo de alivio al acercarse el segundo trimestre.',
+      prepare: 'Organiza exámenes iniciales, resultados y opciones de tamizaje. Decide qué información quieres conocer y qué dudas llevarás al control.',
+      important: 'Suele hablarse de tamizajes del primer trimestre; la translucencia nucal se realiza aproximadamente entre semanas 11 y 14 si está indicada o disponible.',
+    };
+  }
+
+  if (week <= 17) {
+    return {
+      baby: `${sizeText} El bebé crece rápido, sus movimientos se coordinan y sus huesos continúan fortaleciéndose.`,
+      momBody: 'La barriga puede empezar a notarse. El volumen de sangre aumenta y la piel puede cambiar.',
+      feelings: 'Muchas mamás sienten más energía, aunque pueden aparecer dolor lumbar, congestión nasal o ligamentos tirantes.',
+      prepare: 'Busca ropa cómoda, ajusta postura al dormir, cuida hidratación y pregunta qué movimiento o ejercicio es adecuado para ti.',
+      important: 'Si aún no lo hiciste, conversa sobre tamizajes del segundo trimestre y la ecografía anatómica que vendrá más adelante.',
+    };
+  }
+
+  if (week <= 22) {
+    return {
+      baby: `${sizeText} Sus sentidos y movimientos son más claros; muchas mamás empiezan a sentir pataditas.`,
+      momBody: 'El útero sube y puede cambiar tu centro de gravedad. La piel y el abdomen siguen estirándose.',
+      feelings: 'Puedes sentir movimientos, tirones en bajo vientre, acidez, dolor de espalda o más apetito.',
+      prepare: 'Planifica ecografía anatómica, empieza una lista básica del bebé y conversa con tu red de apoyo sobre cómo podrán ayudarte.',
+      important: 'La ecografía anatómica se ofrece generalmente entre semanas 18 y 22 para revisar estructuras principales del bebé.',
+    };
+  }
+
+  if (week <= 27) {
+    return {
+      baby: `${sizeText} Gana peso, practica movimientos respiratorios y responde más a sonidos y luz.`,
+      momBody: 'El abdomen crece más rápido y puede haber retención de líquidos o molestias en espalda y pelvis.',
+      feelings: 'Pueden aparecer calambres, acidez, estreñimiento, sueño interrumpido y patadas más notorias.',
+      prepare: 'Revisa prueba de glucosa, descanso, alimentación, curso prenatal y ejercicios de piso pélvico si tu profesional los permite.',
+      important: 'Entre semanas 24 y 28 suele realizarse tamizaje de diabetes gestacional; también pueden pedir hemograma u otros controles.',
+    };
+  }
+
+  if (week <= 31) {
+    return {
+      baby: `${sizeText} Sigue acumulando grasa, madurando pulmones y organizando ciclos de sueño y actividad.`,
+      momBody: 'El útero ocupa más espacio; respirar profundo, dormir y digerir puede sentirse diferente.',
+      feelings: 'Es común notar presión pélvica, contracciones de Braxton Hicks leves, cansancio y movimientos fuertes.',
+      prepare: 'Ordena documentos, contactos de emergencia, permisos/trabajo, plan de apoyo posparto y compras realmente esenciales.',
+      important: 'Desde esta etapa algunos profesionales recomiendan observar patrones de movimiento fetal. Si notas una disminución clara, consulta.',
+    };
+  }
+
+  if (week <= 35) {
+    return {
+      baby: `${sizeText} El bebé gana peso y se prepara para la vida fuera del útero; puede empezar a acomodarse cabeza abajo.`,
+      momBody: 'La presión en costillas, vejiga y pelvis puede aumentar. El cuerpo empieza a ensayar para el parto.',
+      feelings: 'Más cansancio, insomnio, acidez, dolor pélvico, hinchazón leve y contracciones irregulares pueden aparecer.',
+      prepare: 'Deja avanzada la maleta, silla de auto, ruta al hospital, contactos, plan de parto y cuidados para los primeros días en casa.',
+      important: 'En embarazos con factores de riesgo, el equipo médico puede indicar monitoreos o ecografías adicionales desde semanas 32 a 34.',
+    };
+  }
+
+  return {
+    baby: `${sizeText} En la recta final, el bebé sigue ganando peso y afinando funciones para nacer.`,
+    momBody: 'El bebé puede descender, aumentando presión pélvica y ganas de orinar. El cuello uterino puede empezar a cambiar.',
+    feelings: 'Puedes sentir presión, contracciones irregulares, cansancio, ansiedad, sueño liviano o más flujo.',
+    prepare: 'Ten lista maleta, documentos, transporte y señales de parto/alarma. Define quién te acompaña y cuándo llamar o ir al hospital.',
+    important: 'El tamizaje de estreptococo grupo B suele hacerse entre semanas 36 y 38. Consulta por contracciones regulares, pérdida de líquido, sangrado o menos movimientos.',
+  };
+};
+
+const getPregnancyChecklist = (week: number): string[] => {
+  if (week <= 4) {
+    return ['Confirmar embarazo', 'Agendar primera cita prenatal', 'Revisar medicamentos con tu profesional'];
+  }
+  if (week <= 8) {
+    return ['Preparar dudas para la cita', 'Registrar náuseas o cansancio', 'Mantener hidratación y comidas pequeñas'];
+  }
+  if (week <= 13) {
+    return ['Preguntar por tamizajes del primer trimestre', 'Guardar resultados de exámenes', 'Revisar fecha probable de parto'];
+  }
+  if (week <= 17) {
+    return ['Elegir ropa cómoda', 'Moverte suave si está permitido', 'Planear la ecografía anatómica'];
+  }
+  if (week <= 22) {
+    return ['Agendar o asistir a ecografía anatómica', 'Anotar primeros movimientos si los sientes', 'Pensar en red de apoyo'];
+  }
+  if (week <= 27) {
+    return ['Consultar por prueba de glucosa', 'Revisar descanso y postura', 'Explorar curso prenatal'];
+  }
+  if (week <= 31) {
+    return ['Observar patrón de movimientos', 'Preparar lista básica del bebé', 'Organizar documentos médicos'];
+  }
+  if (week <= 35) {
+    return ['Avanzar maleta del hospital', 'Revisar ruta y contactos', 'Conversar plan de parto'];
+  }
+  return ['Tener maleta lista', 'Confirmar señales de parto', 'Preguntar por GBS y últimos controles'];
+};
+
+const getUpcomingPregnancyControls = (week: number): string[] => {
+  const controls = [
+    { start: 6, end: 10, label: 'Ecografía temprana si tu profesional la indica' },
+    { start: 10, end: 13, label: 'Opciones de tamizaje genético/prenatal' },
+    { start: 11, end: 14, label: 'Translucencia nucal si está indicada o disponible' },
+    { start: 18, end: 22, label: 'Ecografía anatómica' },
+    { start: 24, end: 28, label: 'Tamizaje de diabetes gestacional' },
+    { start: 28, end: 32, label: 'Revisión de crecimiento y bienestar según tu control' },
+    { start: 32, end: 36, label: 'Preparación para parto y controles más frecuentes' },
+    { start: 36, end: 38, label: 'Cultivo de estreptococo grupo B (GBS)' },
+    { start: 40, end: 42, label: 'Seguimiento cercano o planificación de inducción según tu equipo médico' },
+  ];
+
+  return controls
+    .filter((control) => control.end >= week)
+    .slice(0, 3)
+    .map((control) => `Semanas ${control.start}-${control.end}: ${control.label}`);
+};
+
+const getPregnancySymptomsGuidance = (week: number) => {
+  const normal = week <= 13
+    ? ['Náuseas', 'Sueño o cansancio', 'Sensibilidad en senos', 'Olores intensos']
+    : week <= 27
+      ? ['Tirones bajos leves', 'Acidez', 'Dolor de espalda', 'Cambios de apetito']
+      : ['Presión pélvica', 'Braxton Hicks leves', 'Insomnio', 'Hinchazón leve'];
+
+  const alerts = [
+    'Sangrado abundante',
+    'Dolor fuerte o persistente',
+    'Dolor de cabeza intenso',
+    'Menos movimientos claros',
+  ];
+
+  return { normal, alerts };
+};
+
+const PREGNANCY_SYMPTOM_OPTIONS = [
+  'Náuseas',
+  'Cansancio',
+  'Acidez',
+  'Dolor espalda',
+  'Calambres',
+  'Sueño liviano',
+  'Movimientos',
+  'Ánimo sensible',
+];
+
+const PREGNANCY_MODULES = [
+  { id: 'plan', label: 'Plan', icon: 'checkbox-outline' },
+  { id: 'controls', label: 'Controles', icon: 'medical-outline' },
+  { id: 'symptoms', label: 'Síntomas', icon: 'pulse-outline' },
+  { id: 'questions', label: 'Cita', icon: 'help-circle-outline' },
+  { id: 'movements', label: 'Movimientos', icon: 'footsteps-outline' },
+  { id: 'contractions', label: 'Contracciones', icon: 'timer-outline' },
+  { id: 'prep', label: 'Preparar', icon: 'map-outline' },
+  { id: 'notes', label: 'Notas', icon: 'journal-outline' },
+  { id: 'family', label: 'Familia', icon: 'people-outline' },
+] as const;
+
+type PregnancyModuleId = typeof PREGNANCY_MODULES[number]['id'];
+
+const getPregnancyQuestions = (week: number): string[] => {
+  if (week <= 13) {
+    return ['¿Qué exámenes necesito ahora?', '¿Qué medicamentos o suplementos son seguros?', '¿Cuándo debería consultar por sangrado o dolor?'];
+  }
+  if (week <= 22) {
+    return ['¿Qué revisarán en la ecografía anatómica?', '¿Qué movimientos puedo esperar?', '¿Qué actividad física es adecuada para mí?'];
+  }
+  if (week <= 31) {
+    return ['¿Cuándo hago la prueba de glucosa?', '¿Cómo reconozco contracciones de práctica?', '¿Cómo debo observar los movimientos del bebé?'];
+  }
+  return ['¿Cuáles son mis señales para ir al hospital?', '¿Necesito cultivo GBS?', '¿Qué debo tener listo para parto y posparto?'];
+};
+
+const getTrimesterPreparation = (week: number): string => {
+  if (week <= 13) {
+    return 'Primer trimestre: confirma embarazo, agenda controles, guarda exámenes, revisa medicamentos/suplementos y prioriza descanso, hidratación y comidas tolerables.';
+  }
+  if (week <= 27) {
+    return 'Segundo trimestre: planifica ecografía anatómica, arma red de apoyo, define lista básica del bebé y conversa sobre lugar de parto y curso prenatal.';
+  }
+  if (week <= 36) {
+    return 'Tercer trimestre: prepara maleta, documentos, silla de auto, ruta al hospital, plan de parto, apoyo posparto y compras esenciales.';
+  }
+  return 'Recta final: confirma señales para consultar, contactos, transporte, GBS si aplica, maleta y acompañante. Si llegas a 40+, sigue el plan de controles de tu equipo médico.';
+};
+
+const getPartnerSupportTips = (week: number): string[] => {
+  if (week <= 13) return ['Acompañar en citas', 'Preparar snacks suaves', 'Ayudar con descanso'];
+  if (week <= 27) return ['Escuchar sin minimizar síntomas', 'Ayudar con pendientes', 'Celebrar movimientos y controles'];
+  return ['Preparar la casa', 'Revisar transporte', 'Practicar apoyo para parto y posparto'];
+};
+
+const getPregnancyCountdown = (dueDate?: string | null, week?: number | null): string => {
+  if (dueDate) {
+    const due = new Date(dueDate);
+    if (!Number.isNaN(due.getTime())) {
+      const days = Math.max(0, Math.ceil((due.getTime() - Date.now()) / (1000 * 60 * 60 * 24)));
+      const weeks = Math.floor(days / 7);
+      const extraDays = days % 7;
+      return days === 0
+        ? 'La fecha probable es hoy o ya pasó.'
+        : `Faltan aprox. ${weeks} sem ${extraDays} días.`;
+    }
+  }
+
+  if (week) {
+    const remainingWeeks = Math.max(0, 40 - week);
+    if (week > 40) return 'Tu equipo médico puede acompañar esta espera de cerca.';
+    return remainingWeeks === 0 ? 'Estás en la recta final.' : `Faltan aprox. ${remainingWeeks} semanas.`;
+  }
+
+  return 'Agrega la fecha probable para ver el contador.';
+};
+
+const formatContractionDuration = (seconds: number): string => {
+  const mins = Math.floor(seconds / 60);
+  const secs = seconds % 60;
+  return `${mins}:${secs.toString().padStart(2, '0')}`;
+};
+
+const formatContractionInterval = (
+  current: PregnancyContractionRecord,
+  previous?: PregnancyContractionRecord
+): string => {
+  if (!previous) return 'Primera registrada';
+  const diffMinutes = Math.max(0, Math.round((current.startedAt - previous.startedAt) / (1000 * 60)));
+  if (diffMinutes < 1) return 'Menos de 1 min desde la anterior';
+  return `${diffMinutes} min desde la anterior`;
+};
+
 
 // Constantes para las caritas por defecto (fuera del componente para mejor rendimiento)
 const CARITA_1 = require("../../assets/caritas1.png");
@@ -245,6 +690,17 @@ const HomeScreen: React.FC = () => {
 
   const [activeConsultations, setActiveConsultations] = useState<any[]>([]);
   const [loadingConsultations, setLoadingConsultations] = useState(false);
+  const [selectedPregnancyWeek, setSelectedPregnancyWeek] = useState<number | null>(null);
+  const [showPregnancyDetailModal, setShowPregnancyDetailModal] = useState(false);
+  const [pregnancyChecklistState, setPregnancyChecklistState] = useState<Record<string, boolean>>({});
+  const [pregnancySymptoms, setPregnancySymptoms] = useState<string[]>([]);
+  const [pregnancyDiaryNote, setPregnancyDiaryNote] = useState('');
+  const [pregnancyMovementCount, setPregnancyMovementCount] = useState(0);
+  const [activePregnancyModule, setActivePregnancyModule] = useState<PregnancyModuleId>('plan');
+  const [showPregnancyModuleModal, setShowPregnancyModuleModal] = useState(false);
+  const [pregnancyContractions, setPregnancyContractions] = useState<PregnancyContractionRecord[]>([]);
+  const [activeContractionStartedAt, setActiveContractionStartedAt] = useState<number | null>(null);
+  const [contractionTick, setContractionTick] = useState(Date.now());
 
   const [showActivityDetailModal, setShowActivityDetailModal] = useState(false);
   const [selectedActivityDetail, setSelectedActivityDetail] = useState<any>(null);
@@ -301,13 +757,33 @@ const HomeScreen: React.FC = () => {
   const [isLocationReady, setIsLocationReady] = useState(false);
   const lastTodayLoadKeyRef = useRef<string | null>(null);
   const todayLoadInFlightRef = useRef(false);
+  const todayLoadInFlightKeyRef = useRef<string | null>(null);
   const activitySuggestionsInFlightRef = useRef(false);
+  const activitySuggestionsInFlightChildRef = useRef<string | null>(null);
   const lastActivitySuggestionsChildRef = useRef<string | null>(null);
+  const selectedChildIdRef = useRef<string | null>(null);
   const loadDataInFlightRef = useRef(false);
   const lastLoadDataAtRef = useRef(0);
   const loadProfileInFlightRef = useRef(false);
   const lastFocusReloadRef = useRef(0);
   const lastForceReloadRef = useRef<number | null>(null);
+
+  const resetChildScopedTodayData = useCallback(() => {
+    setActivitySuggestions(null);
+    setTodayGuide(null);
+    setTodayGuideError(null);
+    setTodayFaqQuestions([]);
+    setTodayRecipe(null);
+    setSelectedActivityDetail(null);
+    setShowActivityDetailModal(false);
+    setShowPregnancyDetailModal(false);
+    setShowPregnancyModuleModal(false);
+    setLoadingTodayGuide(true);
+    setLoadingTodayFaq(true);
+    setLoadingTodayRecipe(false);
+    setLoadingActivities(false);
+    lastActivitySuggestionsChildRef.current = null;
+  }, []);
 
   useEffect(() => {
     loadData();
@@ -325,6 +801,102 @@ const HomeScreen: React.FC = () => {
     const interval = setInterval(() => setNow(new Date()), 60000);
     return () => clearInterval(interval);
   }, []);
+
+  useEffect(() => {
+    if (!activeContractionStartedAt) return;
+    const interval = setInterval(() => setContractionTick(Date.now()), 1000);
+    return () => clearInterval(interval);
+  }, [activeContractionStartedAt]);
+
+  useEffect(() => {
+    const subscription = DeviceEventEmitter.addListener(
+      'selectedChildChanged',
+      ({ childId, child }: { childId?: string; child?: Child }) => {
+        if (!childId || selectedChild?.id === childId) return;
+
+        const childToSelect = children.find((item) => item.id === childId) || child;
+        if (!childToSelect) return;
+
+        if (selectedChildIdRef.current !== childId) {
+          resetChildScopedTodayData();
+          lastTodayLoadKeyRef.current = null;
+        }
+        selectedChildIdRef.current = childId;
+        setSelectedChild(childToSelect);
+      }
+    );
+
+    return () => {
+      subscription.remove();
+    };
+  }, [children, selectedChild?.id, resetChildScopedTodayData]);
+
+  useEffect(() => {
+    const currentChildId = selectedChild?.id || null;
+    if (selectedChildIdRef.current && selectedChildIdRef.current !== currentChildId) {
+      resetChildScopedTodayData();
+      lastTodayLoadKeyRef.current = null;
+    }
+    selectedChildIdRef.current = currentChildId;
+  }, [selectedChild?.id, resetChildScopedTodayData]);
+
+  useEffect(() => {
+    if (!selectedChild?.isUnborn) {
+      setSelectedPregnancyWeek(null);
+      return;
+    }
+
+    const currentWeek = normalizePregnancyWeek(
+      selectedChild.currentGestationWeeks ??
+      selectedChild.gestationWeeks ??
+      selectedChild.registeredGestationWeeks ??
+      null
+    );
+
+    setSelectedPregnancyWeek(currentWeek);
+  }, [
+    selectedChild?.id,
+    selectedChild?.isUnborn,
+    selectedChild?.currentGestationWeeks,
+    selectedChild?.gestationWeeks,
+    selectedChild?.registeredGestationWeeks,
+  ]);
+
+  useEffect(() => {
+    const loadPregnancyWeekState = async () => {
+      if (!selectedChild?.isUnborn || !selectedChild.id || !selectedPregnancyWeek) {
+        setPregnancyChecklistState({});
+        setPregnancySymptoms([]);
+        setPregnancyDiaryNote('');
+        setPregnancyMovementCount(0);
+        setPregnancyContractions([]);
+        setActiveContractionStartedAt(null);
+        return;
+      }
+
+      const storageKey = `pregnancyWeek:${selectedChild.id}:${selectedPregnancyWeek}`;
+      try {
+        const raw = await AsyncStorage.getItem(storageKey);
+        const parsed = raw ? JSON.parse(raw) : {};
+        setPregnancyChecklistState(parsed.checklist || {});
+        setPregnancySymptoms(Array.isArray(parsed.symptoms) ? parsed.symptoms : []);
+        setPregnancyDiaryNote(typeof parsed.diaryNote === 'string' ? parsed.diaryNote : '');
+        setPregnancyMovementCount(Number(parsed.movementCount) || 0);
+        setPregnancyContractions(Array.isArray(parsed.contractions) ? parsed.contractions : []);
+        setActiveContractionStartedAt(null);
+      } catch (error) {
+        console.warn('⚠️ [PREGNANCY] Error cargando estado semanal:', error);
+        setPregnancyChecklistState({});
+        setPregnancySymptoms([]);
+        setPregnancyDiaryNote('');
+        setPregnancyMovementCount(0);
+        setPregnancyContractions([]);
+        setActiveContractionStartedAt(null);
+      }
+    };
+
+    loadPregnancyWeekState();
+  }, [selectedChild?.id, selectedChild?.isUnborn, selectedPregnancyWeek]);
 
   // Refrescar datos cuando se regrese a esta pantalla o cuando cambie la ubicación
   useEffect(() => {
@@ -415,6 +987,7 @@ const HomeScreen: React.FC = () => {
         // Resetear la clave de carga de "Hoy" para forzar recarga en el próximo ciclo
         lastTodayLoadKeyRef.current = null;
         todayLoadInFlightRef.current = false;
+        todayLoadInFlightKeyRef.current = null;
         
         // Recargar perfil
         setTimeout(() => {
@@ -484,12 +1057,14 @@ const HomeScreen: React.FC = () => {
   useEffect(() => {
     if (!selectedChild || !isLocationReady) return;
     const loadKey = `${selectedChild.id}|${todayLat?.toFixed(4) || 'na'}|${todayLon?.toFixed(4) || 'na'}`;
-    if (todayLoadInFlightRef.current) return;
+    if (todayLoadInFlightRef.current && todayLoadInFlightKeyRef.current === loadKey) return;
     if (lastTodayLoadKeyRef.current === loadKey) return;
 
     const loadAll = async () => {
+      const childForLoad = selectedChild;
       try {
         todayLoadInFlightRef.current = true;
+        todayLoadInFlightKeyRef.current = loadKey;
         lastTodayLoadKeyRef.current = loadKey;
         
         console.log('🔄 [HOME] Cargando datos de sección "Hoy"...');
@@ -513,10 +1088,10 @@ const HomeScreen: React.FC = () => {
           withTimeout(loadTodayRecommendations(), 'Recomendaciones'),
           withTimeout(loadTodayMarket(), 'Market'),
           withTimeout(loadTodayCommunityPosts(), 'Posts'),
-          withTimeout(loadActivitySuggestions(selectedChild.id), 'Actividades'),
-          withTimeout(loadTodayGuide(selectedChild), 'Guía'),
-          withTimeout(loadTodayFaq(selectedChild.id), 'FAQ'),
-          withTimeout(loadTodayRecipe(selectedChild), 'Receta'),
+          withTimeout(loadActivitySuggestions(childForLoad.id), 'Actividades'),
+          withTimeout(loadTodayGuide(childForLoad), 'Guía'),
+          withTimeout(loadTodayFaq(childForLoad.id), 'FAQ'),
+          withTimeout(loadTodayRecipe(childForLoad), 'Receta'),
           withTimeout(loadActiveConsultations(), 'Consultas'),
         ]);
         
@@ -524,7 +1099,10 @@ const HomeScreen: React.FC = () => {
       } catch (error) {
         console.error('❌ [HOME] Error cargando datos:', error);
       } finally {
-        todayLoadInFlightRef.current = false;
+        if (todayLoadInFlightKeyRef.current === loadKey) {
+          todayLoadInFlightRef.current = false;
+          todayLoadInFlightKeyRef.current = null;
+        }
       }
     };
     
@@ -630,24 +1208,39 @@ const HomeScreen: React.FC = () => {
 
   // Función para cargar sugerencias de actividades
   const loadActivitySuggestions = async (childId: string) => {
-    if (activitySuggestionsInFlightRef.current) return;
+    if (
+      activitySuggestionsInFlightRef.current &&
+      activitySuggestionsInFlightChildRef.current === childId
+    ) {
+      return;
+    }
     if (lastActivitySuggestionsChildRef.current === childId && activitySuggestions) return;
     try {
       activitySuggestionsInFlightRef.current = true;
+      activitySuggestionsInFlightChildRef.current = childId;
       setLoadingActivities(true);
       
       const response = await activitiesService.getActivitySuggestions(childId);
       
+      if (selectedChildIdRef.current !== childId) return;
+
       if (response.success) {
         setActivitySuggestions(response);
         lastActivitySuggestionsChildRef.current = childId;
       }
     } catch (error) {
       console.error('❌ [ACTIVITIES] Error cargando sugerencias:', error);
-      setActivitySuggestions(null);
+      if (selectedChildIdRef.current === childId) {
+        setActivitySuggestions(null);
+      }
     } finally {
-      activitySuggestionsInFlightRef.current = false;
-      setLoadingActivities(false);
+      if (activitySuggestionsInFlightChildRef.current === childId) {
+        activitySuggestionsInFlightRef.current = false;
+        activitySuggestionsInFlightChildRef.current = null;
+      }
+      if (selectedChildIdRef.current === childId) {
+        setLoadingActivities(false);
+      }
     }
   };
 
@@ -734,11 +1327,12 @@ const HomeScreen: React.FC = () => {
   };
 
   const loadTodayGuide = async (child: Child) => {
+    const childId = child.id;
     try {
       setLoadingTodayGuide(true);
       setTodayGuideError(null);
 
-      if (!child.id) {
+      if (!childId) {
         setTodayGuide(null);
         setTodayGuideError('No se pudo determinar el niño para la guía');
         return;
@@ -750,11 +1344,13 @@ const HomeScreen: React.FC = () => {
         birthDate: child.birthDate,
         isUnborn: child.isUnborn,
       });
-      console.log('📘 [HOME GUIDE] Payload enviado a learningService:', { childId: child.id });
+      console.log('📘 [HOME GUIDE] Payload enviado a learningService:', { childId });
       
-      const response = await learningService.getTodayGuide({ childId: child.id });
+      const response = await learningService.getTodayGuide({ childId });
       
       console.log('📘 [HOME GUIDE] Respuesta recibida:', response);
+
+      if (selectedChildIdRef.current !== childId) return;
       
       if (response?.success && response?.data) {
         setTodayGuide(response.data);
@@ -763,19 +1359,31 @@ const HomeScreen: React.FC = () => {
       }
     } catch (error: any) {
       console.error('❌ [GUIDE] Error cargando guía de hoy:', error);
-      setTodayGuide(null);
-      setTodayGuideError('No se pudo cargar la guía de hoy');
+      if (selectedChildIdRef.current === childId) {
+        setTodayGuide(null);
+        setTodayGuideError('No se pudo cargar la guía de hoy');
+      }
     } finally {
-      setLoadingTodayGuide(false);
+      if (selectedChildIdRef.current === childId) {
+        setLoadingTodayGuide(false);
+      }
     }
   };
 
   const loadTodayRecipe = async (child: Child) => {
+    const childId = child.id;
     try {
       setLoadingTodayRecipe(true);
 
-      if (!child.id) {
+      if (!childId) {
         setTodayRecipe(null);
+        return;
+      }
+
+      if (child.isUnborn) {
+        if (selectedChildIdRef.current === childId) {
+          setTodayRecipe(null);
+        }
         return;
       }
 
@@ -792,21 +1400,26 @@ const HomeScreen: React.FC = () => {
       }
 
       console.log('🍽️ [HOME RECIPE] Cargando receta del día:', {
-        childId: child.id,
+        childId,
         name: child.name,
         mealType,
         hour: currentHour,
       });
 
-      const recipe = await nutritionService.getTodayRecipe(child.id, mealType);
+      const recipe = await nutritionService.getTodayRecipe(childId, mealType);
 
       console.log('✅ [HOME RECIPE] Receta obtenida:', recipe?.name);
+      if (selectedChildIdRef.current !== childId) return;
       setTodayRecipe(recipe);
     } catch (error: any) {
       console.error('❌ [HOME RECIPE] Error cargando receta del día:', error);
-      setTodayRecipe(null);
+      if (selectedChildIdRef.current === childId) {
+        setTodayRecipe(null);
+      }
     } finally {
-      setLoadingTodayRecipe(false);
+      if (selectedChildIdRef.current === childId) {
+        setLoadingTodayRecipe(false);
+      }
     }
   };
 
@@ -818,12 +1431,17 @@ const HomeScreen: React.FC = () => {
         (Array.isArray(response?.data?.questions) && response.data.questions) ||
         (Array.isArray(response?.questions) && response.questions) ||
         [];
+      if (selectedChildIdRef.current !== childId) return;
       setTodayFaqQuestions(questions);
     } catch (error) {
       console.error('❌ [FAQ] Error cargando preguntas frecuentes:', error);
-      setTodayFaqQuestions([]);
+      if (selectedChildIdRef.current === childId) {
+        setTodayFaqQuestions([]);
+      }
     } finally {
-      setLoadingTodayFaq(false);
+      if (selectedChildIdRef.current === childId) {
+        setLoadingTodayFaq(false);
+      }
     }
   };
 
@@ -1332,6 +1950,94 @@ const HomeScreen: React.FC = () => {
     setImageErrors((prev) => new Set(prev).add(childId));
   };
 
+  const savePregnancyWeekState = async (updates: {
+    checklist?: Record<string, boolean>;
+    symptoms?: string[];
+    diaryNote?: string;
+    movementCount?: number;
+    contractions?: PregnancyContractionRecord[];
+  }) => {
+    if (!selectedChild?.id || !selectedPregnancyWeek) return;
+
+    const nextState = {
+      checklist: updates.checklist ?? pregnancyChecklistState,
+      symptoms: updates.symptoms ?? pregnancySymptoms,
+      diaryNote: updates.diaryNote ?? pregnancyDiaryNote,
+      movementCount: updates.movementCount ?? pregnancyMovementCount,
+      contractions: updates.contractions ?? pregnancyContractions,
+    };
+
+    try {
+      await AsyncStorage.setItem(
+        `pregnancyWeek:${selectedChild.id}:${selectedPregnancyWeek}`,
+        JSON.stringify(nextState)
+      );
+    } catch (error) {
+      console.warn('⚠️ [PREGNANCY] Error guardando estado semanal:', error);
+    }
+  };
+
+  const togglePregnancyChecklistItem = (item: string) => {
+    const nextChecklist = {
+      ...pregnancyChecklistState,
+      [item]: !pregnancyChecklistState[item],
+    };
+    setPregnancyChecklistState(nextChecklist);
+    savePregnancyWeekState({ checklist: nextChecklist });
+  };
+
+  const togglePregnancySymptom = (symptom: string) => {
+    const nextSymptoms = pregnancySymptoms.includes(symptom)
+      ? pregnancySymptoms.filter((item) => item !== symptom)
+      : [...pregnancySymptoms, symptom];
+    setPregnancySymptoms(nextSymptoms);
+    savePregnancyWeekState({ symptoms: nextSymptoms });
+  };
+
+  const updatePregnancyDiaryNote = (note: string) => {
+    setPregnancyDiaryNote(note);
+    savePregnancyWeekState({ diaryNote: note });
+  };
+
+  const addPregnancyMovement = () => {
+    const nextCount = pregnancyMovementCount + 1;
+    setPregnancyMovementCount(nextCount);
+    savePregnancyWeekState({ movementCount: nextCount });
+  };
+
+  const resetPregnancyMovements = () => {
+    setPregnancyMovementCount(0);
+    savePregnancyWeekState({ movementCount: 0 });
+  };
+
+  const startPregnancyContraction = () => {
+    setActiveContractionStartedAt(Date.now());
+    setContractionTick(Date.now());
+  };
+
+  const stopPregnancyContraction = () => {
+    if (!activeContractionStartedAt) return;
+    const endedAt = Date.now();
+    const durationSeconds = Math.max(1, Math.round((endedAt - activeContractionStartedAt) / 1000));
+    const nextContractions = [
+      {
+        startedAt: activeContractionStartedAt,
+        endedAt,
+        durationSeconds,
+      },
+      ...pregnancyContractions,
+    ].slice(0, 10);
+    setPregnancyContractions(nextContractions);
+    setActiveContractionStartedAt(null);
+    savePregnancyWeekState({ contractions: nextContractions });
+  };
+
+  const resetPregnancyContractions = () => {
+    setPregnancyContractions([]);
+    setActiveContractionStartedAt(null);
+    savePregnancyWeekState({ contractions: [] });
+  };
+
 
   const handleDouliPress = () => {
     // Navegar al tab Doula
@@ -1342,9 +2048,49 @@ const HomeScreen: React.FC = () => {
 
   const userFirstName = user?.displayName?.split(' ')[0] || 'Mamá';
   const childFirstName = selectedChild?.name?.split(' ')[0] || 'Tu bebé';
+  const isPregnancyProfile = Boolean(selectedChild?.isUnborn);
   const selectedChildIndex = selectedChild
     ? Math.max(0, children.findIndex((child) => child.id === selectedChild.id))
     : 0;
+  const pregnancyWeeks = selectedChild?.currentGestationWeeks ??
+    selectedChild?.gestationWeeks ??
+    selectedChild?.registeredGestationWeeks ??
+    null;
+  const pregnancyWeekToShow = selectedPregnancyWeek ?? normalizePregnancyWeek(pregnancyWeeks);
+  const pregnancySize = selectedChild?.isUnborn
+    ? getPregnancySizeComparison(pregnancyWeekToShow)
+    : null;
+  const pregnancySizeImage = pregnancyWeekToShow ? PREGNANCY_SIZE_IMAGES[pregnancyWeekToShow] : null;
+  const pregnancyWeekDetail = pregnancySize && pregnancyWeekToShow
+    ? getPregnancyWeekDetail(pregnancyWeekToShow, pregnancySize)
+    : null;
+  const pregnancyApproxMeasurement = pregnancyWeekToShow
+    ? PREGNANCY_APPROX_MEASUREMENTS[pregnancyWeekToShow]
+    : null;
+  const pregnancyChecklist = pregnancyWeekToShow ? getPregnancyChecklist(pregnancyWeekToShow) : [];
+  const pregnancyControls = pregnancyWeekToShow ? getUpcomingPregnancyControls(pregnancyWeekToShow) : [];
+  const pregnancySymptomsGuidance = pregnancyWeekToShow
+    ? getPregnancySymptomsGuidance(pregnancyWeekToShow)
+    : { normal: [], alerts: [] };
+  const pregnancyQuestions = pregnancyWeekToShow ? getPregnancyQuestions(pregnancyWeekToShow) : [];
+  const pregnancyTrimesterPrep = pregnancyWeekToShow ? getTrimesterPreparation(pregnancyWeekToShow) : '';
+  const pregnancySupportTips = pregnancyWeekToShow ? getPartnerSupportTips(pregnancyWeekToShow) : [];
+  const pregnancyCountdown = getPregnancyCountdown(selectedChild?.dueDate, pregnancyWeekToShow);
+  const completedPregnancyChecklist = pregnancyChecklist.filter((item) => pregnancyChecklistState[item]).length;
+  const activeContractionElapsedSeconds = activeContractionStartedAt
+    ? Math.max(0, Math.round((contractionTick - activeContractionStartedAt) / 1000))
+    : 0;
+  const pregnancyModulePreviews: Record<PregnancyModuleId, string> = {
+    plan: `${completedPregnancyChecklist}/${pregnancyChecklist.length || 0} listo`,
+    controls: pregnancyControls[0]?.replace(/^Semanas /, 'Sem. ') || 'Sin pendientes',
+    symptoms: pregnancySymptoms.length ? `${pregnancySymptoms.length} registrados` : 'Registrar hoy',
+    questions: `${pregnancyQuestions.length} preguntas`,
+    movements: pregnancyWeekToShow && pregnancyWeekToShow >= 20 ? `${pregnancyMovementCount} hoy` : 'Disponible pronto',
+    contractions: pregnancyContractions.length ? `${pregnancyContractions.length} registradas` : 'Cronómetro',
+    prep: pregnancyWeekToShow && pregnancyWeekToShow <= 13 ? 'Primer trimestre' : pregnancyWeekToShow && pregnancyWeekToShow <= 27 ? 'Segundo trimestre' : 'Tercer trimestre',
+    notes: pregnancyDiaryNote ? 'Nota guardada' : 'Escribir nota',
+    family: `${pregnancySupportTips.length} ideas`,
+  };
 
   return (
     <View style={styles.container}>
@@ -1364,142 +2110,144 @@ const HomeScreen: React.FC = () => {
           </Text>
         </View>
 
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.quickActionsContainer}
-        >
-          <TouchableOpacity
-            style={[styles.quickActionButton, styles.quickActionTeal]}
-            onPress={() => {
-              analyticsService.logEvent('quick_action_clicked', {
-                action: 'crecimiento',
-                child_id: selectedChild?.id,
-              });
-              (navigation as any).navigate('Growth');
-            }}
+        {!isPregnancyProfile && (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.quickActionsContainer}
           >
-            <Ionicons name="scale-outline" size={20} color="#FFFFFF" />
-            <Text style={styles.quickActionLabel}>Crecimiento</Text>
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={[styles.quickActionButton, styles.quickActionGreen]} 
-            onPress={() => {
-              analyticsService.logEvent('quick_action_clicked', {
-                action: 'vacunas',
-                child_id: selectedChild?.id,
-              });
-              // @ts-ignore
-              navigation.navigate('VaccineTracker');
-            }}
-          >
-            <Ionicons name="shield-checkmark-outline" size={20} color="#FFFFFF" />
-            <Text style={styles.quickActionLabel}>Vacunas</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.quickActionButton, styles.quickActionYellow]}
-            onPress={() => {
-              analyticsService.logEvent('quick_action_clicked', {
-                action: 'medicacion',
-                child_id: selectedChild?.id,
-              });
-              (navigation as any).navigate('Medications');
-            }}
-          >
-            <FontAwesome5 name="briefcase-medical" size={20} color="#FFFFFF" />
-            <Text style={styles.quickActionLabel}>Medicación</Text>
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={[styles.quickActionButton, styles.quickActionPurple]} 
-            onPress={() => {
-              analyticsService.logEvent('quick_action_clicked', {
-                action: 'denticion',
-                child_id: selectedChild?.id,
-              });
-              // @ts-ignore
-              navigation.navigate('TeethingTracker');
-            }}
-          >
-            <FontAwesome5 name="tooth" size={20} color="#FFFFFF" />
-            <Text style={styles.quickActionLabel}>Dentición</Text>
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={[styles.quickActionButton, styles.quickActionPink]} 
-            onPress={() => {
-              analyticsService.logEvent('quick_action_clicked', {
-                action: 'hitos',
-                child_id: selectedChild?.id,
-              });
-              // @ts-ignore
-              navigation.navigate('Milestones');
-            }}
-          >
-            <Ionicons name="trophy-outline" size={20} color="#FFFFFF" />
-            <Text style={styles.quickActionLabel}>Hitos</Text>
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={[styles.quickActionButton, styles.quickActionOrange]} 
-            onPress={() => {
-              // Calcular edad desde birthDate si está disponible
-              let ageInMonths = selectedChild?.ageInMonths ?? 0;
-              
-              if (selectedChild?.birthDate) {
-                let birthDate: Date;
+            <TouchableOpacity
+              style={[styles.quickActionButton, styles.quickActionTeal]}
+              onPress={() => {
+                analyticsService.logEvent('quick_action_clicked', {
+                  action: 'crecimiento',
+                  child_id: selectedChild?.id,
+                });
+                (navigation as any).navigate('Growth');
+              }}
+            >
+              <Ionicons name="scale-outline" size={20} color="#FFFFFF" />
+              <Text style={styles.quickActionLabel}>Crecimiento</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={[styles.quickActionButton, styles.quickActionGreen]} 
+              onPress={() => {
+                analyticsService.logEvent('quick_action_clicked', {
+                  action: 'vacunas',
+                  child_id: selectedChild?.id,
+                });
+                // @ts-ignore
+                navigation.navigate('VaccineTracker');
+              }}
+            >
+              <Ionicons name="shield-checkmark-outline" size={20} color="#FFFFFF" />
+              <Text style={styles.quickActionLabel}>Vacunas</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.quickActionButton, styles.quickActionYellow]}
+              onPress={() => {
+                analyticsService.logEvent('quick_action_clicked', {
+                  action: 'medicacion',
+                  child_id: selectedChild?.id,
+                });
+                (navigation as any).navigate('Medications');
+              }}
+            >
+              <FontAwesome5 name="briefcase-medical" size={20} color="#FFFFFF" />
+              <Text style={styles.quickActionLabel}>Medicación</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={[styles.quickActionButton, styles.quickActionPurple]} 
+              onPress={() => {
+                analyticsService.logEvent('quick_action_clicked', {
+                  action: 'denticion',
+                  child_id: selectedChild?.id,
+                });
+                // @ts-ignore
+                navigation.navigate('TeethingTracker');
+              }}
+            >
+              <FontAwesome5 name="tooth" size={20} color="#FFFFFF" />
+              <Text style={styles.quickActionLabel}>Dentición</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={[styles.quickActionButton, styles.quickActionPink]} 
+              onPress={() => {
+                analyticsService.logEvent('quick_action_clicked', {
+                  action: 'hitos',
+                  child_id: selectedChild?.id,
+                });
+                // @ts-ignore
+                navigation.navigate('Milestones');
+              }}
+            >
+              <Ionicons name="trophy-outline" size={20} color="#FFFFFF" />
+              <Text style={styles.quickActionLabel}>Hitos</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={[styles.quickActionButton, styles.quickActionOrange]} 
+              onPress={() => {
+                // Calcular edad desde birthDate si está disponible
+                let ageInMonths = selectedChild?.ageInMonths ?? 0;
                 
-                // Manejar Firestore Timestamp
-                if (typeof selectedChild.birthDate === 'object' && '_seconds' in selectedChild.birthDate) {
-                  birthDate = new Date((selectedChild.birthDate as any)._seconds * 1000);
-                } else if (typeof selectedChild.birthDate === 'string') {
-                  birthDate = new Date(selectedChild.birthDate);
-                } else {
-                  birthDate = new Date(selectedChild.birthDate as any);
+                if (selectedChild?.birthDate) {
+                  let birthDate: Date;
+                  
+                  // Manejar Firestore Timestamp
+                  if (typeof selectedChild.birthDate === 'object' && '_seconds' in selectedChild.birthDate) {
+                    birthDate = new Date((selectedChild.birthDate as any)._seconds * 1000);
+                  } else if (typeof selectedChild.birthDate === 'string') {
+                    birthDate = new Date(selectedChild.birthDate);
+                  } else {
+                    birthDate = new Date(selectedChild.birthDate as any);
+                  }
+                  
+                  const today = new Date();
+                  const diffTime = Math.abs(today.getTime() - birthDate.getTime());
+                  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                  ageInMonths = diffDays / 30.44; // Promedio de días por mes
                 }
                 
-                const today = new Date();
-                const diffTime = Math.abs(today.getTime() - birthDate.getTime());
-                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-                ageInMonths = diffDays / 30.44; // Promedio de días por mes
-              }
-              
-              console.log('🍎 [NUTRICION] Edad del niño:', {
-                name: selectedChild?.name,
-                ageInMonths: ageInMonths,
-                ageFloor: Math.floor(ageInMonths),
-                birthDate: selectedChild?.birthDate,
-                canAccess: Math.floor(ageInMonths) >= 5
-              });
-              
-              const ageFloor = Math.floor(ageInMonths);
-              if (ageFloor < 5) {
-                const monthsRemaining = 5 - ageFloor;
-                Alert.alert(
-                  '🍎 Nutrición disponible pronto',
-                  `Esta funcionalidad estará disponible cuando ${selectedChild?.name || 'tu bebé'} cumpla 5 meses.\n\n¡Solo ${monthsRemaining} ${monthsRemaining === 1 ? 'mes' : 'meses'} más! 💙`,
-                  [{ text: 'Entendido', style: 'default' }]
-                );
-                analyticsService.logEvent('nutrition_early_access_attempted', {
+                console.log('🍎 [NUTRICION] Edad del niño:', {
+                  name: selectedChild?.name,
+                  ageInMonths: ageInMonths,
+                  ageFloor: Math.floor(ageInMonths),
+                  birthDate: selectedChild?.birthDate,
+                  canAccess: Math.floor(ageInMonths) >= 5
+                });
+                
+                const ageFloor = Math.floor(ageInMonths);
+                if (ageFloor < 5) {
+                  const monthsRemaining = 5 - ageFloor;
+                  Alert.alert(
+                    '🍎 Nutrición disponible pronto',
+                    `Esta funcionalidad estará disponible cuando ${selectedChild?.name || 'tu bebé'} cumpla 5 meses.\n\n¡Solo ${monthsRemaining} ${monthsRemaining === 1 ? 'mes' : 'meses'} más! 💙`,
+                    [{ text: 'Entendido', style: 'default' }]
+                  );
+                  analyticsService.logEvent('nutrition_early_access_attempted', {
+                    child_id: selectedChild?.id,
+                    age_in_months: ageInMonths,
+                  });
+                  return;
+                }
+                analyticsService.logEvent('quick_action_clicked', {
+                  action: 'nutricion',
                   child_id: selectedChild?.id,
                   age_in_months: ageInMonths,
                 });
-                return;
-              }
-              analyticsService.logEvent('quick_action_clicked', {
-                action: 'nutricion',
-                child_id: selectedChild?.id,
-                age_in_months: ageInMonths,
-              });
-              // @ts-ignore
-              navigation.navigate('Feeding');
-            }}
-          >
-            <Ionicons 
-              name="restaurant-outline" 
-              size={20} 
-              color="#FFFFFF" 
-            />
-            <Text style={styles.quickActionLabel}>Nutrición</Text>
-          </TouchableOpacity>
-        </ScrollView>
+                // @ts-ignore
+                navigation.navigate('Feeding');
+              }}
+            >
+              <Ionicons 
+                name="restaurant-outline" 
+                size={20} 
+                color="#FFFFFF" 
+              />
+              <Text style={styles.quickActionLabel}>Nutrición</Text>
+            </TouchableOpacity>
+          </ScrollView>
+        )}
 
         {/* Consultas Activas */}
         {(activeConsultations.length > 0 || loadingConsultations) && (
@@ -1676,6 +2424,100 @@ const HomeScreen: React.FC = () => {
             </View>
 
             <Text style={styles.todaySubtitle}></Text>
+            {pregnancySize && (
+              <View style={styles.pregnancySizeCard}>
+                <TouchableOpacity
+                  style={styles.pregnancySizeImageWrap}
+                  onPress={() => setShowPregnancyDetailModal(true)}
+                  activeOpacity={0.92}
+                >
+                  <View style={styles.pregnancySizeLearnMore}>
+                    <Text style={styles.pregnancySizeLearnMoreText}>Saber más</Text>
+                    <Ionicons name="chevron-forward" size={14} color="#FFFFFF" />
+                  </View>
+                  {pregnancySizeImage ? (
+                    <Image
+                      source={pregnancySizeImage}
+                      style={styles.pregnancySizeImage}
+                      resizeMode="contain"
+                    />
+                  ) : (
+                    <View style={styles.pregnancySizeImagePlaceholder}>
+                      <Text style={styles.pregnancySizeEmoji}>{pregnancySize.emoji}</Text>
+                      <Text style={styles.pregnancySizeMissingText}>
+                        Imagen pendiente
+                      </Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.pregnancyWeekScroller}
+                >
+                  {PREGNANCY_WEEKS.map((week) => {
+                    const isActive = week === pregnancySize.week;
+                    const hasImage = Boolean(PREGNANCY_SIZE_IMAGES[week]);
+                    return (
+                      <TouchableOpacity
+                        key={week}
+                        style={[
+                          styles.pregnancyWeekChip,
+                          isActive && styles.pregnancyWeekChipActive,
+                        ]}
+                        onPress={() => setSelectedPregnancyWeek(week)}
+                        activeOpacity={0.8}
+                      >
+                        <Text
+                          style={[
+                            styles.pregnancyWeekChipText,
+                            isActive && styles.pregnancyWeekChipTextActive,
+                          ]}
+                        >
+                          {week}
+                        </Text>
+                        {hasImage && <View style={styles.pregnancyWeekChipDot} />}
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+              </View>
+            )}
+            {isPregnancyProfile && pregnancyWeekToShow && (
+              <View style={styles.pregnancyHub}>
+                <View style={styles.pregnancyHubHeader}>
+                  <View>
+                    <Text style={styles.pregnancyHubTitle}>Embarazo esta semana</Text>
+                    <Text style={styles.pregnancyHubSubtitle}>{pregnancyCountdown}</Text>
+                  </View>
+                  <View style={styles.pregnancyHubWeekBadge}>
+                    <Text style={styles.pregnancyHubWeekText}>{pregnancyWeekToShow}</Text>
+                  </View>
+                </View>
+
+                <View style={styles.pregnancyModuleGrid}>
+                  {PREGNANCY_MODULES.map((module) => (
+                    <TouchableOpacity
+                      key={module.id}
+                      style={styles.pregnancyModuleTile}
+                      onPress={() => {
+                        setActivePregnancyModule(module.id);
+                        setShowPregnancyModuleModal(true);
+                      }}
+                      activeOpacity={0.85}
+                    >
+                      <View style={styles.pregnancyModuleTileIcon}>
+                        <Ionicons name={module.icon as any} size={18} color="#E84D8A" />
+                      </View>
+                      <Text style={styles.pregnancyModuleTileTitle}>{module.label}</Text>
+                      <Text style={styles.pregnancyModuleTilePreview} numberOfLines={2}>
+                        {pregnancyModulePreviews[module.id]}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+            )}
             <View style={styles.todayGuideCard}>
               <Text style={styles.todayGuideLabel}>Tu guía de hoy</Text>
               {loadingTodayGuide ? (
@@ -1733,36 +2575,40 @@ const HomeScreen: React.FC = () => {
               </View>
             )}
 
-            <Text style={styles.todaySectionTitle}>Herramientas</Text>
+            {!isPregnancyProfile && (
+              <>
+                <Text style={styles.todaySectionTitle}>Herramientas</Text>
 
-            {/* Banner Home 2 - Debajo del título Herramientas */}
-            <View style={styles.bannerHome2Container}>
-              <BannerCarousel 
-                section="home2" 
-                fallbackToHome={false}
-              />
-            </View>
+                {/* Banner Home 2 - Debajo del título Herramientas */}
+                <View style={styles.bannerHome2Container}>
+                  <BannerCarousel 
+                    section="home2" 
+                    fallbackToHome={false}
+                  />
+                </View>
 
-            <View style={styles.todayToolsRow}>
-              <TouchableOpacity 
-                style={[styles.todayToolCard, styles.todayToolCardSounds]} 
-                onPress={openWhiteNoiseModal}
-              >
-                <Ionicons name="musical-notes" size={22} color="#FFF" />
-                <Text style={styles.todayToolTitle}>Sonidos</Text>
-                <Text style={styles.todayToolSubtitle}>Ruido Blanco</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={[styles.todayToolCard, styles.todayToolCardAdvisories]} onPress={openAdvisories}>
-                <Ionicons name="medical" size={22} color="#FFF" />
-                <Text style={styles.todayToolTitle}>Primeros Auxilios</Text>
-                <Text style={styles.todayToolSubtitle}>Una guía rápida</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={[styles.todayToolCard, styles.todayToolCardHealth]} onPress={openHealthProfile}>
-                <Ionicons name="fitness" size={22} color="#FFF" />
-                <Text style={styles.todayToolTitle}>Desarrollo</Text>
-                <Text style={styles.todayToolSubtitle}>Ejercicios</Text>
-              </TouchableOpacity>
-            </View>
+                <View style={styles.todayToolsRow}>
+                  <TouchableOpacity 
+                    style={[styles.todayToolCard, styles.todayToolCardSounds]} 
+                    onPress={openWhiteNoiseModal}
+                  >
+                    <Ionicons name="musical-notes" size={22} color="#FFF" />
+                    <Text style={styles.todayToolTitle}>Sonidos</Text>
+                    <Text style={styles.todayToolSubtitle}>Ruido Blanco</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={[styles.todayToolCard, styles.todayToolCardAdvisories]} onPress={openAdvisories}>
+                    <Ionicons name="medical" size={22} color="#FFF" />
+                    <Text style={styles.todayToolTitle}>Primeros Auxilios</Text>
+                    <Text style={styles.todayToolSubtitle}>Una guía rápida</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={[styles.todayToolCard, styles.todayToolCardHealth]} onPress={openHealthProfile}>
+                    <Ionicons name="fitness" size={22} color="#FFF" />
+                    <Text style={styles.todayToolTitle}>Desarrollo</Text>
+                    <Text style={styles.todayToolSubtitle}>Ejercicios</Text>
+                  </TouchableOpacity>
+                </View>
+              </>
+            )}
 
             <View style={styles.todayBannerContainer}>
               <BannerCarousel
@@ -2045,6 +2891,404 @@ const HomeScreen: React.FC = () => {
         {/* Espacio final - con padding extra para el botón fijo */}
         <View style={[styles.finalSpacing, { height: 100 }]} />
       </ScrollView>
+
+      {/* Modal de módulos de embarazo */}
+      <Modal
+        visible={showPregnancyModuleModal}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowPregnancyModuleModal(false)}
+      >
+        <View style={styles.pregnancyDetailOverlay}>
+          <View style={styles.pregnancyModuleModalContent}>
+            <View style={styles.pregnancyDetailHeader}>
+              <View>
+                <Text style={styles.pregnancyDetailEyebrow}>Semana {pregnancyWeekToShow}</Text>
+                <Text style={styles.pregnancyDetailTitle}>
+                  {PREGNANCY_MODULES.find((module) => module.id === activePregnancyModule)?.label || 'Embarazo'}
+                </Text>
+              </View>
+              <TouchableOpacity
+                style={styles.pregnancyDetailClose}
+                onPress={() => setShowPregnancyModuleModal(false)}
+              >
+                <Ionicons name="close" size={24} color="#2D3748" />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {activePregnancyModule === 'plan' && (
+                <View style={styles.pregnancyInfoCard}>
+                  <View style={styles.pregnancyInfoHeader}>
+                    <Ionicons name="checkbox-outline" size={18} color="#E84D8A" />
+                    <Text style={styles.pregnancyInfoTitle}>Checklist semanal</Text>
+                  </View>
+                  {pregnancyChecklist.map((item) => (
+                    <TouchableOpacity
+                      key={item}
+                      style={styles.pregnancyChecklistRow}
+                      onPress={() => togglePregnancyChecklistItem(item)}
+                      activeOpacity={0.8}
+                    >
+                      <Ionicons
+                        name={pregnancyChecklistState[item] ? 'checkmark-circle' : 'ellipse-outline'}
+                        size={20}
+                        color={pregnancyChecklistState[item] ? '#59C6C0' : '#A0AEC0'}
+                      />
+                      <Text
+                        style={[
+                          styles.pregnancyChecklistText,
+                          pregnancyChecklistState[item] && styles.pregnancyChecklistTextDone,
+                        ]}
+                      >
+                        {item}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+
+              {activePregnancyModule === 'controls' && (
+                <View style={styles.pregnancyInfoCard}>
+                  <View style={styles.pregnancyInfoHeader}>
+                    <Ionicons name="medical-outline" size={18} color="#E84D8A" />
+                    <Text style={styles.pregnancyInfoTitle}>Próximos controles</Text>
+                  </View>
+                  {pregnancyControls.map((control) => (
+                    <Text key={control} style={styles.pregnancyBulletText}>• {control}</Text>
+                  ))}
+                </View>
+              )}
+
+              {activePregnancyModule === 'symptoms' && (
+                <>
+                  <View style={styles.pregnancyTwoColumn}>
+                    <View style={styles.pregnancyColumnCard}>
+                      <Text style={styles.pregnancyColumnTitle}>Puede ser normal</Text>
+                      {pregnancySymptomsGuidance.normal.map((symptom) => (
+                        <Text key={symptom} style={styles.pregnancySmallBullet}>• {symptom}</Text>
+                      ))}
+                    </View>
+                    <View style={styles.pregnancyColumnCardAlert}>
+                      <Text style={styles.pregnancyColumnTitle}>Consulta si</Text>
+                      {pregnancySymptomsGuidance.alerts.map((alertItem) => (
+                        <Text key={alertItem} style={styles.pregnancySmallBullet}>• {alertItem}</Text>
+                      ))}
+                    </View>
+                  </View>
+                  <View style={styles.pregnancyInfoCard}>
+                    <View style={styles.pregnancyInfoHeader}>
+                      <Ionicons name="pulse-outline" size={18} color="#E84D8A" />
+                      <Text style={styles.pregnancyInfoTitle}>Registrar síntomas</Text>
+                    </View>
+                    <View style={styles.pregnancySymptomChips}>
+                      {PREGNANCY_SYMPTOM_OPTIONS.map((symptom) => {
+                        const isSelected = pregnancySymptoms.includes(symptom);
+                        return (
+                          <TouchableOpacity
+                            key={symptom}
+                            style={[
+                              styles.pregnancySymptomChip,
+                              isSelected && styles.pregnancySymptomChipActive,
+                            ]}
+                            onPress={() => togglePregnancySymptom(symptom)}
+                            activeOpacity={0.8}
+                          >
+                            <Text
+                              style={[
+                                styles.pregnancySymptomChipText,
+                                isSelected && styles.pregnancySymptomChipTextActive,
+                              ]}
+                            >
+                              {symptom}
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  </View>
+                </>
+              )}
+
+              {activePregnancyModule === 'questions' && (
+                <View style={styles.pregnancyInfoCard}>
+                  <View style={styles.pregnancyInfoHeader}>
+                    <Ionicons name="help-circle-outline" size={18} color="#E84D8A" />
+                    <Text style={styles.pregnancyInfoTitle}>Preguntas para tu próxima cita</Text>
+                  </View>
+                  {pregnancyQuestions.map((question) => (
+                    <Text key={question} style={styles.pregnancyBulletText}>• {question}</Text>
+                  ))}
+                </View>
+              )}
+
+              {activePregnancyModule === 'movements' && (
+                <View style={styles.pregnancyInfoCard}>
+                  <View style={styles.pregnancyInfoHeader}>
+                    <Ionicons name="footsteps-outline" size={18} color="#E84D8A" />
+                    <Text style={styles.pregnancyInfoTitle}>Movimientos del bebé</Text>
+                  </View>
+                  <Text style={styles.pregnancyInfoText}>
+                    {pregnancyWeekToShow && pregnancyWeekToShow >= 20
+                      ? 'Observa su patrón de movimiento. Si notas una disminución clara, consulta.'
+                      : 'Más adelante, muchas mamás empiezan a sentir movimientos entre semanas 18 y 22.'}
+                  </Text>
+                  {pregnancyWeekToShow && pregnancyWeekToShow >= 20 && (
+                    <View style={styles.pregnancyMovementRow}>
+                      <TouchableOpacity style={styles.pregnancyMovementButton} onPress={addPregnancyMovement}>
+                        <Ionicons name="add" size={18} color="#FFFFFF" />
+                        <Text style={styles.pregnancyMovementButtonText}>Registrar</Text>
+                      </TouchableOpacity>
+                      <Text style={styles.pregnancyMovementCount}>{pregnancyMovementCount}</Text>
+                      <TouchableOpacity style={styles.pregnancyMovementReset} onPress={resetPregnancyMovements}>
+                        <Text style={styles.pregnancyMovementResetText}>Reiniciar</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                </View>
+              )}
+
+              {activePregnancyModule === 'contractions' && (
+                <View style={styles.pregnancyInfoCard}>
+                  <View style={styles.pregnancyInfoHeader}>
+                    <Ionicons name="timer-outline" size={18} color="#E84D8A" />
+                    <Text style={styles.pregnancyInfoTitle}>Contador de contracciones</Text>
+                  </View>
+                  <Text style={styles.pregnancyInfoText}>
+                    Úsalo cuando sientas que una contracción empieza y detenlo cuando termine. Si son regulares, dolorosas o tienes dudas, consulta a tu equipo médico.
+                  </Text>
+                  <View style={styles.contractionTimerDisplay}>
+                    <Text style={styles.contractionTimerText}>
+                      {formatContractionDuration(activeContractionElapsedSeconds)}
+                    </Text>
+                    <Text style={styles.contractionTimerLabel}>
+                      {activeContractionStartedAt ? 'Contracción en curso' : 'Lista para registrar'}
+                    </Text>
+                  </View>
+                  <View style={styles.pregnancyMovementRow}>
+                    <TouchableOpacity
+                      style={[
+                        styles.pregnancyMovementButton,
+                        activeContractionStartedAt ? styles.contractionStopButton : null,
+                      ]}
+                      onPress={activeContractionStartedAt ? stopPregnancyContraction : startPregnancyContraction}
+                    >
+                      <Ionicons
+                        name={activeContractionStartedAt ? 'stop' : 'play'}
+                        size={18}
+                        color="#FFFFFF"
+                      />
+                      <Text style={styles.pregnancyMovementButtonText}>
+                        {activeContractionStartedAt ? 'Detener' : 'Iniciar'}
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.pregnancyMovementReset} onPress={resetPregnancyContractions}>
+                      <Text style={styles.pregnancyMovementResetText}>Reiniciar</Text>
+                    </TouchableOpacity>
+                  </View>
+                  {pregnancyContractions.length > 0 && (
+                    <View style={styles.contractionHistory}>
+                      {pregnancyContractions.slice(0, 5).map((record, index) => (
+                        <View key={`${record.startedAt}-${index}`} style={styles.contractionHistoryRow}>
+                          <Text style={styles.contractionHistoryDuration}>
+                            {formatContractionDuration(record.durationSeconds)}
+                          </Text>
+                          <Text style={styles.contractionHistoryInterval}>
+                            {formatContractionInterval(record, pregnancyContractions[index + 1])}
+                          </Text>
+                        </View>
+                      ))}
+                    </View>
+                  )}
+                </View>
+              )}
+
+              {activePregnancyModule === 'prep' && (
+                <View style={styles.pregnancyInfoCard}>
+                  <View style={styles.pregnancyInfoHeader}>
+                    <Ionicons name="map-outline" size={18} color="#E84D8A" />
+                    <Text style={styles.pregnancyInfoTitle}>Preparación por trimestre</Text>
+                  </View>
+                  <Text style={styles.pregnancyInfoText}>{pregnancyTrimesterPrep}</Text>
+                </View>
+              )}
+
+              {activePregnancyModule === 'notes' && (
+                <View style={styles.pregnancyInfoCard}>
+                  <View style={styles.pregnancyInfoHeader}>
+                    <Ionicons name="journal-outline" size={18} color="#E84D8A" />
+                    <Text style={styles.pregnancyInfoTitle}>Notas para mamá</Text>
+                  </View>
+                  <TextInput
+                    value={pregnancyDiaryNote}
+                    onChangeText={updatePregnancyDiaryNote}
+                    placeholder="¿Cómo te sientes esta semana?"
+                    placeholderTextColor="#9CA3AF"
+                    style={styles.pregnancyDiaryInput}
+                    multiline
+                    textAlignVertical="top"
+                  />
+                </View>
+              )}
+
+              {activePregnancyModule === 'family' && (
+                <View style={styles.pregnancyInfoCard}>
+                  <View style={styles.pregnancyInfoHeader}>
+                    <Ionicons name="people-outline" size={18} color="#E84D8A" />
+                    <Text style={styles.pregnancyInfoTitle}>Para pareja o familia</Text>
+                  </View>
+                  {pregnancySupportTips.map((tip) => (
+                    <Text key={tip} style={styles.pregnancyBulletText}>• {tip}</Text>
+                  ))}
+                </View>
+              )}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Modal de detalle de embarazo */}
+      <Modal
+        visible={showPregnancyDetailModal}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowPregnancyDetailModal(false)}
+      >
+        <View style={styles.pregnancyDetailOverlay}>
+          <View style={styles.pregnancyDetailContent}>
+            <View style={styles.pregnancyDetailHeader}>
+              <View>
+                <Text style={styles.pregnancyDetailEyebrow}>Embarazo</Text>
+                <Text style={styles.pregnancyDetailTitle}>
+                  Semana {pregnancySize?.week || pregnancyWeekToShow}
+                </Text>
+              </View>
+              <TouchableOpacity
+                style={styles.pregnancyDetailClose}
+                onPress={() => setShowPregnancyDetailModal(false)}
+              >
+                <Ionicons name="close" size={24} color="#2D3748" />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView
+              style={styles.pregnancyDetailScroll}
+              showsVerticalScrollIndicator={false}
+            >
+              {pregnancySizeImage && (
+                <Image
+                  source={pregnancySizeImage}
+                  style={styles.pregnancyDetailImage}
+                  resizeMode="contain"
+                />
+              )}
+
+              {pregnancyWeekDetail && (
+                <>
+                  {pregnancyApproxMeasurement && (
+                    <View style={styles.pregnancyMeasurementCard}>
+                      <Text style={styles.pregnancyMeasurementTitle}>
+                        Tamaño y peso aproximados
+                      </Text>
+                      <View style={styles.pregnancyMeasurementRow}>
+                        <View style={styles.pregnancyMeasurementItem}>
+                          <Ionicons name="resize-outline" size={18} color="#E84D8A" />
+                          <Text style={styles.pregnancyMeasurementLabel}>Largo</Text>
+                          <Text style={styles.pregnancyMeasurementValue}>
+                            {pregnancyApproxMeasurement.length}
+                          </Text>
+                        </View>
+                        <View style={styles.pregnancyMeasurementDivider} />
+                        <View style={styles.pregnancyMeasurementItem}>
+                          <Ionicons name="scale-outline" size={18} color="#E84D8A" />
+                          <Text style={styles.pregnancyMeasurementLabel}>Peso</Text>
+                          <Text style={styles.pregnancyMeasurementValue}>
+                            {pregnancyApproxMeasurement.weight}
+                          </Text>
+                        </View>
+                      </View>
+                      {pregnancyApproxMeasurement.note ? (
+                        <Text style={styles.pregnancyMeasurementNote}>
+                          {pregnancyApproxMeasurement.note}
+                        </Text>
+                      ) : null}
+                      <Text style={styles.pregnancyMeasurementNote}>
+                        Son rangos orientativos; cada bebé crece a su ritmo.
+                      </Text>
+                    </View>
+                  )}
+
+                  <View style={styles.pregnancyDetailSection}>
+                    <View style={styles.pregnancyDetailSectionIcon}>
+                      <Ionicons name="sparkles" size={16} color="#E84D8A" />
+                    </View>
+                    <View style={styles.pregnancyDetailSectionBody}>
+                      <Text style={styles.pregnancyDetailSectionTitle}>Bebé</Text>
+                      <Text style={styles.pregnancyDetailSectionText}>
+                        {pregnancyWeekDetail.baby}
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.pregnancyDetailSection}>
+                    <View style={styles.pregnancyDetailSectionIcon}>
+                      <Ionicons name="body-outline" size={16} color="#E84D8A" />
+                    </View>
+                    <View style={styles.pregnancyDetailSectionBody}>
+                      <Text style={styles.pregnancyDetailSectionTitle}>Cuerpo de mamá</Text>
+                      <Text style={styles.pregnancyDetailSectionText}>
+                        {pregnancyWeekDetail.momBody}
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.pregnancyDetailSection}>
+                    <View style={styles.pregnancyDetailSectionIcon}>
+                      <Ionicons name="heart-outline" size={16} color="#E84D8A" />
+                    </View>
+                    <View style={styles.pregnancyDetailSectionBody}>
+                      <Text style={styles.pregnancyDetailSectionTitle}>Qué podrías sentir</Text>
+                      <Text style={styles.pregnancyDetailSectionText}>
+                        {pregnancyWeekDetail.feelings}
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.pregnancyDetailSection}>
+                    <View style={styles.pregnancyDetailSectionIcon}>
+                      <Ionicons name="list-outline" size={16} color="#E84D8A" />
+                    </View>
+                    <View style={styles.pregnancyDetailSectionBody}>
+                      <Text style={styles.pregnancyDetailSectionTitle}>Prepararte</Text>
+                      <Text style={styles.pregnancyDetailSectionText}>
+                        {pregnancyWeekDetail.prepare}
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.pregnancyDetailImportant}>
+                    <View style={styles.pregnancyDetailImportantIcon}>
+                      <Ionicons name="medical-outline" size={18} color="#FFFFFF" />
+                    </View>
+                    <View style={styles.pregnancyDetailSectionBody}>
+                      <Text style={styles.pregnancyDetailImportantTitle}>
+                        Controles importantes
+                      </Text>
+                      <Text style={styles.pregnancyDetailImportantText}>
+                        {pregnancyWeekDetail.important}
+                      </Text>
+                    </View>
+                  </View>
+
+                  <Text style={styles.pregnancyDetailDisclaimer}>
+                    Información orientativa. Tu obstetra o matrona puede ajustar controles según tu historia y tu embarazo.
+                  </Text>
+                </>
+              )}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
 
       {/* Modal de Ruido Blanco */}
       <Modal
@@ -4917,6 +6161,607 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingBottom: 20,
   },
+  pregnancySizeCard: {
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 18,
+    padding: 8,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  pregnancySizeImageWrap: {
+    width: '100%',
+    height: PREGNANCY_SIZE_IMAGE_HEIGHT,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'transparent',
+    borderRadius: 16,
+    marginBottom: 6,
+    overflow: 'hidden',
+  },
+  pregnancySizeImage: {
+    width: '100%',
+    height: '100%',
+  },
+  pregnancySizeLearnMore: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    zIndex: 2,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#E84D8A',
+    borderRadius: 18,
+    paddingVertical: 7,
+    paddingHorizontal: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.18,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  pregnancySizeLearnMoreText: {
+    fontSize: 12,
+    fontWeight: '900',
+    color: '#FFFFFF',
+    marginRight: 2,
+  },
+  pregnancySizeImagePlaceholder: {
+    width: '100%',
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
+  },
+  pregnancySizeEmoji: {
+    fontSize: 56,
+  },
+  pregnancySizeMissingText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#8A8F98',
+    marginTop: 8,
+  },
+  pregnancySizeLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#178A84',
+    textTransform: 'uppercase',
+    textAlign: 'center',
+  },
+  pregnancySizeTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#2D3748',
+    marginTop: 6,
+    lineHeight: 23,
+    textAlign: 'center',
+  },
+  pregnancySizeDetail: {
+    fontSize: 12,
+    color: '#4A5568',
+    marginTop: 2,
+    lineHeight: 16,
+    textAlign: 'center',
+    paddingHorizontal: 8,
+  },
+  pregnancyWeekScroller: {
+    paddingTop: 8,
+    paddingBottom: 2,
+    paddingHorizontal: 4,
+    gap: 8,
+  },
+  pregnancyWeekChip: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#D8F1EF',
+    marginRight: 8,
+  },
+  pregnancyWeekChipActive: {
+    backgroundColor: '#59C6C0',
+    borderColor: '#59C6C0',
+  },
+  pregnancyWeekChipText: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#4A5568',
+  },
+  pregnancyWeekChipTextActive: {
+    color: '#FFFFFF',
+  },
+  pregnancyWeekChipDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: '#FFC211',
+    position: 'absolute',
+    bottom: 6,
+  },
+  pregnancyHub: {
+    marginBottom: 14,
+  },
+  pregnancyHubHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  pregnancyHubTitle: {
+    fontSize: 18,
+    fontWeight: '900',
+    color: '#2D3748',
+  },
+  pregnancyHubSubtitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#6B7280',
+    marginTop: 2,
+  },
+  pregnancyHubWeekBadge: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: '#E84D8A',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pregnancyHubWeekText: {
+    fontSize: 16,
+    fontWeight: '900',
+    color: '#FFFFFF',
+  },
+  pregnancyModuleGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  pregnancyModuleTile: {
+    width: '48%',
+    minHeight: 112,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#EEF0F3',
+    justifyContent: 'space-between',
+  },
+  pregnancyModuleTileIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: '#FFF0F6',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+  },
+  pregnancyModuleTileTitle: {
+    fontSize: 14,
+    fontWeight: '900',
+    color: '#2D3748',
+  },
+  pregnancyModuleTilePreview: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#6B7280',
+    lineHeight: 15,
+    marginTop: 4,
+  },
+  pregnancyModuleTabs: {
+    paddingBottom: 10,
+    gap: 8,
+  },
+  pregnancyModuleTab: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 18,
+    paddingVertical: 8,
+    paddingHorizontal: 11,
+    borderWidth: 1,
+    borderColor: '#F3C2D7',
+    gap: 5,
+    marginRight: 8,
+  },
+  pregnancyModuleTabActive: {
+    backgroundColor: '#E84D8A',
+    borderColor: '#E84D8A',
+  },
+  pregnancyModuleTabText: {
+    fontSize: 12,
+    fontWeight: '900',
+    color: '#E84D8A',
+  },
+  pregnancyModuleTabTextActive: {
+    color: '#FFFFFF',
+  },
+  pregnancyInfoCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 14,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: '#EEF0F3',
+  },
+  pregnancyInfoHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+    gap: 8,
+  },
+  pregnancyInfoTitle: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '900',
+    color: '#2D3748',
+  },
+  pregnancyInfoText: {
+    fontSize: 13,
+    color: '#4A5568',
+    lineHeight: 19,
+  },
+  pregnancyBulletText: {
+    fontSize: 13,
+    color: '#4A5568',
+    lineHeight: 19,
+    marginTop: 3,
+  },
+  pregnancyChecklistRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 6,
+    gap: 8,
+  },
+  pregnancyChecklistText: {
+    flex: 1,
+    fontSize: 13,
+    color: '#4A5568',
+    lineHeight: 18,
+  },
+  pregnancyChecklistTextDone: {
+    color: '#9CA3AF',
+    textDecorationLine: 'line-through',
+  },
+  pregnancyTwoColumn: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 12,
+  },
+  pregnancyColumnCard: {
+    flex: 1,
+    backgroundColor: '#F0FBFA',
+    borderRadius: 16,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#BDEBE7',
+  },
+  pregnancyColumnCardAlert: {
+    flex: 1,
+    backgroundColor: '#FFF7D6',
+    borderRadius: 16,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#FFE08A',
+  },
+  pregnancyColumnTitle: {
+    fontSize: 13,
+    fontWeight: '900',
+    color: '#2D3748',
+    marginBottom: 6,
+  },
+  pregnancySmallBullet: {
+    fontSize: 12,
+    color: '#4A5568',
+    lineHeight: 17,
+    marginTop: 2,
+  },
+  pregnancySymptomChips: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  pregnancySymptomChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: 18,
+    backgroundColor: '#F9FAFB',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  pregnancySymptomChipActive: {
+    backgroundColor: '#E84D8A',
+    borderColor: '#E84D8A',
+  },
+  pregnancySymptomChipText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#4A5568',
+  },
+  pregnancySymptomChipTextActive: {
+    color: '#FFFFFF',
+  },
+  pregnancyMovementRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 12,
+    gap: 10,
+  },
+  pregnancyMovementButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#E84D8A',
+    borderRadius: 18,
+    paddingVertical: 9,
+    paddingHorizontal: 12,
+    gap: 4,
+  },
+  pregnancyMovementButtonText: {
+    fontSize: 12,
+    fontWeight: '900',
+    color: '#FFFFFF',
+  },
+  pregnancyMovementCount: {
+    minWidth: 34,
+    textAlign: 'center',
+    fontSize: 20,
+    fontWeight: '900',
+    color: '#2D3748',
+  },
+  pregnancyMovementReset: {
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+  },
+  pregnancyMovementResetText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#6B7280',
+  },
+  contractionTimerDisplay: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFF0F6',
+    borderRadius: 18,
+    paddingVertical: 20,
+    marginTop: 14,
+    borderWidth: 1,
+    borderColor: '#FFD6E8',
+  },
+  contractionTimerText: {
+    fontSize: 44,
+    fontWeight: '900',
+    color: '#E84D8A',
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+  },
+  contractionTimerLabel: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#6B7280',
+    marginTop: 4,
+  },
+  contractionStopButton: {
+    backgroundColor: '#EF4444',
+  },
+  contractionHistory: {
+    marginTop: 14,
+    borderTopWidth: 1,
+    borderTopColor: '#EEF0F3',
+    paddingTop: 8,
+  },
+  contractionHistoryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 8,
+  },
+  contractionHistoryDuration: {
+    fontSize: 14,
+    fontWeight: '900',
+    color: '#2D3748',
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+  },
+  contractionHistoryInterval: {
+    flex: 1,
+    textAlign: 'right',
+    fontSize: 12,
+    color: '#6B7280',
+    marginLeft: 10,
+  },
+  pregnancyDiaryInput: {
+    minHeight: 92,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    backgroundColor: '#F9FAFB',
+    padding: 12,
+    fontSize: 13,
+    color: '#2D3748',
+    lineHeight: 18,
+  },
+  pregnancyDetailOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(45, 55, 72, 0.45)',
+    justifyContent: 'flex-end',
+  },
+  pregnancyDetailContent: {
+    maxHeight: '88%',
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingTop: 18,
+    paddingHorizontal: 18,
+    paddingBottom: 24,
+  },
+  pregnancyModuleModalContent: {
+    maxHeight: '78%',
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingTop: 18,
+    paddingHorizontal: 18,
+    paddingBottom: 24,
+  },
+  pregnancyDetailHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  pregnancyDetailEyebrow: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#E84D8A',
+    textTransform: 'uppercase',
+  },
+  pregnancyDetailTitle: {
+    fontSize: 24,
+    fontWeight: '900',
+    color: '#2D3748',
+    marginTop: 2,
+  },
+  pregnancyDetailClose: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#F3F4F6',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pregnancyDetailScroll: {
+    marginHorizontal: -2,
+    paddingHorizontal: 2,
+  },
+  pregnancyDetailImage: {
+    width: '100%',
+    height: 220,
+    borderRadius: 18,
+    marginBottom: 14,
+  },
+  pregnancyMeasurementCard: {
+    backgroundColor: '#FFF0F6',
+    borderRadius: 16,
+    padding: 14,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: '#FFD6E8',
+  },
+  pregnancyMeasurementTitle: {
+    fontSize: 14,
+    fontWeight: '900',
+    color: '#2D3748',
+    textAlign: 'center',
+    marginBottom: 12,
+  },
+  pregnancyMeasurementRow: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+  },
+  pregnancyMeasurementItem: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+  },
+  pregnancyMeasurementDivider: {
+    width: 1,
+    backgroundColor: '#FFD6E8',
+    marginHorizontal: 10,
+  },
+  pregnancyMeasurementLabel: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#6B7280',
+    textTransform: 'uppercase',
+  },
+  pregnancyMeasurementValue: {
+    fontSize: 17,
+    fontWeight: '900',
+    color: '#E84D8A',
+    textAlign: 'center',
+  },
+  pregnancyMeasurementNote: {
+    fontSize: 11,
+    color: '#6B7280',
+    lineHeight: 16,
+    textAlign: 'center',
+    marginTop: 10,
+  },
+  pregnancyDetailSection: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: '#F9FAFB',
+    borderRadius: 16,
+    padding: 14,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: '#EEF0F3',
+  },
+  pregnancyDetailSectionIcon: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: '#FFF0F6',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+  },
+  pregnancyDetailSectionBody: {
+    flex: 1,
+  },
+  pregnancyDetailSectionTitle: {
+    fontSize: 14,
+    fontWeight: '900',
+    color: '#2D3748',
+    marginBottom: 4,
+  },
+  pregnancyDetailSectionText: {
+    fontSize: 13,
+    color: '#4A5568',
+    lineHeight: 19,
+  },
+  pregnancyDetailImportant: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: '#FFF7D6',
+    borderRadius: 16,
+    padding: 14,
+    marginTop: 2,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#FFC211',
+  },
+  pregnancyDetailImportantIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#E84D8A',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+  },
+  pregnancyDetailImportantTitle: {
+    fontSize: 14,
+    fontWeight: '900',
+    color: '#2D3748',
+    marginBottom: 4,
+  },
+  pregnancyDetailImportantText: {
+    fontSize: 13,
+    color: '#4A5568',
+    lineHeight: 19,
+  },
+  pregnancyDetailDisclaimer: {
+    fontSize: 11,
+    color: '#6B7280',
+    lineHeight: 16,
+    textAlign: 'center',
+    marginBottom: 10,
+    paddingHorizontal: 10,
+  },
   todayGuideCard: {
     backgroundColor: "#FFF7D6",
     borderRadius: 18,
@@ -5684,4 +7529,3 @@ const styles = StyleSheet.create({
 });
 
 export default HomeScreen;
-

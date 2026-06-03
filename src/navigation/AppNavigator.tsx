@@ -191,6 +191,7 @@ const ChildrenHeaderTitle = () => {
     setSelectedChildId(child.id);
     await AsyncStorage.setItem('selectedChildId', child.id);
     setShowSelector(false);
+    DeviceEventEmitter.emit('selectedChildChanged', { childId: child.id, child });
     
     // Notificar al HomeScreen sobre el cambio
     navigation.setParams({ selectedChildId: child.id, refresh: Date.now() });
