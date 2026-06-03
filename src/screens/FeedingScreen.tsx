@@ -105,22 +105,16 @@ const FeedingScreen: React.FC = () => {
   useEffect(() => {
     loadChildren();
     nutritionService.getNutritionSponsor().then(s => {
-      console.log('🎯 [SPONSOR]', JSON.stringify(s));
       setSponsor(s);
     });
 
     // Log de la selección automática
     const initialMealType = getMealTypeByHour();
-    console.log('🍽️ [NUTRITION] Tipo de comida automático según hora:', {
-      hour: new Date().getHours(),
-      mealType: initialMealType,
-    });
   }, []);
 
   // Manejar parámetros de navegación (cuando viene desde notificación)
   useEffect(() => {
     if (route.params?.mealType) {
-      console.log('🍽️ [NUTRITION] mealType recibido desde notificación:', route.params.mealType);
       setSelectedMealType(route.params.mealType);
     }
   }, [route.params?.mealType]);
@@ -137,7 +131,6 @@ const FeedingScreen: React.FC = () => {
     try {
       setShowingFromIngredients(false);
       setLoadingRecipes(true);
-      console.log('🍽️ [NUTRITION] Cargando recetas para:', selectedChild.name);
       
       const response = await nutritionService.getRecipes(
         selectedChild.id,
@@ -157,7 +150,6 @@ const FeedingScreen: React.FC = () => {
         regenerated: regenerate,
       });
 
-      console.log('✅ [NUTRITION] Recetas cargadas:', response.data.length);
     } catch (error: any) {
       console.error('❌ [NUTRITION] Error cargando recetas:', error);
       Alert.alert(

@@ -13,16 +13,12 @@ interface CustomTabBarProps {
 }
 
 const CustomTabBar: React.FC<CustomTabBarProps> = ({ state, descriptors, navigation }) => {
-  console.log('🔍 CustomTabBar: Componente renderizado');
   
   const currentRoute = useRoute();
-  console.log('🔍 CustomTabBar: useRoute ejecutado, ruta:', currentRoute.name);
   
   const insets = useSafeAreaInsets();
   const { isVisible, currentMessage, hideMessage, handleChatPress } = useDouliChat(currentRoute.name);
   
-  console.log('🔍 CustomTabBar: Hook ejecutado, valores:', { isVisible, currentMessage: currentMessage?.text });
-  console.log('🔍 CustomTabBar: Safe area insets:', { bottom: insets.bottom });
 
   const getIconName = (routeName: string) => {
     switch (routeName) {

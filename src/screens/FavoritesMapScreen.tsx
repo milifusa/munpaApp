@@ -59,25 +59,21 @@ const FavoritesMapScreen = ({ navigation }: any) => {
     try {
       setIsLoading(true);
       setError(null);
-      console.log('🗺️ [FAVORITES MAP] Cargando favoritos con ubicación...');
       
       const response = await api.getFavorites();
-      console.log('🗺️ [FAVORITES MAP] Favoritos obtenidos:', response.data?.length || 0);
       
       // Filtrar solo favoritos con ubicación
       const favoritesWithLocation = (response.data || []).filter(
         (fav: Recommendation) => fav.latitude && fav.longitude
       );
       
-      console.log('🗺️ [FAVORITES MAP] Favoritos con ubicación:', favoritesWithLocation.length);
       setFavorites(favoritesWithLocation);
       
       // Calcular el centro del mapa si hay favoritos
       if (favoritesWithLocation.length > 0) {
-        const centerLat = favoritesWithLocation.reduce((sum, f) => sum + (f.latitude || 0), 0) / favoritesWithLocation.length;
-        const centerLng = favoritesWithLocation.reduce((sum, f) => sum + (f.longitude || 0), 0) / favoritesWithLocation.length;
+        const centerLat = favoritesWithLocation.reduce((sum: number, f: Recommendation) => sum + (f.latitude || 0), 0) / favoritesWithLocation.length;
+        const centerLng = favoritesWithLocation.reduce((sum: number, f: Recommendation) => sum + (f.longitude || 0), 0) / favoritesWithLocation.length;
         setMapCenter({ latitude: centerLat, longitude: centerLng });
-        console.log('🗺️ [FAVORITES MAP] Centro del mapa calculado:', { latitude: centerLat, longitude: centerLng });
       }
     } catch (error: any) {
       console.error('❌ [FAVORITES MAP] Error cargando favoritos:', error);
@@ -91,10 +87,8 @@ const FavoritesMapScreen = ({ navigation }: any) => {
   // En Android, onMapLoaded debería ejecutarse, pero agregamos un timeout de respaldo
   useEffect(() => {
     if (mapCenter && favorites.length > 0) {
-      console.log('⏱️ [MAP] Iniciando timeout de respaldo para ocultar loading');
       const timeoutId = setTimeout(() => {
         if (!mapLoaded) {
-          console.log('⚠️ [MAP] onMapLoaded no se ejecutó, ocultando loading después de 3 segundos (timeout de respaldo)');
           setMapLoaded(true);
         }
       }, 3000); // 3 segundos de respaldo
@@ -247,18 +241,11 @@ const FavoritesMapScreen = ({ navigation }: any) => {
       {mapCenter ? (
         <View style={styles.mapContainer}>
           {(() => {
-            console.log('🔍 [MAP] ========== RENDERIZANDO MAPA ==========');
-            console.log('🔍 [MAP] mapCenter:', mapCenter);
-            console.log('🔍 [MAP] favorites.length:', favorites.length);
-            console.log('🔍 [MAP] Platform.OS:', Platform.OS);
-            console.log('🔍 [MAP] GoogleMaps disponible:', typeof GoogleMaps !== 'undefined');
-            console.log('🔍 [MAP] AppleMaps disponible:', typeof AppleMaps !== 'undefined');
 
             const hasAppleMaps = Platform.OS === 'ios' && AppleMaps && AppleMaps.View;
             const hasGoogleMaps = Platform.OS === 'android' && GoogleMaps && GoogleMaps.View;
 
             if (hasAppleMaps || hasGoogleMaps) {
-              console.log('✅ [MAP] Renderizando', Platform.OS === 'ios' ? 'AppleMaps.View' : 'GoogleMaps.View');
 
               // Crear marcadores según la plataforma
               const markers = favorites.map((fav, index) => {
@@ -284,10 +271,7 @@ const FavoritesMapScreen = ({ navigation }: any) => {
                 }
               });
 
-              console.log('📍 [MAP] Marcadores creados:', markers.length);
 
-              console.log('🔍 [MAP] Estado mapLoaded:', mapLoaded);
-              console.log('🔍 [MAP] Renderizando mapa con', markers.length, 'marcadores');
               
               return (
                 <>
@@ -308,12 +292,10 @@ const FavoritesMapScreen = ({ navigation }: any) => {
                       annotations={markers}
                       onCameraMove={(event: any) => {
                         if (!mapLoaded) {
-                          console.log('✅ [MAP] Mapa está cargado (detectado por onCameraMove)');
                           setMapLoaded(true);
                         }
                       }}
                       onMarkerClick={(event: any) => {
-                        console.log('📍 [MAP] onMarkerClick ejecutado (iOS):', event);
                         const coordinate = event.coordinates || event.coordinate;
                         if (coordinate) {
                           const clickedMarker = markers.find(m => 
@@ -339,17 +321,9 @@ const FavoritesMapScreen = ({ navigation }: any) => {
                       } as any}
                       markers={markers}
                       onMapLoaded={() => {
-                        console.log('✅ [MAP] ========== onMapLoaded EJECUTADO (Android) ==========');
-                        console.log('✅ [MAP] Mapa cargado correctamente (Android)');
-                        console.log('✅ [MAP] onMapLoaded ejecutado, ocultando loading');
-                        setMapLoaded(true);
-                      }}
-                      onMapReady={() => {
-                        console.log('✅ [MAP] onMapReady ejecutado (Android)');
                         setMapLoaded(true);
                       }}
                       onMarkerClick={(event: any) => {
-                        console.log('📍 [MAP] onMarkerClick ejecutado (Android):', event);
                         const coordinate = event.coordinate || event.coordinates;
                         if (coordinate) {
                           const clickedMarker = markers.find(m => 

@@ -23,7 +23,7 @@ export default function StripeProviderWrapper({ children }: StripeProviderWrappe
       publishableKey={STRIPE_PUBLISHABLE_KEY}
       merchantIdentifier="merchant.com.munpa"
     >
-      {children}
+      <>{children}</>
     </StripeProvider>
   );
 }

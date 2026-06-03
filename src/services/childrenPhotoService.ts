@@ -26,7 +26,6 @@ export interface UpdateChildData {
 export const childrenPhotoService = {
   // Subir foto usando Firebase Storage
   uploadPhoto: async (uri: string, childId: string) => {
-    console.log('📤 [FIREBASE] Subiendo foto para hijo:', childId);
     
     try {
       // Crear FormData para enviar la imagen
@@ -52,7 +51,6 @@ export const childrenPhotoService = {
       // Subir foto al servidor (que la subirá a Firebase Storage)
       const response = await axiosInstance.post('/api/auth/children/upload-photo', formData, config);
       
-      console.log('✅ [FIREBASE] Foto subida exitosamente:', response.data);
       return response.data.data.photoUrl;
     } catch (error) {
       console.error('❌ [FIREBASE] Error subiendo foto:', error);
@@ -62,11 +60,9 @@ export const childrenPhotoService = {
 
   // Eliminar foto de Firebase Storage
   removeChildPhoto: async (childId: string) => {
-    console.log('🗑️ [FIREBASE] Eliminando foto de hijo:', childId);
     
     try {
       const response = await axiosInstance.delete(`/api/auth/children/${childId}/photo`);
-      console.log('✅ [FIREBASE] Foto eliminada:', response.data);
       return response.data;
     } catch (error) {
       console.error('❌ [FIREBASE] Error eliminando foto:', error);
@@ -76,13 +72,11 @@ export const childrenPhotoService = {
 
   // Actualizar foto de un hijo (usar URL externa)
   updateChildPhoto: async (childId: string, photoUrl: string) => {
-    console.log('📸 [FIREBASE] Actualizando foto para hijo:', childId);
     
     try {
       const response = await axiosInstance.put(`/api/auth/children/${childId}`, {
         photoUrl: photoUrl
       });
-      console.log('✅ [FIREBASE] Foto actualizada:', response.data);
       return response.data;
     } catch (error) {
       console.error('❌ [FIREBASE] Error actualizando foto:', error);

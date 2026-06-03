@@ -57,7 +57,6 @@ const SpecialistScheduleScreen = () => {
     try {
       setLoading(true);
       const response = await axiosInstance.get('/api/specialist/availability');
-      console.log('📅 [SCHEDULE] Horario cargado:', response.data);
       
       const apiSchedule = response.data?.data?.schedule || response.data?.schedule || {};
       
@@ -151,10 +150,8 @@ const SpecialistScheduleScreen = () => {
         maxConsultationsPerDay,
       };
 
-      console.log('📤 [SCHEDULE] Guardando horario:', requestData);
       const response = await axiosInstance.put('/api/specialist/availability', requestData);
       
-      console.log('✅ [SCHEDULE] Horario guardado:', response.data);
       
       analyticsService.logEvent('specialist_schedule_saved', {
         days_active: Object.keys(formattedSchedule).length,

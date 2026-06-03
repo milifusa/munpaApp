@@ -37,11 +37,9 @@ const SpecialistProfileScreen = () => {
   const loadProfileData = async () => {
     try {
       setLoading(true);
-      console.log('👤 [PROFILE] Cargando perfil profesional...');
 
       // Cargar datos del perfil profesional
       const profileResponse = await axiosInstance.get('/api/profile/professional');
-      console.log('✅ [PROFILE] Perfil obtenido:', profileResponse.data);
       
       const profile = profileResponse.data?.data || profileResponse.data;
       setProfileData(profile);
@@ -52,7 +50,6 @@ const SpecialistProfileScreen = () => {
         const statsData = statsResponse.data?.data || statsResponse.data;
         setStats(statsData);
       } catch (error) {
-        console.log('⚠️ [PROFILE] No se pudieron cargar estadísticas');
       }
 
       // Cargar datos del recomendado vinculado
@@ -60,7 +57,6 @@ const SpecialistProfileScreen = () => {
         const recResponse = await axiosInstance.get('/api/professionals/me/recommendation');
         setRecommendationData(recResponse.data?.data || recResponse.data);
       } catch (error) {
-        console.log('⚠️ [PROFILE] No se pudieron cargar datos del recomendado');
       }
     } catch (error: any) {
       console.error('❌ [PROFILE] Error cargando perfil:', error);

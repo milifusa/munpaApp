@@ -111,14 +111,12 @@ const SpecialistDashboardScreen = () => {
   const loadServiceDashboard = async () => {
     try {
       setLoading(true);
-      console.log('📦 [DASHBOARD] Cargando datos de servicio...');
       
       // Cargar productos del vendedor
       const productsResponse = await axiosInstance.get('/api/vendor/products');
       const productsData = productsResponse?.data?.data || productsResponse?.data?.products || [];
       const productsList = Array.isArray(productsData) ? productsData : [];
       
-      console.log('✅ [DASHBOARD] Productos cargados:', productsList.length);
       
       // Calcular estadísticas
       const availableProducts = productsList.filter((p: any) => 

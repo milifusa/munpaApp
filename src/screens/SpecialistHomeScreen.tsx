@@ -128,14 +128,12 @@ const SpecialistHomeScreen = () => {
   const loadServiceData = async () => {
     try {
       setLoading(true);
-      console.log('📦 [SERVICE HOME] Cargando datos de servicio...');
       
       // Cargar productos del vendedor
       const productsResponse = await axiosInstance.get('/api/vendor/products');
       const productsData = productsResponse?.data?.data || productsResponse?.data?.products || [];
       const productsList = Array.isArray(productsData) ? productsData : [];
       
-      console.log('✅ [SERVICE HOME] Productos cargados:', productsList.length);
       
       // Calcular estadísticas
       const availableProducts = productsList.filter((p: any) => 

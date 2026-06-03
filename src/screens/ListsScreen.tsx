@@ -43,12 +43,6 @@ const calculateListStats = (list: any) => {
   const starsCount = list.starsCount || 0;
   const commentsCount = list.commentsCount || 0;
   
-  console.log(`📊 [CALCULATE STATS] Lista "${list.title}":`, {
-    totalItems: itemsCount,
-    completedItems: completedItemsCount,
-    rawBackendCompletedCount: list.completedItemsCount,
-    rawBackendItemsCount: list.itemsCount
-  });
   
   return {
     ...list,
@@ -100,7 +94,6 @@ const ListsScreen = () => {
     if (!isAuthenticated) return;
     
     try {
-      console.log('📋 [LISTS SCREEN] Cargando mis listas...');
       const response = await listsService.getUserLists();
       
       // Asegurar que isOwner esté correctamente calculado y estadísticas
@@ -115,15 +108,6 @@ const ListsScreen = () => {
       });
       
       setMyLists(listsWithOwnership);
-      console.log('✅ [LISTS SCREEN] Mis listas cargadas:', listsWithOwnership.length);
-      console.log('📊 [LISTS SCREEN] Datos de ejemplo de lista:', listsWithOwnership[0] ? {
-        id: listsWithOwnership[0].id,
-        title: listsWithOwnership[0].title,
-        itemsCount: listsWithOwnership[0].itemsCount,
-        completedItemsCount: listsWithOwnership[0].completedItemsCount,
-        starsCount: listsWithOwnership[0].starsCount,
-        commentsCount: listsWithOwnership[0].commentsCount,
-      } : 'No hay listas');
     } catch (error) {
       console.error('❌ [LISTS SCREEN] Error cargando mis listas:', error);
       Alert.alert('Error', 'No se pudieron cargar tus listas');
@@ -132,7 +116,6 @@ const ListsScreen = () => {
 
   const loadPublicLists = async () => {
     try {
-      console.log('📋 [LISTS SCREEN] Cargando listas públicas...');
       const response = await listsService.getPublicLists({ limit: 20, sortBy: 'stars' });
       
       // Asegurar que isOwner esté correctamente calculado y estadísticas para listas públicas
@@ -147,15 +130,6 @@ const ListsScreen = () => {
       });
       
       setPublicLists(listsWithOwnership);
-      console.log('✅ [LISTS SCREEN] Listas públicas cargadas:', listsWithOwnership.length);
-      console.log('📊 [LISTS SCREEN] Datos de ejemplo de lista pública:', listsWithOwnership[0] ? {
-        id: listsWithOwnership[0].id,
-        title: listsWithOwnership[0].title,
-        itemsCount: listsWithOwnership[0].itemsCount,
-        completedItemsCount: listsWithOwnership[0].completedItemsCount,
-        starsCount: listsWithOwnership[0].starsCount,
-        commentsCount: listsWithOwnership[0].commentsCount,
-      } : 'No hay listas públicas');
     } catch (error) {
       console.error('❌ [LISTS SCREEN] Error cargando listas públicas:', error);
       Alert.alert('Error', 'No se pudieron cargar las listas públicas');
@@ -204,7 +178,6 @@ const ListsScreen = () => {
   // Cambiar automáticamente a tab de públicas si no hay listas propias (solo en primera carga)
   useEffect(() => {
     if (!isLoading && !hasAutoSwitched && myLists.length === 0 && publicLists.length > 0 && activeTab === 'my') {
-      console.log('🔄 [LISTS SCREEN] No hay listas propias, cambiando a tab de públicas');
       setActiveTab('public');
       setHasAutoSwitched(true);
     }
@@ -219,17 +192,14 @@ const ListsScreen = () => {
 
     setIsCreating(true);
     try {
-      console.log('📋 [LISTS SCREEN] Creando nueva lista:', newList);
       
       let imageUrl = null;
       
       // Si hay una imagen seleccionada, subirla primero
       if (newList.imageUrl) {
         try {
-          console.log('🖼️ [LISTS SCREEN] Subiendo imagen de lista...');
           const uploadResult = await imageUploadService.uploadCommunityImage(newList.imageUrl);
           imageUrl = uploadResult;
-          console.log('✅ [LISTS SCREEN] Imagen subida exitosamente:', imageUrl);
         } catch (uploadError) {
           console.error('❌ [LISTS SCREEN] Error subiendo imagen:', uploadError);
           Alert.alert('Advertencia', 'No se pudo subir la imagen, pero la lista se creará sin imagen');
@@ -244,7 +214,6 @@ const ListsScreen = () => {
       };
 
       const result = await listsService.createList(listData);
-      console.log('✅ [LISTS SCREEN] Lista creada exitosamente:', result);
 
       Alert.alert(
         'Éxito',
@@ -306,7 +275,6 @@ const ListsScreen = () => {
       });
 
       if (!result.canceled && result.assets[0]) {
-        console.log('🖼️ [LISTS SCREEN] Imagen seleccionada:', result.assets[0].uri);
         setNewList(prev => ({ ...prev, imageUrl: result.assets[0].uri }));
       }
     } catch (error) {
@@ -330,7 +298,6 @@ const ListsScreen = () => {
       });
 
       if (!result.canceled && result.assets[0]) {
-        console.log('📸 [LISTS SCREEN] Foto tomada:', result.assets[0].uri);
         setNewList(prev => ({ ...prev, imageUrl: result.assets[0].uri }));
       }
     } catch (error) {
@@ -344,7 +311,6 @@ const ListsScreen = () => {
   };
 
   const handleListPress = (list: List) => {
-    console.log('📋 [LISTS SCREEN] Navegando a lista:', list.id, list.title);
     navigation.navigate('ListDetail', {
       listId: list.id,
       listTitle: list.title,
@@ -353,7 +319,6 @@ const ListsScreen = () => {
 
   const handleCopyList = async (list: List) => {
     try {
-      console.log('📋 [LISTS SCREEN] Copiando lista pública:', list.id);
       const result = await listsService.copyList(list.id);
       
       Alert.alert(

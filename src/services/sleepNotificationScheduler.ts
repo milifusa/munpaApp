@@ -23,7 +23,6 @@ class SleepNotificationScheduler {
    */
   async scheduleAllNotifications(childId: string, forceReschedule: boolean = false): Promise<void> {
     try {
-      console.log('📅 [SLEEP-NOTIF] Programando notificaciones del día...');
       
       // Verificar si ya se programaron hoy (solo si no es forzado)
       if (!forceReschedule) {
@@ -36,7 +35,6 @@ class SleepNotificationScheduler {
           return;
         }
       } else {
-        console.log('🔄 [SLEEP-NOTIF] REPROGRAMANDO notificaciones (predicciones actualizadas)...');
       }
       
       // 1. Programar notificaciones 30min antes de cada siesta
@@ -68,10 +66,8 @@ class SleepNotificationScheduler {
       );
       
       const data = response.data;
-      console.log(`⏰ [SLEEP-NOTIF] Pre-nap: ${data.message}`);
       
       if (data.notifications && data.notifications.length > 0) {
-        console.log(`   📋 Programadas ${data.notifications.length} notificaciones pre-siesta`);
       }
     } catch (error: any) {
       console.error('❌ [SLEEP-NOTIF] Error programando pre-nap:', error.response?.data || error.message);
@@ -88,10 +84,8 @@ class SleepNotificationScheduler {
       );
       
       const data = response.data;
-      console.log(`💤 [SLEEP-NOTIF] Nap-time: ${data.message}`);
       
       if (data.notifications && data.notifications.length > 0) {
-        console.log(`   📋 Programadas ${data.notifications.length} notificaciones (siestas + bedtime)`);
       }
     } catch (error: any) {
       console.error('❌ [SLEEP-NOTIF] Error programando nap-time:', error.response?.data || error.message);
@@ -104,7 +98,6 @@ class SleepNotificationScheduler {
    * - Siestas largas: cada hora
    */
   startPeriodicChecks(childId: string): void {
-    console.log('🔄 [SLEEP-NOTIF] Iniciando verificaciones periódicas...');
     
     // Limpiar intervalos existentes
     this.stopPeriodicChecks();
@@ -139,7 +132,6 @@ class SleepNotificationScheduler {
       this.checkLongInterval = null;
     }
     
-    console.log('🛑 [SLEEP-NOTIF] Verificaciones periódicas detenidas');
   }
 
   /**
@@ -154,9 +146,7 @@ class SleepNotificationScheduler {
       const data = response.data;
       
       if (data.lateNaps && data.lateNaps.length > 0) {
-        console.log(`⚠️ [SLEEP-NOTIF] ${data.lateNaps.length} siesta(s) sin registrar detectadas`);
         data.lateNaps.forEach((nap: any) => {
-          console.log(`   📍 Siesta #${nap.napNumber}: ${nap.minutesLate} min de retraso`);
         });
       } 
     } catch (error: any) {
@@ -177,9 +167,7 @@ class SleepNotificationScheduler {
       const data = response.data;
       
       if (data.longNaps && data.longNaps.length > 0) {
-        console.log(`🚨 [SLEEP-NOTIF] ${data.longNaps.length} siesta(s) larga(s) detectadas`);
         data.longNaps.forEach((nap: any) => {
-          console.log(`   ⏰ Siesta activa: ${nap.durationHours}h desde ${new Date(nap.startTime).toLocaleTimeString()}`);
         });
       } 
     } catch (error: any) {
@@ -210,7 +198,6 @@ class SleepNotificationScheduler {
       });
       
       const result = response.data;
-      console.log(`📨 [SLEEP-NOTIF] Notificación enviada: ${result.message}`);
       
       return result.success;
     } catch (error: any) {
@@ -225,7 +212,6 @@ class SleepNotificationScheduler {
   async clearScheduledData(childId: string): Promise<void> {
     try {
       await AsyncStorage.removeItem(`notifications_scheduled_${childId}`);
-      console.log('🗑️ [SLEEP-NOTIF] Datos de programación limpiados');
     } catch (error) {
       console.error('❌ [SLEEP-NOTIF] Error limpiando datos:', error);
     }

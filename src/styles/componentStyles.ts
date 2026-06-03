@@ -38,7 +38,7 @@ export const buttonStyles = StyleSheet.create({
   },
   
   // Botón de texto
-  text: {
+  textButton: {
     backgroundColor: 'transparent',
     padding: spacing.sm,
     alignItems: 'center',
@@ -435,4 +435,3 @@ export default {
   separatorStyles,
   tooltipStyles,
 };
-

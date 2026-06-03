@@ -117,7 +117,6 @@ const ServiceRequestScreen = () => {
     try {
       setLoadingCategories(true);
       const response = await axiosInstance.get('/api/professionals/profile-categories');
-      console.log('📋 [CATEGORIES] Respuesta:', response.data);
       
       const categoriesData = response.data?.data || response.data?.categories || response.data || [];
       setCategories(Array.isArray(categoriesData) ? categoriesData : []);
@@ -133,7 +132,6 @@ const ServiceRequestScreen = () => {
     try {
       setLoadingCountries(true);
       const response = await api.getCountries();
-      console.log('🌍 [COUNTRIES] Respuesta:', response);
       
       const countriesData = response?.data || response?.countries || response || [];
       setCountries(Array.isArray(countriesData) ? countriesData : []);
@@ -148,7 +146,6 @@ const ServiceRequestScreen = () => {
     try {
       setLoadingCities(true);
       const response = await api.getCities(countryId);
-      console.log('🏙️ [CITIES] Respuesta:', response);
       
       const citiesData = response?.data || response?.cities || response || [];
       setCities(Array.isArray(citiesData) ? citiesData : []);
@@ -201,15 +198,12 @@ const ServiceRequestScreen = () => {
         type,
       } as any);
 
-      console.log('📤 [LOGO] Subiendo logo...');
       const response = await axiosInstance.post('/api/professionals/requests/upload-logo', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
       });
 
-      console.log('✅ [LOGO] Logo subido:', response.data);
-      console.log('✅ [LOGO] Respuesta completa:', JSON.stringify(response.data, null, 2));
       
       const uploadedUrl = response.data?.data?.imageUrl || 
                          response.data?.imageUrl ||
@@ -225,8 +219,6 @@ const ServiceRequestScreen = () => {
                          response.data?.path ||
                          '';
       
-      console.log('✅ [LOGO] URL extraída:', uploadedUrl);
-      console.log('✅ [LOGO] Storage path extraído:', storagePath);
       
       if (!uploadedUrl) {
         console.error('❌ [LOGO] No se pudo obtener la URL del logo de la respuesta');
@@ -300,7 +292,6 @@ const ServiceRequestScreen = () => {
                 copyToCacheDirectory: true,
               });
 
-              console.log('📄 [DOCUMENT PICKER] Result:', result);
 
               if (!result.canceled && result.assets && result.assets[0]) {
                 await uploadDocument(result.assets[0].uri, 'file', result.assets[0].name, result.assets[0].mimeType);
@@ -350,14 +341,12 @@ const ServiceRequestScreen = () => {
         type,
       } as any);
 
-      console.log('📤 [DOCUMENT] Subiendo documento:', { filename, type, source });
       const response = await axiosInstance.post('/api/professionals/requests/upload-document', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
       });
 
-      console.log('✅ [DOCUMENT] Documento subido:', response.data);
       
       const uploadedUrl = response.data?.data?.documentUrl || 
                          response.data?.documentUrl ||
@@ -477,9 +466,6 @@ const ServiceRequestScreen = () => {
     setIsSubmitting(true);
 
     try {
-      console.log('📍 [DEBUG] selectedCountry:', selectedCountry);
-      console.log('📍 [DEBUG] selectedCity:', selectedCity);
-      console.log('📍 [DEBUG] countries:', countries.length, 'ciudades:', cities.length);
 
       // ✅ Campos Requeridos
       const requestData: any = {
@@ -512,12 +498,9 @@ const ServiceRequestScreen = () => {
       if (logoUrl) requestData.logoUrl = logoUrl;
       if (logoStoragePath) requestData.logoStoragePath = logoStoragePath;
 
-      console.log('📤 [SERVICE REQUEST] Enviando solicitud a /api/profile/request-service');
-      console.log('📤 [SERVICE REQUEST] Datos completos:', JSON.stringify(requestData, null, 2));
 
       const response = await axiosInstance.post('/api/profile/request-service', requestData);
 
-      console.log('✅ [SERVICE REQUEST] Solicitud enviada exitosamente:', response.data);
 
       analyticsService.logEvent('professional_request_submitted', {
         category: selectedCategory,
@@ -569,12 +552,9 @@ const ServiceRequestScreen = () => {
       }
       if (certifications.length > 0) requestData.professional.certifications = certifications;
 
-      console.log('📤 [PROFESSIONAL REQUEST] Enviando solicitud a /api/profile/request-professional');
-      console.log('📤 [PROFESSIONAL REQUEST] Datos completos:', JSON.stringify(requestData, null, 2));
 
       const response = await axiosInstance.post('/api/profile/request-professional', requestData);
 
-      console.log('✅ [PROFESSIONAL REQUEST] Solicitud enviada exitosamente:', response.data);
 
       analyticsService.logEvent('professional_request_submitted', {
         accountType: accountType,
@@ -845,7 +825,6 @@ const ServiceRequestScreen = () => {
                           ...countries.map(country => ({
                             text: country.name,
                             onPress: () => {
-                              console.log('🌍 [PAÍS SELECCIONADO] ID:', country.id, 'Nombre:', country.name);
                               setSelectedCountry(country.id);
                             },
                           })),
@@ -884,7 +863,6 @@ const ServiceRequestScreen = () => {
                             ...cities.map(city => ({
                               text: city.name,
                               onPress: () => {
-                                console.log('🏙️ [CIUDAD SELECCIONADA] ID:', city.id, 'Nombre:', city.name);
                                 setSelectedCity(city.id);
                               },
                             })),

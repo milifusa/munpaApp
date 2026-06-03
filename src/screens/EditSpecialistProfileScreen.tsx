@@ -156,10 +156,8 @@ const EditSpecialistProfileScreen = () => {
   const uploadPhoto = async (uri: string) => {
     try {
       setUploadingPhoto(true);
-      console.log('📤 [EDIT PROFILE] Subiendo foto...');
 
       const uploadedUrl = await imageUploadService.uploadProfileImage(uri);
-      console.log('✅ [EDIT PROFILE] Foto subida:', uploadedUrl);
 
       setPhotoURL(uploadedUrl);
       
@@ -250,7 +248,6 @@ const EditSpecialistProfileScreen = () => {
 
     try {
       setSaving(true);
-      console.log('💾 [EDIT PROFILE] Guardando perfil...');
 
       const requestData = {
         personalInfo: {
@@ -267,7 +264,6 @@ const EditSpecialistProfileScreen = () => {
       };
 
       const response = await axiosInstance.put('/api/profile/professional', requestData);
-      console.log('✅ [EDIT PROFILE] Perfil actualizado:', response.data);
 
       // Guardar datos del recomendado
       if (recNombre.trim()) {
@@ -284,7 +280,6 @@ const EditSpecialistProfileScreen = () => {
         };
         if (recImagen) recData.imageUrl = recImagen;
         await axiosInstance.put('/api/professionals/me/recommendation', recData);
-        console.log('✅ [EDIT PROFILE] Recomendado actualizado');
       }
 
       analyticsService.logEvent('specialist_profile_updated', {

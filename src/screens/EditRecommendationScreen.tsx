@@ -113,7 +113,6 @@ const EditRecommendationScreen = () => {
       if (imageUrl) body.imageUrl = imageUrl;
 
       await axiosInstance.put('/api/professionals/me/recommendation', body);
-      console.log('✅ [EDIT REC] Recomendado actualizado');
       Alert.alert('Éxito', 'Recomendado actualizado correctamente', [
         { text: 'OK', onPress: () => navigation.goBack() },
       ]);

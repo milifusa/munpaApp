@@ -186,7 +186,6 @@ const CreateEventScreen: React.FC = () => {
         };
       }
 
-      console.log('📅 [CREATE EVENT] Creando evento:', postData);
 
       // Crear el post/evento
       await communitiesService.createCommunityPost(communityId, postData);

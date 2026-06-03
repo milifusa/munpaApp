@@ -44,7 +44,7 @@ const ChildInvitationsScreen: React.FC = () => {
   };
 
   const handleInvitationPress = (invitation: ChildInvitation) => {
-    navigation.navigate('AcceptInvitation' as never, { token: invitation.token } as never);
+    (navigation as any).navigate('AcceptInvitation', { token: invitation.token });
   };
 
   const formatDate = (dateString: string) => {
@@ -266,4 +266,3 @@ const styles = StyleSheet.create({
 });
 
 export default ChildInvitationsScreen;
-

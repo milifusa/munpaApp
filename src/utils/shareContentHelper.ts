@@ -96,11 +96,6 @@ async function shareContent(response: ShareContentResponse): Promise<void> {
   // Construir mensaje para compartir
   const message = `${data.title}\n\n${data.description}\n\n${data.webUrl}`;
   
-  console.log('📤 [SHARE] Compartiendo contenido:', {
-    title: data.title,
-    webUrl: data.webUrl,
-    shareUrl: data.shareUrl,
-  });
 
   try {
     if (Platform.OS === 'ios') {

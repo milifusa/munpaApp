@@ -47,7 +47,6 @@ const DevelopmentScreen: React.FC = () => {
 
   useFocusEffect(
     useCallback(() => {
-      console.log('🔄 Development screen focused, reloading...');
       if (selectedChild) {
         loadActivitiesForChild(selectedChild);
       }
@@ -83,20 +82,16 @@ const DevelopmentScreen: React.FC = () => {
     
     try {
       setLoading(true);
-      console.log('🔄 Cargando actividades para:', child.id, child.name);
       
       const response = await activitiesService.getActivitySuggestions(child.id);
       
-      console.log('📊 Respuesta de actividades:', response);
       
       if (response.success) {
         // La respuesta tiene una estructura anidada: response.suggestions.activities
         const activitiesList = response.suggestions?.activities || response.data || [];
         setActivities(activitiesList);
-        console.log('✅ Actividades cargadas:', activitiesList.length);
       } else {
         setActivities([]);
-        console.log('⚠️ No hay actividades en la respuesta');
       }
     } catch (error) {
       console.error('❌ Error cargando actividades:', error);

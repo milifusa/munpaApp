@@ -56,9 +56,9 @@ const ChildrenDataScreen: React.FC = () => {
   const navigation = useNavigation();
   const route = useRoute();
   const routeParams = route.params as RouteParams;
-  
+
   const { setUser, user } = useAuth();
-  
+
   // Valores por defecto si no se reciben parámetros
   const parsedChildrenCount = Number(routeParams?.childrenCount);
   const profileChildrenCount = Number(user?.childrenCount);
@@ -73,7 +73,7 @@ const ChildrenDataScreen: React.FC = () => {
   const isEditing = routeParams?.isEditing || false;
   const childData = routeParams?.childData;
   const childId = routeParams?.childId;
-  
+
   // Inicializar con datos del hijo si está en modo edición
   const getInitialChildrenData = () => {
     if (isEditing && childData) {
@@ -81,7 +81,7 @@ const ChildrenDataScreen: React.FC = () => {
         name: childData.name || '',
         isUnborn: childData.isUnborn || false,
       };
-      
+
       if (childData.isUnborn) {
         // Para bebés no nacidos, usar dueDate si existe, si no calcular desde gestationWeeks
         if (childData.dueDate) {
@@ -106,7 +106,7 @@ const ChildrenDataScreen: React.FC = () => {
           initialData.birthDate = birthDate;
         }
       }
-      
+
       return [initialData];
     }
     return Array(childrenCount).fill(null).map((_, index) => {
@@ -114,15 +114,15 @@ const ChildrenDataScreen: React.FC = () => {
         ? index >= (childrenCount - (isMultiplePregnancy ? 2 : 1))
         : false;
       return {
-      name: '', 
-      birthDate: new Date(), 
+      name: '',
+      birthDate: new Date(),
       dueDate: new Date(),
         isUnborn: unborn,
         gestationWeeks: undefined
       };
     });
   };
-  
+
   const [childrenData, setChildrenData] = useState<ChildData[]>(getInitialChildrenData());
   const [isLoading, setIsLoading] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -134,6 +134,31 @@ const ChildrenDataScreen: React.FC = () => {
     setChildrenData(newChildrenData);
   };
 
+  const syncPregnancyProfile = async (gestationWeeks?: number) => {
+    const profileUpdate: { isPregnant: boolean; gestationWeeks?: number } = {
+      isPregnant: true,
+    };
+
+    if (typeof gestationWeeks === 'number' && gestationWeeks >= 1 && gestationWeeks <= 42) {
+      profileUpdate.gestationWeeks = gestationWeeks;
+    }
+
+    await profileService.updateProfile(profileUpdate);
+
+    const storedUser = await AsyncStorage.getItem('userData');
+    const storedUserData = storedUser ? JSON.parse(storedUser) : {};
+    const updatedUserData = {
+      ...storedUserData,
+      ...(user || {}),
+      isPregnant: true,
+      gestationWeeks: profileUpdate.gestationWeeks ?? user?.gestationWeeks ?? storedUserData?.gestationWeeks,
+      updatedAt: new Date().toISOString(),
+    };
+
+    await AsyncStorage.setItem('userData', JSON.stringify(updatedUserData));
+    setUser(updatedUserData);
+  };
+
   const validateData = () => {
     for (let i = 0; i < childrenData.length; i++) {
       const child = childrenData[i];
@@ -141,7 +166,7 @@ const ChildrenDataScreen: React.FC = () => {
         Alert.alert('Error', `Por favor ingresa el nombre del hijo ${i + 1}`);
         return false;
       }
-      
+
       const isUnborn = child.isUnborn ?? isUnbornChild(i);
       if (isUnborn) {
         const weeks = child.gestationWeeks;
@@ -151,7 +176,7 @@ const ChildrenDataScreen: React.FC = () => {
           Alert.alert('Error', `Por favor ingresa las semanas de gestación para ${child.name}`);
           return false;
         }
-        
+
         if (weeks !== undefined && (weeks < 1 || weeks > 42)) {
           Alert.alert('Error', 'Las semanas de gestación deben estar entre 1 y 42');
           return false;
@@ -163,7 +188,7 @@ const ChildrenDataScreen: React.FC = () => {
         today.setHours(0, 0, 0, 0);
         const twoWeeksAgo = new Date(today);
         twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14);
-        
+
           if (dueDateToValidate < twoWeeksAgo) {
           Alert.alert('Error', `La fecha de parto para ${child.name} no puede ser hace más de 2 semanas`);
           return false;
@@ -175,20 +200,20 @@ const ChildrenDataScreen: React.FC = () => {
           Alert.alert('Error', `Por favor selecciona la fecha de nacimiento para ${child.name}`);
           return false;
         }
-        
+
         const today = new Date();
         today.setHours(0, 0, 0, 0);
         const birthDate = new Date(child.birthDate);
         birthDate.setHours(0, 0, 0, 0);
-        
+
         if (birthDate > today) {
           Alert.alert('Error', `La fecha de nacimiento de ${child.name} no puede ser en el futuro`);
           return false;
         }
-        
+
         const eighteenYearsAgo = new Date(today);
         eighteenYearsAgo.setFullYear(eighteenYearsAgo.getFullYear() - 18);
-        
+
         if (birthDate < eighteenYearsAgo) {
           Alert.alert('Error', `La fecha de nacimiento de ${child.name} no puede ser hace más de 18 años`);
         return false;
@@ -210,18 +235,17 @@ const ChildrenDataScreen: React.FC = () => {
 
     setIsLoading(true);
     try {
-      console.log('Guardando datos de hijos:', childrenData);
-      
+
       // Si estamos en modo edición, actualizar el hijo existente
       if (isEditing && childId) {
         const child = childrenData[0]; // Solo editamos un hijo a la vez
         const isUnborn = child.isUnborn ?? false;
-        
+
         const updateData: any = {
           name: child.name,
           isUnborn: isUnborn,
         };
-        
+
         const weeks = child.gestationWeeks;
         const hasValidWeeks = typeof weeks === 'number' && weeks >= 1 && weeks <= 42;
         const dueDateFromWeeks = hasValidWeeks ? computeDueDateFromWeeks(weeks as number) : null;
@@ -237,10 +261,13 @@ const ChildrenDataScreen: React.FC = () => {
           // Usar nuevo sistema de fechas para hijos nacidos
           updateData.birthDate = formatDateToYYYYMMDD(child.birthDate);
         }
-        
-        console.log('Actualizando hijo con ID:', childId, 'Datos:', updateData);
+
         await childrenService.updateChild(childId, updateData);
-        
+
+        if (isUnborn) {
+          await syncPregnancyProfile(hasValidWeeks ? weeks : undefined);
+        }
+
         Alert.alert(
           '¡Éxito!',
           'Datos actualizados correctamente',
@@ -255,7 +282,7 @@ const ChildrenDataScreen: React.FC = () => {
         );
         return;
       }
-      
+
       // Modo creación
       // Preparar los datos en el formato del nuevo sistema de fechas
       const childrenToSave: CreateChildData[] = childrenData.map((child, index) => {
@@ -264,7 +291,7 @@ const ChildrenDataScreen: React.FC = () => {
         const hasValidWeeks = typeof weeks === 'number' && weeks >= 1 && weeks <= 42;
         const dueDateFromWeeks = hasValidWeeks ? computeDueDateFromWeeks(weeks as number) : null;
         const dueDateToSave = dueDateFromWeeks;
-        
+
         if (isUnborn && dueDateToSave) {
           // Para bebé por nacer - usar nuevo sistema de fechas
           return {
@@ -290,40 +317,29 @@ const ChildrenDataScreen: React.FC = () => {
         }
       });
 
-      console.log('Datos preparados para enviar:', childrenToSave);
-      
+
       // Enviar cada hijo al backend
       await childrenService.addMultipleChildren(childrenToSave);
-      
-      // Si está embarazada, actualizar el perfil con el estado de embarazo y las semanas de gestación
-      if (pregnancyStatus === 'pregnant') {
+
+      // Si hay al menos un bebé por nacer, actualizar el perfil con estado de embarazo.
+      const unbornChild = childrenToSave.find(child => child.isUnborn);
+      if (unbornChild) {
         try {
-          // Obtener las semanas de gestación del bebé por nacer
-          const unbornChild = childrenToSave.find(child => child.isUnborn);
-          if (unbornChild && unbornChild.gestationWeeks) {
-            console.log('🤰 Actualizando perfil con estado de embarazo y semanas de gestación:', unbornChild.gestationWeeks);
-            await profileService.updateProfile({
-              isPregnant: true,
-              gestationWeeks: unbornChild.gestationWeeks
-            });
-            console.log('✅ Perfil actualizado con estado de embarazo y semanas de gestación');
-            
-            // Verificar que la actualización se guardó correctamente
-            try {
-              const updatedProfile = await profileService.getProfile();
-              console.log('🔍 Verificación - Perfil después de actualizar:', updatedProfile);
-            } catch (verifyError) {
-              console.error('❌ Error verificando perfil actualizado:', verifyError);
-            }
+          await syncPregnancyProfile(unbornChild.gestationWeeks);
+
+          // Verificar que la actualización se guardó correctamente
+          try {
+            const updatedProfile = await profileService.getProfile();
+          } catch (verifyError) {
+            console.error('❌ Error verificando perfil actualizado:', verifyError);
           }
         } catch (profileError) {
           console.error('❌ Error actualizando perfil con estado de embarazo:', profileError);
           // No mostrar error al usuario, ya que los hijos se guardaron correctamente
         }
       } else {
-        console.log('ℹ️ Usuario no está embarazada, no se actualiza perfil');
       }
-      
+
       Alert.alert(
         '¡Éxito!',
         'Datos de tus hijos guardados correctamente',
@@ -338,10 +354,8 @@ const ChildrenDataScreen: React.FC = () => {
               }
               // Marcar que el usuario ya tiene hijos
               await AsyncStorage.setItem('hasChildren', 'true');
-              console.log('✅ Marcado como usuario con hijos');
               // Resetear la navegación al Home para limpiar el stack
-              // @ts-ignore
-              navigation.reset({
+              (navigation as any).reset({
                 index: 0,
                 routes: [{ name: 'MainTabs' }],
               });
@@ -374,17 +388,15 @@ const ChildrenDataScreen: React.FC = () => {
             // Si está embarazada, actualizar perfil aunque omita los hijos
             if (pregnancyStatus === 'pregnant') {
               try {
-                await profileService.updateProfile({ isPregnant: true });
+                await syncPregnancyProfile();
               } catch (error) {
                 console.error('❌ Error actualizando estado de embarazo:', error);
               }
             }
             // Marcar que se omitió el registro (se considera como "ya revisado")
             await AsyncStorage.setItem('hasChildren', 'false');
-            console.log('⏭️ Usuario omitió el registro de hijos');
             // Resetear la navegación al Home para limpiar el stack
-            // @ts-ignore
-            navigation.reset({
+            (navigation as any).reset({
               index: 0,
               routes: [{ name: 'MainTabs' }],
             });
@@ -442,7 +454,7 @@ const ChildrenDataScreen: React.FC = () => {
     const diffTime = dueDate.getTime() - today.getTime();
     const diffWeeks = Math.ceil(diffTime / (1000 * 60 * 60 * 24 * 7));
     const currentWeeks = 40 - diffWeeks;
-    
+
     if (currentWeeks < 12) return `Semana ${currentWeeks} - Primer trimestre`;
     if (currentWeeks < 28) return `Semana ${currentWeeks} - Segundo trimestre`;
     if (currentWeeks < 37) return `Semana ${currentWeeks} - Tercer trimestre`;
@@ -454,15 +466,15 @@ const ChildrenDataScreen: React.FC = () => {
     const today = new Date();
     const years = today.getFullYear() - birthDate.getFullYear();
     const months = today.getMonth() - birthDate.getMonth();
-    
+
     let totalMonths = (years * 12) + months;
     if (today.getDate() < birthDate.getDate()) {
       totalMonths--;
     }
-    
+
     const ageYears = Math.floor(totalMonths / 12);
     const ageMonths = totalMonths % 12;
-    
+
     if (ageYears > 0) {
       return `${ageYears} ${ageYears === 1 ? 'año' : 'años'}${ageMonths > 0 ? ` y ${ageMonths} ${ageMonths === 1 ? 'mes' : 'meses'}` : ''}`;
     }
@@ -473,7 +485,7 @@ const ChildrenDataScreen: React.FC = () => {
     if (Platform.OS === 'android') {
       setShowDatePicker(false);
     }
-    
+
     if (selectedDate && selectedChildIndex !== null) {
       const child = childrenData[selectedChildIndex];
       const isUnborn = child.isUnborn ?? isUnbornChild(selectedChildIndex);
@@ -483,7 +495,7 @@ const ChildrenDataScreen: React.FC = () => {
         updateChildData(selectedChildIndex, 'birthDate', selectedDate);
       }
     }
-    
+
     if (Platform.OS === 'ios' && event.type === 'dismissed') {
       setSelectedChildIndex(null);
     }
@@ -513,12 +525,12 @@ const ChildrenDataScreen: React.FC = () => {
             {isEditing ? 'Editar información' : 'Datos de tus hijos'}
           </Text>
           <Text style={styles.subtitle}>
-            {isEditing 
+            {isEditing
               ? 'Actualiza la información de tu hijo'
               : `${gender === 'F' ? 'Mamá' : 'Papá'}, cuéntanos sobre tus hijos`
             }
           </Text>
-          
+
           {/* Información adicional para quienes esperan bebé(s) */}
           {pregnancyStatus === 'pregnant' && (
             <View style={styles.infoContainer}>
@@ -543,17 +555,17 @@ const ChildrenDataScreen: React.FC = () => {
             <View key={index} style={styles.childCard}>
               <View style={styles.cardHeader}>
                 <View style={styles.iconContainer}>
-                  <Ionicons 
-                    name={isUnborn ? "heart" : "person"} 
-                    size={24} 
-                    color="#59C6C0" 
+                  <Ionicons
+                    name={isUnborn ? "heart" : "person"}
+                    size={24}
+                    color="#59C6C0"
                   />
                 </View>
               <Text style={styles.childTitle}>
                 {getChildTitle(index, child)}
               </Text>
               </View>
-              
+
               <View style={styles.inputContainer}>
                 <View style={styles.labelContainer}>
                   <Ionicons name="person-outline" size={18} color="#59C6C0" />
@@ -599,17 +611,17 @@ const ChildrenDataScreen: React.FC = () => {
                   >
                     <Ionicons name="calendar" size={20} color="#59C6C0" style={styles.dateIconLeft} />
                     <Text style={styles.dateButtonText}>
-                      {child.birthDate 
-                        ? child.birthDate.toLocaleDateString('es-ES', { 
-                            year: 'numeric', 
-                            month: 'long', 
-                            day: 'numeric' 
+                      {child.birthDate
+                        ? child.birthDate.toLocaleDateString('es-ES', {
+                            year: 'numeric',
+                            month: 'long',
+                            day: 'numeric'
                           })
                         : 'Seleccionar fecha'}
                     </Text>
                     <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
                         </TouchableOpacity>
-                  
+
                   {child.birthDate && (
                     <View style={styles.calculatedAgeContainer}>
                       <Ionicons name="time-outline" size={18} color="#4CAF50" />
@@ -668,8 +680,8 @@ const ChildrenDataScreen: React.FC = () => {
                 <Ionicons name="checkmark-circle" size={20} color="#FFFFFF" style={styles.buttonIcon} />
               )}
               <Text style={styles.buttonText}>
-                {isLoading 
-                  ? (isEditing ? 'Actualizando...' : 'Guardando...') 
+                {isLoading
+                  ? (isEditing ? 'Actualizando...' : 'Guardando...')
                   : (isEditing ? 'Actualizar datos' : 'Guardar datos')
                 }
               </Text>
@@ -707,14 +719,14 @@ const ChildrenDataScreen: React.FC = () => {
               <View style={styles.datePickerContainer}>
                 <View style={styles.datePickerHeader}>
                   <Text style={styles.datePickerTitle}>
-                    {childrenData[selectedChildIndex]?.isUnborn 
-                      ? 'Selecciona la fecha de parto' 
+                    {childrenData[selectedChildIndex]?.isUnborn
+                      ? 'Selecciona la fecha de parto'
                       : 'Selecciona la fecha de nacimiento'}
                   </Text>
                 </View>
                 <DateTimePicker
                   value={
-                    childrenData[selectedChildIndex]?.isUnborn 
+                    childrenData[selectedChildIndex]?.isUnborn
                       ? (childrenData[selectedChildIndex]?.dueDate || new Date())
                       : (childrenData[selectedChildIndex]?.birthDate || new Date())
                   }
@@ -723,7 +735,7 @@ const ChildrenDataScreen: React.FC = () => {
                   onChange={handleDateChange}
                   maximumDate={
                     (childrenData[selectedChildIndex]?.isUnborn ?? isUnbornChild(selectedChildIndex))
-                      ? undefined 
+                      ? undefined
                       : new Date()
                   }
                   minimumDate={
@@ -738,7 +750,7 @@ const ChildrenDataScreen: React.FC = () => {
                   locale="es-ES"
                 />
                 <View style={styles.datePickerButtons}>
-                  <TouchableOpacity 
+                  <TouchableOpacity
                     style={[styles.datePickerButton, styles.cancelButton]}
                     onPress={() => {
                       setShowDatePicker(false);
@@ -747,7 +759,7 @@ const ChildrenDataScreen: React.FC = () => {
                   >
                     <Text style={styles.cancelButtonText}>Cancelar</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity 
+                  <TouchableOpacity
                     style={[styles.datePickerButton, styles.confirmButton]}
                     onPress={() => {
                       setShowDatePicker(false);
@@ -763,7 +775,7 @@ const ChildrenDataScreen: React.FC = () => {
         ) : (
           <DateTimePicker
             value={
-              childrenData[selectedChildIndex]?.isUnborn 
+              childrenData[selectedChildIndex]?.isUnborn
                 ? (childrenData[selectedChildIndex]?.dueDate || new Date())
                 : (childrenData[selectedChildIndex]?.birthDate || new Date())
             }
@@ -772,7 +784,7 @@ const ChildrenDataScreen: React.FC = () => {
             onChange={handleDateChange}
             maximumDate={
               (childrenData[selectedChildIndex]?.isUnborn ?? isUnbornChild(selectedChildIndex))
-                ? undefined 
+                ? undefined
                 : new Date()
             }
             minimumDate={

@@ -39,8 +39,6 @@ const CreatePostScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   
   // Log de prueba para verificar que imageUploadService esté disponible
-  console.log('🔍 [CREATE POST] imageUploadService disponible:', !!imageUploadService);
-  console.log('🔍 [CREATE POST] imageUploadService.uploadCommunityImage disponible:', !!imageUploadService.uploadCommunityImage);
   
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
@@ -79,7 +77,6 @@ const CreatePostScreen: React.FC = () => {
       });
 
       if (!result.canceled && result.assets[0]) {
-        console.log('🖼️ [CREATE POST] Imagen seleccionada:', result.assets[0].uri);
         setSelectedImage(result.assets[0].uri);
       }
     } catch (error) {
@@ -114,7 +111,6 @@ const CreatePostScreen: React.FC = () => {
       });
 
       if (!result.canceled && result.assets[0]) {
-        console.log('📸 [CREATE POST] Foto tomada:', result.assets[0].uri);
         setSelectedImage(result.assets[0].uri);
       }
     } catch (error) {
@@ -139,7 +135,6 @@ const CreatePostScreen: React.FC = () => {
       
       try {
         setIsLoadingLists(true);
-        console.log('📋 [CREATE POST] Iniciando carga de listas...');
         
         // Cargar listas del usuario y listas públicas
         const [userListsResponse, publicListsResponse] = await Promise.all([
@@ -153,33 +148,19 @@ const CreatePostScreen: React.FC = () => {
           })
         ]);
         
-        console.log('📋 [CREATE POST] Respuesta listas del usuario:', {
-          success: userListsResponse.success,
-          hasData: !!userListsResponse.data,
-          isArray: Array.isArray(userListsResponse.data),
-          length: Array.isArray(userListsResponse.data) ? userListsResponse.data.length : 0
-        });
         
-        console.log('📋 [CREATE POST] Respuesta listas públicas:', {
-          success: publicListsResponse.success,
-          hasData: !!publicListsResponse.data,
-          isArray: Array.isArray(publicListsResponse.data),
-          length: Array.isArray(publicListsResponse.data) ? publicListsResponse.data.length : 0
-        });
         
         const allLists: List[] = [];
         
         // Agregar listas del usuario
         if (userListsResponse.success && userListsResponse.data) {
           const userLists = Array.isArray(userListsResponse.data) ? userListsResponse.data : [];
-          console.log('📋 [CREATE POST] Agregando', userLists.length, 'listas del usuario');
           allLists.push(...userLists);
         }
         
         // Agregar listas públicas (evitando duplicados)
         if (publicListsResponse.success && publicListsResponse.data) {
           const publicLists = Array.isArray(publicListsResponse.data) ? publicListsResponse.data : [];
-          console.log('📋 [CREATE POST] Agregando', publicLists.length, 'listas públicas');
           publicLists.forEach((list: List) => {
             // Solo agregar si no está ya en la lista (por ID)
             if (!allLists.find(l => l.id === list.id)) {
@@ -198,13 +179,6 @@ const CreatePostScreen: React.FC = () => {
           return isOwner || isPublic;
         });
         
-        console.log('📋 [CREATE POST] Total listas disponibles:', available.length);
-        console.log('📋 [CREATE POST] Desglose:', {
-          total: allLists.length,
-          disponibles: available.length,
-          propias: available.filter(l => l.creatorId === user.id).length,
-          publicas: available.filter(l => l.isPublic && l.creatorId !== user.id).length
-        });
         
         setAvailableLists(available);
       } catch (error) {
@@ -216,7 +190,6 @@ const CreatePostScreen: React.FC = () => {
             const publicLists = Array.isArray(publicResponse.data) ? publicResponse.data : [];
             const listsWithPublic = publicLists.map((list: List) => ({ ...list, isPublic: true }));
             setAvailableLists(listsWithPublic);
-            console.log('📋 [CREATE POST] Cargadas', listsWithPublic.length, 'listas públicas como fallback');
           }
         } catch (fallbackError) {
           console.error('❌ [CREATE POST] Error en fallback:', fallbackError);
@@ -272,19 +245,11 @@ const CreatePostScreen: React.FC = () => {
       // Si hay imagen seleccionada, subirla primero
       if (selectedImage) {
         setIsUploadingImage(true);
-        console.log('🖼️ [CREATE POST] Subiendo imagen...');
-        console.log('🖼️ [CREATE POST] URI de imagen seleccionada:', selectedImage);
-        console.log('🖼️ [CREATE POST] Tipo de imagen:', typeof selectedImage);
         
         try {
-          console.log('🖼️ [CREATE POST] Llamando a imageUploadService.uploadCommunityImage...');
           const uploadResult = await imageUploadService.uploadCommunityImage(selectedImage);
-          console.log('🖼️ [CREATE POST] Resultado de uploadCommunityImage:', uploadResult);
-          console.log('🖼️ [CREATE POST] Tipo de resultado:', typeof uploadResult);
           
           const imageUrl = uploadResult;
-          console.log('✅ [CREATE POST] Imagen subida exitosamente, URL:', imageUrl);
-          console.log('✅ [CREATE POST] imageUrl final:', imageUrl);
           
           // Crear el post con la URL de la imagen
           await createPost(imageUrl);
@@ -341,8 +306,6 @@ const CreatePostScreen: React.FC = () => {
 
   // Función auxiliar para crear el post
   const createPost = async (imageUrl?: string) => {
-    console.log('📝 [CREATE POST] createPost llamado con imageUrl:', imageUrl);
-    console.log('📝 [CREATE POST] Tipo de imageUrl:', typeof imageUrl);
     
     // Preparar datos del post
     const postData: { 
@@ -369,14 +332,8 @@ const CreatePostScreen: React.FC = () => {
     // Agregar listas adjuntas si hay alguna seleccionada
     if (selectedLists.length > 0) {
       postData.attachedLists = selectedLists;
-      console.log('📋 [CREATE POST] Listas adjuntas:', selectedLists);
     }
 
-    console.log('📝 [CREATE POST] === DEBUG DATOS DEL POST ===');
-    console.log('📝 [CREATE POST] Contenido:', content.trim());
-    console.log('📝 [CREATE POST] imageUrl:', imageUrl || 'NO');
-    console.log('📝 [CREATE POST] Datos del post a enviar:', JSON.stringify(postData, null, 2));
-    console.log('📝 [CREATE POST] Campos enviados:', Object.keys(postData));
 
     // Llamar al servicio para crear el post
     const result = await communitiesService.createCommunityPost(communityId, postData);

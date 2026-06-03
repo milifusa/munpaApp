@@ -26,13 +26,11 @@ const api = axios.create({
 // Función para intercambiar customToken por idToken usando Firebase Auth
 const exchangeCustomTokenForIdToken = async (customToken: string): Promise<string> => {
   try {
-    console.log('🔄 Intercambiando customToken por idToken...');
     
     // Para esto necesitaríamos Firebase Auth SDK en el cliente
     // Por ahora, vamos a usar el customToken directamente
     // y modificar el backend para aceptarlo
     
-    console.log('⚠️ Usando customToken directamente (backend debe ser modificado)');
     return customToken;
   } catch (error) {
     console.error('❌ Error intercambiando token:', error);
@@ -56,7 +54,6 @@ api.interceptors.request.use(
         console.error('❌ [INTERCEPTOR] Error configurando token:', error);
       }
     } else {
-      console.log('⚠️ [INTERCEPTOR] No hay token disponible');
     }
 
     // Agregar timezone del usuario en el header
@@ -100,14 +97,11 @@ api.interceptors.response.use(
     
     if (error.response?.status === 401) {
       // Token de acceso requerido - limpiar almacenamiento
-      console.log('🔐 Token de acceso requerido, limpiando almacenamiento...');
       await AsyncStorage.removeItem('authToken');
       await AsyncStorage.removeItem('userData');
     } else if (error.response?.status === 403) {
       // Token inválido o expirado - pero no limpiar automáticamente
       // ya que puede ser un problema del backend
-      console.log('🔐 Token inválido o expirado (posible problema del backend)');
-      console.log('⚠️ No se limpia automáticamente el token para permitir debugging');
     }
     return Promise.reject(error);
   }
@@ -166,17 +160,8 @@ export interface ChangePasswordData {
 export const authService = {
   // Registro
   signup: async (data: SignupData) => {
-    console.log('📝 Iniciando registro con datos:', data);
-    console.log('📊 Datos específicos:', {
-      email: data.email,
-      displayName: data.displayName,
-      gender: data.gender,
-      childrenCount: data.childrenCount,
-      isPregnant: data.isPregnant
-    });
     try {
       const response = await api.post('/api/auth/signup', data);
-      console.log('✅ Registro exitoso:', response.data);
       return response.data;
     } catch (error) {
       console.error('❌ Error en registro:', error);
@@ -186,10 +171,8 @@ export const authService = {
 
   // Login
   login: async (data: LoginData) => {
-    console.log('🔑 Iniciando login con email:', data.email);
     try {
       const response = await api.post('/api/auth/login', data);
-      console.log('✅ Login exitoso:', response.data);
       return response.data;
     } catch (error) {
       console.error('❌ Error en login:', error);
@@ -199,11 +182,8 @@ export const authService = {
 
   // Login con Google usando idToken (nuevo endpoint que resuelve DEVELOPER_ERROR)
   googleLogin: async (idToken: string) => {
-    console.log('🔑 Iniciando login con Google con idToken...');
-    console.log('🔑 idToken (primeros 50 chars):', idToken.substring(0, 50) + '...');
     try {
       const response = await api.post('/api/auth/google', { idToken });
-      console.log('✅ Login con Google exitoso:', response.data);
       return response.data;
     } catch (error: any) {
       console.error('❌ Error en login con Google:', error.response?.data || error.message);
@@ -213,11 +193,8 @@ export const authService = {
 
   // Login con Google (endpoint simplificado) - DEPRECATED, usar googleLogin
   googleLoginSimple: async (data: { email: string; displayName: string; photoURL?: string; googleId: string }) => {
-    console.log('🔑 Iniciando login con Google (simplificado)...');
-    console.log('📤 Datos a enviar:', data);
     try {
       const response = await api.post('/api/auth/google-login-simple', data);
-      console.log('✅ Login con Google exitoso:', response.data);
       return response.data;
     } catch (error: any) {
       console.error('❌ Error en login con Google:', error.response?.data || error.message);
@@ -227,16 +204,8 @@ export const authService = {
 
   // Login con Apple
   appleLogin: async (data: { identityToken: string; email?: string; fullName?: { givenName?: string; familyName?: string }; user: string }) => {
-    console.log('🍎 Iniciando login con Apple...');
-    console.log('📤 Datos a enviar:', {
-      identityToken: data.identityToken ? 'Presente' : 'Ausente',
-      email: data.email || 'No proporcionado',
-      fullName: data.fullName,
-      user: data.user
-    });
     try {
       const response = await api.post('/api/auth/apple-login', data);
-      console.log('✅ Login con Apple exitoso:', response.data);
       return response.data;
     } catch (error) {
       console.error('❌ Error en login con Apple:', error);
@@ -246,10 +215,8 @@ export const authService = {
 
   // Obtener perfil
   getProfile: async () => {
-    console.log('👤 Obteniendo perfil del usuario...');
     try {
       const response = await api.get('/api/auth/profile');
-      console.log('✅ Perfil obtenido:', response.data);
       return response.data;
     } catch (error) {
       console.error('❌ Error obteniendo perfil:', error);
@@ -259,11 +226,8 @@ export const authService = {
 
   // Actualizar perfil
   updateProfile: async (data: UpdateProfileData) => {
-    console.log('✏️ Actualizando perfil del usuario...');
-    console.log('📤 Datos enviados al backend:', data);
     try {
       const response = await api.put('/api/auth/profile', data);
-      console.log('✅ Perfil actualizado:', response.data);
       return response.data;
     } catch (error) {
       console.error('❌ Error actualizando perfil:', error);
@@ -289,11 +253,8 @@ export const authService = {
 
   // Actualizar foto de perfil (usando el endpoint de actualización de perfil)
   updateProfilePhoto: async (photoURL: string) => {
-    console.log('📸 Actualizando foto de perfil...');
-    console.log('📤 photoURL:', photoURL);
     try {
       const response = await api.put('/api/auth/profile', { photoURL });
-      console.log('✅ Foto de perfil actualizada:', response.data);
       return response.data;
     } catch (error) {
       console.error('❌ Error actualizando foto de perfil:', error);
@@ -303,10 +264,8 @@ export const authService = {
 
   // Cambiar contraseña
   changePassword: async (data: ChangePasswordData) => {
-    console.log('🔒 Cambiando contraseña...');
     try {
       const response = await api.put('/api/auth/change-password', data);
-      console.log('✅ Contraseña cambiada exitosamente');
       return response.data;
     } catch (error) {
       console.error('❌ Error cambiando contraseña:', error);
@@ -316,10 +275,8 @@ export const authService = {
 
   // Eliminar cuenta
   deleteAccount: async () => {
-    console.log('🗑️ Eliminando cuenta...');
     try {
       const response = await api.delete('/api/auth/account');
-      console.log('✅ Cuenta eliminada exitosamente');
       return response.data;
     } catch (error) {
       console.error('❌ Error eliminando cuenta:', error);
@@ -340,7 +297,6 @@ export const authService = {
 
   // Renovar token (obtener un nuevo customToken)
   refreshToken: async () => {
-    console.log('🔄 Renovando token...');
     try {
       // Obtener el email del usuario actual
       const userData = await AsyncStorage.getItem('userData');
@@ -356,7 +312,6 @@ export const authService = {
         password: '' // Necesitamos la contraseña, pero no la tenemos almacenada
       });
       
-      console.log('✅ Token renovado');
       return response.data;
     } catch (error) {
       console.error('❌ Error renovando token:', error);
@@ -366,10 +321,8 @@ export const authService = {
 
   // Logout (opcional - para futuras implementaciones del backend)
   logout: async () => {
-    console.log('🚪 Enviando logout al servidor...');
     try {
       const response = await api.post('/api/auth/logout');
-      console.log('✅ Logout enviado al servidor');
       return response.data;
     } catch (error) {
       console.error('❌ Error enviando logout al servidor:', error);
@@ -381,7 +334,6 @@ export const authService = {
   healthCheck: async () => {
     try {
       const response = await api.get('/health');
-      console.log('✅ Estado del servidor:', response.data);
       return response.data;
     } catch (error) {
       console.error('❌ Error verificando estado del servidor:', error);
@@ -391,26 +343,12 @@ export const authService = {
 
   // Función para solicitar restablecimiento de contraseña
   forgotPassword: async (email: string) => {
-    console.log('🔑 [API SERVICE] === INICIANDO FORGOT PASSWORD ===');
-    console.log('📧 [API SERVICE] Email:', email);
-    console.log('🌐 [API SERVICE] Endpoint: POST /api/auth/forgot-password');
-    console.log('📦 [API SERVICE] Payload:', JSON.stringify({ email }, null, 2));
     
     try {
       const response = await api.post('/api/auth/forgot-password', { email });
       
-      console.log('✅ [API SERVICE] === RESPUESTA EXITOSA DE LA API ===');
-      console.log('✅ [API SERVICE] Status:', response.status);
-      console.log('✅ [API SERVICE] Status Text:', response.statusText);
-      console.log('✅ [API SERVICE] Headers:', JSON.stringify(response.headers, null, 2));
-      console.log('✅ [API SERVICE] Data completa:', JSON.stringify(response.data, null, 2));
-      console.log('✅ [API SERVICE] Tipo de data:', typeof response.data);
-      console.log('✅ [API SERVICE] Propiedades de data:', Object.keys(response.data || {}));
       
       if (response.data) {
-        console.log('✅ [API SERVICE] Success:', response.data.success);
-        console.log('✅ [API SERVICE] Message:', response.data.message);
-        console.log('✅ [API SERVICE] Data:', response.data.data);
       }
       
       return response.data;
@@ -445,13 +383,11 @@ export const authService = {
 
   // Función para restablecer contraseña
   resetPassword: async (oobCode: string, newPassword: string) => {
-    console.log('🔑 [RESET-PASSWORD] Restableciendo contraseña...');
     try {
       const response = await api.post('/api/auth/reset-password', {
         oobCode,
         newPassword
       });
-      console.log('✅ [RESET-PASSWORD] Contraseña restablecida:', response.data);
       return response.data;
     } catch (error) {
       console.error('❌ [RESET-PASSWORD] Error:', error);
@@ -464,7 +400,6 @@ export const authService = {
     try {
       const urlObj = new URL(url);
       const oobCode = urlObj.searchParams.get('oobCode');
-      console.log('🔍 [EXTRACT] oobCode extraído:', oobCode ? 'SÍ' : 'NO');
       return oobCode;
     } catch (error) {
       console.error('❌ [EXTRACT] Error extrayendo oobCode:', error);
@@ -474,7 +409,6 @@ export const authService = {
 
   // Función para manejar deep link de restablecimiento
   handlePasswordResetLink: async (url: string) => {
-    console.log('🔗 [DEEP-LINK] Procesando URL de restablecimiento:', url);
     
     const oobCode = authService.extractOobCodeFromUrl(url);
     if (!oobCode) {
@@ -536,11 +470,9 @@ export const childrenService = {
 
   // Agregar un nuevo hijo
   addChild: async (data: CreateChildData) => {
-    console.log('👶 [CHILDREN] Agregando hijo:', data);
     
     try {
       const response = await api.post('/api/auth/children', data);
-      console.log('✅ [CHILDREN] Hijo agregado:', response.data);
       return response.data;
     } catch (error) {
       console.error('❌ [CHILDREN] Error agregando hijo:', error);
@@ -550,12 +482,10 @@ export const childrenService = {
 
   // Agregar múltiples hijos de una vez
   addMultipleChildren: async (children: CreateChildData[]) => {
-    console.log('👶 [CHILDREN] Agregando múltiples hijos:', children);
     
     try {
       const promises = children.map(child => api.post('/api/auth/children', child));
       const responses = await Promise.all(promises);
-      console.log('✅ [CHILDREN] Todos los hijos agregados:', responses.map(r => r.data));
       return responses.map(r => r.data);
     } catch (error) {
       console.error('❌ [CHILDREN] Error agregando múltiples hijos:', error);
@@ -565,11 +495,9 @@ export const childrenService = {
 
   // Actualizar un hijo existente
   updateChild: async (childId: string, data: UpdateChildData) => {
-    console.log('👶 [CHILDREN] Actualizando hijo:', childId, data);
     
     try {
       const response = await api.put(`/api/auth/children/${childId}`, data);
-      console.log('✅ [CHILDREN] Hijo actualizado:', response.data);
       return response.data;
     } catch (error) {
       console.error('❌ [CHILDREN] Error actualizando hijo:', error);
@@ -579,11 +507,9 @@ export const childrenService = {
 
   // Eliminar un hijo
   deleteChild: async (childId: string) => {
-    console.log('👶 [CHILDREN] Eliminando hijo:', childId);
     
     try {
       const response = await api.delete(`/api/auth/children/${childId}`);
-      console.log('✅ [CHILDREN] Hijo eliminado:', response.data);
       return response.data;
     } catch (error) {
       console.error('❌ [CHILDREN] Error eliminando hijo:', error);
@@ -594,7 +520,6 @@ export const childrenService = {
   // Obtener información de desarrollo del niño
   getChildDevelopmentInfo: async (name: string, ageInMonths: number, isUnborn: boolean = false, gestationWeeks: number | null = null) => {
     try {
-      console.log('👶 [DEVELOPMENT] Obteniendo información de desarrollo para:', name);
       
       const response = await api.post('/api/children/development-info', {
         name,
@@ -603,7 +528,6 @@ export const childrenService = {
         gestationWeeks
       });
       
-      console.log('✅ [DEVELOPMENT] Información obtenida:', response.data);
       return response.data;
     } catch (error: any) {
       console.error('❌ [DEVELOPMENT] Error obteniendo información:', error.response?.data || error.message);
@@ -649,6 +573,8 @@ export const profileService = {
     childrenCount?: number;
     isPregnant?: boolean;
     gestationWeeks?: number;
+    countryId?: string;
+    cityId?: string;
   }) => {
     
     try {
@@ -676,16 +602,6 @@ export const communitiesService = {
       let response;
       
       // Enviar como JSON con o sin URL de imagen
-      console.log('📝 [COMMUNITIES] Enviando como JSON:', {
-        name: data.name,
-        keywords: data.keywords,
-        description: data.description,
-        isPrivate: data.isPrivate,
-        isPublic: !data.isPrivate,
-        imageUrl: data.image,
-        imageType: typeof data.image,
-        imageLength: data.image?.length
-      });
       
       const requestData = {
         name: data.name,
@@ -695,12 +611,10 @@ export const communitiesService = {
         imageUrl: data.image // Cambiar a imageUrl para que coincida con el backend
       };
       
-      console.log('📤 [COMMUNITIES] Datos exactos enviados al backend:', JSON.stringify(requestData, null, 2));
       
       response = await api.post('/api/communities', requestData);
       
       if (response) {
-        console.log('✅ [COMMUNITIES] Comunidad creada:', response.data);
         return response.data;
       } else {
         throw new Error('No se pudo crear la comunidad');
@@ -740,7 +654,6 @@ export const communitiesService = {
     
     try {
       const response = await api.post(`/api/communities/${communityId}/join`);
-      console.log('✅ [COMMUNITIES] Unido a comunidad:', response.data);
       return response.data;
     } catch (error: any) {
       console.error('❌ [COMMUNITIES] Error uniéndose a comunidad:', error.response?.data || error.message);
@@ -750,11 +663,9 @@ export const communitiesService = {
 
   // Obtener solicitudes pendientes de una comunidad (solo para dueños)
   getJoinRequests: async (communityId: string) => {
-    console.log('👀 [COMMUNITIES] Obteniendo solicitudes pendientes para comunidad:', communityId);
     
     try {
       const response = await api.get(`/api/communities/${communityId}/join-requests`);
-      console.log('✅ [COMMUNITIES] Solicitudes obtenidas:', response.data);
       return response.data;
     } catch (error: any) {
       console.error('❌ [COMMUNITIES] Error obteniendo solicitudes:', error.response?.data || error.message);
@@ -764,13 +675,11 @@ export const communitiesService = {
 
   // Aprobar o rechazar solicitud de unión (solo para dueños)
   updateJoinRequest: async (communityId: string, requestId: string, action: 'approve' | 'reject') => {
-    console.log(`🔄 [COMMUNITIES] ${action === 'approve' ? 'Aprobando' : 'Rechazando'} solicitud:`, requestId);
     
     try {
       const response = await api.put(`/api/communities/${communityId}/join-requests/${requestId}`, {
         action: action
       });
-      console.log(`✅ [COMMUNITIES] Solicitud ${action === 'approve' ? 'aprobada' : 'rechazada'}:`, response.data);
       return response.data;
     } catch (error: any) {
       console.error(`❌ [COMMUNITIES] Error ${action === 'approve' ? 'aprobando' : 'rechazando'} solicitud:`, error.response?.data || error.message);
@@ -780,11 +689,9 @@ export const communitiesService = {
 
   // Obtener posts de una comunidad
   getCommunityPosts: async (communityId: string) => {
-    console.log('📝 [COMMUNITIES] Obteniendo posts de comunidad:', communityId);
     
     try {
       const response = await api.get(`/api/communities/${communityId}/posts`);
-      console.log('✅ [COMMUNITIES] Posts obtenidos:', response.data);
       return response.data;
     } catch (error: any) {
       console.error('❌ [COMMUNITIES] Error obteniendo posts:', error.response?.data || error.message);
@@ -800,8 +707,6 @@ export const communitiesService = {
     tags?: string[];
     attachedLists?: string[]; // Array de IDs de listas
   }) => {
-    console.log('📝 [COMMUNITIES] Creando nuevo post en comunidad:', communityId);
-    console.log('📝 [COMMUNITIES] Datos del post:', postData);
     
     // Limpiar objeto removiendo propiedades undefined
     const cleanPostData = Object.entries(postData).reduce((acc, [key, value]) => {
@@ -811,12 +716,9 @@ export const communitiesService = {
       return acc;
     }, {} as any);
     
-    console.log('📝 [COMMUNITIES] Datos limpios del post:', cleanPostData);
-    console.log('📝 [COMMUNITIES] Campos finales:', Object.keys(cleanPostData));
     
     try {
       const response = await api.post(`/api/communities/${communityId}/posts`, cleanPostData);
-      console.log('✅ [COMMUNITIES] Post creado exitosamente:', response.data);
       return response.data;
     } catch (error: any) {
       console.error('❌ [COMMUNITIES] Error creando post:', error.response?.data || error.message);
@@ -830,9 +732,6 @@ export const communitiesService = {
     content: string;
     tags?: string[];
   }, imageUrl?: string) => {
-    console.log('📝 [COMMUNITIES] Creando nuevo post con imageUrl en comunidad:', communityId);
-    console.log('📝 [COMMUNITIES] Datos del post:', postData);
-    console.log('📝 [COMMUNITIES] imageUrl:', imageUrl || 'NO');
     
     try {
       // Preparar datos del post incluyendo imageUrl
@@ -841,11 +740,9 @@ export const communitiesService = {
         ...(imageUrl && { imageUrl })
       };
       
-      console.log('📝 [COMMUNITIES] Datos del post con imagen:', postDataWithImage);
       
       // Llamar al endpoint normal (el backend procesará imageUrl)
       const response = await api.post(`/api/communities/${communityId}/posts`, postDataWithImage);
-      console.log('✅ [COMMUNITIES] Post con imageUrl creado exitosamente:', response.data);
       return response.data;
     } catch (error: any) {
       console.error('❌ [COMMUNITIES] Error creando post con imageUrl:', error.response?.data || error.message);
@@ -855,11 +752,9 @@ export const communitiesService = {
 
   // Sistema de Likes para Posts
   likePost: async (postId: string) => {
-    console.log('❤️ [LIKES] Dando like al post:', postId);
     
     try {
       const response = await api.post(`/api/posts/${postId}/like`);
-      console.log('✅ [LIKES] Like del post procesado:', response.data);
       return response.data;
     } catch (error: any) {
       console.error('❌ [LIKES] Error procesando like del post:', error.response?.data || error.message);
@@ -869,11 +764,9 @@ export const communitiesService = {
 
   // Sistema de Likes para Comentarios
   likeComment: async (commentId: string) => {
-    console.log('❤️ [LIKES] Dando like al comentario:', commentId);
     
     try {
       const response = await api.post(`/api/comments/${commentId}/like`);
-      console.log('✅ [LIKES] Like del comentario procesado:', response.data);
       return response.data;
     } catch (error: any) {
       console.error('❌ [LIKES] Error procesando like del comentario:', error.response?.data || error.message);
@@ -884,11 +777,9 @@ export const communitiesService = {
   // Sistema de Comentarios
   // Obtener comentarios de un post
   getPostComments: async (postId: string) => {
-    console.log('💬 [COMMENTS] Obteniendo comentarios del post:', postId);
     
     try {
       const response = await api.get(`/api/posts/${postId}/comments`);
-      console.log('✅ [COMMENTS] Comentarios obtenidos:', response.data);
       return response.data;
     } catch (error: any) {
       console.error('❌ [COMMENTS] Error obteniendo comentarios:', error.response?.data || error.message);
@@ -898,12 +789,9 @@ export const communitiesService = {
 
   // Crear un nuevo comentario en un post
   createComment: async (postId: string, content: string) => {
-    console.log('💬 [COMMENTS] Creando comentario en post:', postId);
-    console.log('💬 [COMMENTS] Contenido del comentario:', content);
     
     try {
       const response = await api.post(`/api/posts/${postId}/comments`, { content });
-      console.log('✅ [COMMENTS] Comentario creado exitosamente:', response.data);
       return response.data;
     } catch (error: any) {
       console.error('❌ [COMMENTS] Error creando comentario:', error.response?.data || error.message);
@@ -913,8 +801,6 @@ export const communitiesService = {
 
   // Sistema de Búsqueda Inteligente de Comunidades
   searchCommunities: async (query: string, limit: number = 20) => {
-    console.log('🔍 [SEARCH] Buscando comunidades con query:', query);
-    console.log('🔍 [SEARCH] Límite de resultados:', limit);
     
     try {
       // Validar parámetros
@@ -934,9 +820,6 @@ export const communitiesService = {
         }
       });
       
-      console.log('✅ [SEARCH] Búsqueda completada:', response.data);
-      console.log('🔍 [SEARCH] Resultados encontrados:', response.data.data?.results?.length || 0);
-      console.log('🔍 [SEARCH] Total encontrados por el backend:', response.data.data?.totalFound || 0);
       
       return response.data;
     } catch (error: any) {
@@ -947,11 +830,9 @@ export const communitiesService = {
 
   // Salir de una comunidad
   leaveCommunity: async (communityId: string) => {
-    console.log('🚪 [COMMUNITIES] Saliendo de la comunidad:', communityId);
     
     try {
       const response = await api.post(`/api/communities/${communityId}/leave`);
-      console.log('✅ [COMMUNITIES] Salida exitosa de la comunidad:', response.data);
       return response.data;
     } catch (error: any) {
       console.error('❌ [COMMUNITIES] Error saliendo de la comunidad:', error.response?.data || error.message);
@@ -974,11 +855,9 @@ export const communitiesService = {
 
   // Obtener un post específico por ID
   getPost: async (postId: string) => {
-    console.log('📥 [COMMUNITIES] Obteniendo post:', postId);
     
     try {
       const response = await api.get(`/api/posts/${postId}`);
-      console.log('✅ [COMMUNITIES] Post obtenido exitosamente:', response.data);
       return response.data;
     } catch (error: any) {
       console.error('❌ [COMMUNITIES] Error obteniendo post:', error.response?.data || error.message);
@@ -988,11 +867,9 @@ export const communitiesService = {
 
   // NUEVO: Eliminar un post (solo el autor puede hacerlo)
   deletePost: async (postId: string) => {
-    console.log('🗑️ [COMMUNITIES] Eliminando post:', postId);
     
     try {
       const response = await api.delete(`/api/posts/${postId}`);
-      console.log('✅ [COMMUNITIES] Post eliminado exitosamente:', response.data);
       return response.data;
     } catch (error: any) {
       console.error('❌ [COMMUNITIES] Error eliminando post:', error.response?.data || error.message);
@@ -1056,7 +933,6 @@ export const listsService = {
   getListDetails: async (listId: string) => {
     try {
       const response = await api.get(`/api/lists/${listId}`);
-      console.log('✅ [LISTS] Detalles de lista obtenidos:', response.data);
       return response.data;
     } catch (error: any) {
       console.error('❌ [LISTS] Error obteniendo detalles de lista:', error.response?.data || error.message);
@@ -1072,7 +948,6 @@ export const listsService = {
   }) => {
     try {
       const response = await api.put(`/api/lists/${listId}`, data);
-      console.log('✅ [LISTS] Lista actualizada exitosamente:', response.data);
       return response.data;
     } catch (error: any) {
       console.error('❌ [LISTS] Error actualizando lista:', error.response?.data || error.message);
@@ -1084,7 +959,6 @@ export const listsService = {
   copyList: async (listId: string) => {
     try {
       const response = await api.post(`/api/lists/${listId}/copy`);
-      console.log('✅ [LISTS] Lista copiada exitosamente:', response.data);
       return response.data;
     } catch (error: any) {
       console.error('❌ [LISTS] Error copiando lista:', error.response?.data || error.message);
@@ -1104,10 +978,8 @@ export const listsService = {
     store?: string;
     approximatePrice?: number;
   }) => {
-    console.log('📝 [LISTS] Agregando item a lista:', listId, data);
     try {
       const response = await api.post(`/api/lists/${listId}/items`, data);
-      console.log('✅ [LISTS] Item agregado exitosamente:', response.data);
       return response.data;
     } catch (error: any) {
       console.error('❌ [LISTS] Error agregando item:', error.response?.data || error.message);
@@ -1117,10 +989,8 @@ export const listsService = {
 
   // Marcar/desmarcar item como completado
   toggleItem: async (listId: string, itemId: string) => {
-    console.log('✅ [LISTS] Alternando estado del item:', listId, itemId);
     try {
       const response = await api.put(`/api/lists/${listId}/items/${itemId}/toggle`);
-      console.log('✅ [LISTS] Estado del item alternado:', response.data);
       return response.data;
     } catch (error: any) {
       console.error('❌ [LISTS] Error alternando estado del item:', error.response?.data || error.message);
@@ -1130,10 +1000,8 @@ export const listsService = {
 
   // Eliminar item
   deleteItem: async (listId: string, itemId: string) => {
-    console.log('🗑️ [LISTS] Eliminando item:', listId, itemId);
     try {
       const response = await api.delete(`/api/lists/${listId}/items/${itemId}`);
-      console.log('✅ [LISTS] Item eliminado exitosamente:', response.data);
       return response.data;
     } catch (error: any) {
       console.error('❌ [LISTS] Error eliminando item:', error.response?.data || error.message);
@@ -1145,10 +1013,8 @@ export const listsService = {
 
   // Dar/quitar estrella a lista
   toggleStar: async (listId: string) => {
-    console.log('⭐ [LISTS] Alternando estrella en lista:', listId);
     try {
       const response = await api.post(`/api/lists/${listId}/star`);
-      console.log('✅ [LISTS] Estrella alternada exitosamente:', response.data);
       return response.data;
     } catch (error: any) {
       console.error('❌ [LISTS] Error alternando estrella:', error.response?.data || error.message);
@@ -1160,10 +1026,8 @@ export const listsService = {
 
   // Obtener comentarios de un item
   getItemComments: async (listId: string, itemId: string) => {
-    console.log('💬 [LISTS] Obteniendo comentarios del item:', listId, itemId);
     try {
       const response = await api.get(`/api/lists/${listId}/items/${itemId}/comments`);
-      console.log('✅ [LISTS] Comentarios obtenidos:', response.data);
       return response.data;
     } catch (error: any) {
       console.error('❌ [LISTS] Error obteniendo comentarios:', error.response?.data || error.message);
@@ -1173,10 +1037,8 @@ export const listsService = {
 
   // Agregar comentario a un item
   addItemComment: async (listId: string, itemId: string, data: { content: string }) => {
-    console.log('💬 [LISTS] Agregando comentario al item:', listId, itemId, data);
     try {
       const response = await api.post(`/api/lists/${listId}/items/${itemId}/comments`, data);
-      console.log('✅ [LISTS] Comentario agregado exitosamente:', response.data);
       return response.data;
     } catch (error: any) {
       console.error('❌ [LISTS] Error agregando comentario:', error.response?.data || error.message);
@@ -1186,10 +1048,8 @@ export const listsService = {
 
   // Calificar un item (1-5 estrellas)
   rateItem: async (listId: string, itemId: string, rating: number) => {
-    console.log('⭐ [LISTS] Calificando item:', listId, itemId, 'Rating:', rating);
     try {
       const response = await api.post(`/api/lists/${listId}/items/${itemId}/rate`, { rating });
-      console.log('✅ [LISTS] Item calificado exitosamente:', response.data);
       return response.data;
     } catch (error: any) {
       console.error('❌ [LISTS] Error calificando item:', error.response?.data || error.message);
@@ -1205,12 +1065,9 @@ export const listsService = {
 export const categoriesService = {
   // Obtener todas las categorías activas
   getCategories: async () => {
-    console.log('📂 [CATEGORIES] Obteniendo todas las categorías');
     try {
       const response = await api.get('/api/categories');
       
-      console.log('✅ [CATEGORIES] Categorías obtenidas exitosamente');
-      console.log('📦 [CATEGORIES] Total de categorías:', response.data?.data?.length || 0);
       
       return response.data;
     } catch (error: any) {
@@ -1222,12 +1079,9 @@ export const categoriesService = {
 
   // Obtener una categoría específica por ID
   getCategoryById: async (categoryId: string) => {
-    console.log('📂 [CATEGORIES] Obteniendo categoría:', categoryId);
     try {
       const response = await api.get(`/api/categories/${categoryId}`);
       
-      console.log('✅ [CATEGORIES] Categoría obtenida exitosamente');
-      console.log('📦 [CATEGORIES] Datos:', JSON.stringify(response.data, null, 2));
       
       return response.data;
     } catch (error: any) {
@@ -1251,13 +1105,10 @@ export const recommendationsService = {
     params.append('limit', limit.toString());
     
     const queryParam = params.toString() ? `?${params.toString()}` : '';
-    console.log('⭐ [RECOMMENDATIONS] Obteniendo recomendaciones', categoryId ? `para categoría: ${categoryId}` : '', `Página: ${page}, Límite: ${limit}`);
     
     try {
       const response = await api.get(`/api/recommendations${queryParam}`);
       
-      console.log('✅ [RECOMMENDATIONS] Recomendaciones obtenidas exitosamente');
-      console.log('📦 [RECOMMENDATIONS] Total en esta página:', response.data?.data?.length || 0);
       
       return response.data;
     } catch (error: any) {
@@ -1282,19 +1133,15 @@ export const recommendationsService = {
 
   // Obtener recomendaciones por categoría (alias más específico) con paginación
   getRecommendationsByCategory: async (categoryId: string, page: number = 1, limit: number = 20) => {
-    console.log('⭐ [RECOMMENDATIONS] Obteniendo recomendaciones por categoría:', categoryId, `Página: ${page}, Límite: ${limit}`);
     return recommendationsService.getRecommendations(categoryId, page, limit);
   },
 
   // Obtener una recomendación específica por ID
   getRecommendationById: async (recommendationId: string) => {
-    console.log('⭐ [RECOMMENDATIONS] Obteniendo recomendación:', recommendationId);
     
     try {
       const response = await api.get(`/api/recommendations/${recommendationId}`);
       
-      console.log('✅ [RECOMMENDATIONS] Recomendación obtenida exitosamente');
-      console.log('📦 [RECOMMENDATIONS] Datos:', JSON.stringify(response.data, null, 2));
       
       return response.data;
     } catch (error: any) {
@@ -1309,14 +1156,12 @@ export const recommendationsService = {
     recommendationId: string,
     options?: { serviceType?: string; limit?: number }
   ) => {
-    console.log('🛍️ [RECOMMENDATIONS] Obteniendo productos del profesional:', recommendationId);
 
     try {
       const response = await api.get(`/api/recommendations/${recommendationId}/products`, {
         params: { ...options },
       });
 
-      console.log('✅ [RECOMMENDATIONS] Productos del profesional obtenidos');
       return response.data; // { hasProfessional, professional?, products? }
     } catch (error: any) {
       console.error('❌ [RECOMMENDATIONS] Error obteniendo productos del profesional:', error.response?.data || error.message);
@@ -1345,16 +1190,12 @@ export const recommendationsService = {
 
   // Obtener reviews de una recomendación
   getRecommendationReviews: async (recommendationId: string, page: number = 1, limit: number = 20) => {
-    console.log('⭐ [RECOMMENDATIONS] Obteniendo reviews:', recommendationId, `Página: ${page}`);
     
     try {
       const response = await api.get(`/api/recommendations/${recommendationId}/reviews`, {
         params: { page, limit }
       });
       
-      console.log('✅ [RECOMMENDATIONS] Reviews obtenidas exitosamente');
-      console.log('📦 [RECOMMENDATIONS] Total reviews:', response.data?.stats?.totalReviews || 0);
-      console.log('📦 [RECOMMENDATIONS] Rating promedio:', response.data?.stats?.averageRating || 0);
       
       return response.data;
     } catch (error: any) {
@@ -1366,13 +1207,10 @@ export const recommendationsService = {
 
   // Obtener mi review para una recomendación
   getMyReview: async (recommendationId: string) => {
-    console.log('⭐ [RECOMMENDATIONS] Obteniendo mi review:', recommendationId);
     
     try {
       const response = await api.get(`/api/recommendations/${recommendationId}/reviews/my-review`);
       
-      console.log('✅ [RECOMMENDATIONS] Mi review obtenida');
-      console.log('📦 [RECOMMENDATIONS] Datos:', response.data?.data);
       
       return response.data;
     } catch (error: any) {
@@ -1391,7 +1229,6 @@ export const recommendationsService = {
     childAge?: string,
     visitedWith?: 'Solo' | 'Pareja' | 'Familia' | 'Amigos'
   ) => {
-    console.log('⭐ [RECOMMENDATIONS] Creando/actualizando review:', recommendationId, `Rating: ${rating}`);
     
     try {
       const reviewData: any = {
@@ -1404,12 +1241,9 @@ export const recommendationsService = {
       if (childAge) reviewData.childAge = childAge;
       if (visitedWith) reviewData.visitedWith = visitedWith;
 
-      console.log('📦 [RECOMMENDATIONS] Review data:', reviewData);
 
       const response = await api.post(`/api/recommendations/${recommendationId}/reviews`, reviewData);
       
-      console.log('✅ [RECOMMENDATIONS] Review guardada exitosamente');
-      console.log('📦 [RECOMMENDATIONS] Datos:', response.data);
       
       return response.data;
     } catch (error: any) {
@@ -1421,7 +1255,6 @@ export const recommendationsService = {
 
   // Subir foto individual de review
   uploadReviewPhoto: async (recommendationId: string, photoFile: any) => {
-    console.log('📸 [RECOMMENDATIONS] Subiendo foto de review:', recommendationId);
     
     try {
       const formData = new FormData();
@@ -1441,7 +1274,6 @@ export const recommendationsService = {
         }
       );
       
-      console.log('✅ [RECOMMENDATIONS] Foto subida:', response.data.data.photoUrl);
       
       return response.data;
     } catch (error: any) {
@@ -1452,7 +1284,6 @@ export const recommendationsService = {
 
   // Subir múltiples fotos de review (máx 5)
   uploadReviewPhotos: async (recommendationId: string, photoFiles: any[]) => {
-    console.log('📸 [RECOMMENDATIONS] Subiendo', photoFiles.length, 'fotos de review:', recommendationId);
     
     try {
       const formData = new FormData();
@@ -1475,7 +1306,6 @@ export const recommendationsService = {
         }
       );
       
-      console.log('✅ [RECOMMENDATIONS] Fotos subidas:', response.data.data.photoUrls.length);
       
       return response.data;
     } catch (error: any) {
@@ -1486,14 +1316,12 @@ export const recommendationsService = {
 
   // Toggle "útil" en una review
   toggleReviewHelpful: async (recommendationId: string, reviewId: string) => {
-    console.log('👍 [RECOMMENDATIONS] Toggle útil en review:', reviewId);
     
     try {
       const response = await api.post(
         `/api/recommendations/${recommendationId}/reviews/${reviewId}/helpful`
       );
       
-      console.log('✅ [RECOMMENDATIONS] Toggle útil exitoso:', response.data.isHelpful);
       
       return response.data;
     } catch (error: any) {
@@ -1518,12 +1346,10 @@ export const recommendationsService = {
 
   // Eliminar mi review
   deleteMyReview: async (recommendationId: string) => {
-    console.log('🗑️ [RECOMMENDATIONS] Eliminando mi review:', recommendationId);
     
     try {
       const response = await api.delete(`/api/recommendations/${recommendationId}/reviews/my-review`);
       
-      console.log('✅ [RECOMMENDATIONS] Review eliminada exitosamente');
       
       return response.data;
     } catch (error: any) {
@@ -1535,13 +1361,10 @@ export const recommendationsService = {
 
   // Obtener mis favoritos
   getFavorites: async () => {
-    console.log('❤️ [RECOMMENDATIONS] Obteniendo favoritos');
     
     try {
       const response = await api.get('/api/recommendations/favorites');
       
-      console.log('✅ [RECOMMENDATIONS] Favoritos obtenidos exitosamente');
-      console.log('📦 [RECOMMENDATIONS] Total favoritos:', response.data?.data?.length || 0);
       
       return response.data;
     } catch (error: any) {
@@ -1553,12 +1376,10 @@ export const recommendationsService = {
 
   // Verificar si es favorito
   isFavorite: async (recommendationId: string) => {
-    console.log('❤️ [RECOMMENDATIONS] Verificando favorito:', recommendationId);
     
     try {
       const response = await api.get(`/api/recommendations/${recommendationId}/favorite`);
       
-      console.log('✅ [RECOMMENDATIONS] Estado de favorito:', response.data?.isFavorite);
       
       return response.data;
     } catch (error: any) {
@@ -1570,12 +1391,10 @@ export const recommendationsService = {
 
   // Toggle favorito (agregar/quitar)
   toggleFavorite: async (recommendationId: string) => {
-    console.log('❤️ [RECOMMENDATIONS] Toggle favorito:', recommendationId);
     
     try {
       const response = await api.post(`/api/recommendations/${recommendationId}/favorite`);
       
-      console.log('✅ [RECOMMENDATIONS] Favorito actualizado:', response.data?.isFavorite);
       
       return response.data;
     } catch (error: any) {
@@ -1587,15 +1406,12 @@ export const recommendationsService = {
 
   // Obtener recomendaciones recientes
   getRecentRecommendations: async (limit: number = 10) => {
-    console.log('🆕 [RECOMMENDATIONS] Obteniendo recomendaciones recientes, límite:', limit);
     
     try {
       const response = await api.get('/api/recommendations/recent', {
         params: { limit }
       });
       
-      console.log('✅ [RECOMMENDATIONS] Recomendaciones recientes obtenidas exitosamente');
-      console.log('📦 [RECOMMENDATIONS] Total recientes:', response.data?.data?.length || 0);
       
       return response.data;
     } catch (error: any) {
@@ -1616,16 +1432,12 @@ export const recommendationsService = {
     radius: number = 10, 
     categoryId?: string
   ) => {
-    console.log('📍 [RECOMMENDATIONS] Obteniendo recomendaciones cercanas');
-    console.log(`📍 Ubicación: ${latitude}, ${longitude}, Radio: ${radius}km`);
     
     try {
       const response = await api.get('/api/recommendations/nearby', {
         params: { latitude, longitude, radius, categoryId }
       });
       
-      console.log('✅ [RECOMMENDATIONS] Recomendaciones cercanas obtenidas');
-      console.log('📦 [RECOMMENDATIONS] Total cercanas:', response.data?.data?.length || 0);
       
       return response.data;
     } catch (error: any) {
@@ -1656,13 +1468,10 @@ export const recommendationsService = {
     whatsapp?: string;
     imageUrl?: string;
   }) => {
-    console.log('✏️ [RECOMMENDATIONS] Creando nueva recomendación:', data.name);
     
     try {
       const response = await api.post('/api/recommendations', data);
       
-      console.log('✅ [RECOMMENDATIONS] Recomendación creada exitosamente');
-      console.log('📦 [RECOMMENDATIONS] ID:', response.data?.data?.id);
       
       return response.data;
     } catch (error: any) {
@@ -1674,7 +1483,6 @@ export const recommendationsService = {
 
   // Agregar a lista de deseos
   addToWishlist: async (recommendationId: string, notes?: string, priority?: string) => {
-    console.log('💝 [RECOMMENDATIONS] Agregando a lista de deseos:', recommendationId);
     
     try {
       const response = await api.post('/api/recommendations/wishlist', {
@@ -1683,7 +1491,6 @@ export const recommendationsService = {
         priority
       });
       
-      console.log('✅ [RECOMMENDATIONS] Agregado a lista de deseos');
       
       return response.data;
     } catch (error: any) {
@@ -1695,15 +1502,12 @@ export const recommendationsService = {
 
   // Obtener mi lista de deseos
   getWishlist: async (priority?: string) => {
-    console.log('💝 [RECOMMENDATIONS] Obteniendo lista de deseos');
     
     try {
       const response = await api.get('/api/recommendations/wishlist', {
         params: { priority }
       });
       
-      console.log('✅ [RECOMMENDATIONS] Lista de deseos obtenida');
-      console.log('📦 [RECOMMENDATIONS] Total en wishlist:', response.data?.data?.length || 0);
       
       return response.data;
     } catch (error: any) {
@@ -1715,12 +1519,10 @@ export const recommendationsService = {
 
   // Quitar de lista de deseos
   removeFromWishlist: async (wishlistId: string) => {
-    console.log('💔 [RECOMMENDATIONS] Quitando de lista de deseos:', wishlistId);
     
     try {
       const response = await api.delete(`/api/recommendations/wishlist/${wishlistId}`);
       
-      console.log('✅ [RECOMMENDATIONS] Quitado de lista de deseos');
       
       return response.data;
     } catch (error: any) {
@@ -1732,12 +1534,10 @@ export const recommendationsService = {
   
   // Verificar si está en wishlist
   isInWishlist: async (recommendationId: string) => {
-    console.log('💝 [RECOMMENDATIONS] Verificando si está en wishlist:', recommendationId);
     
     try {
       const response = await api.get(`/api/recommendations/${recommendationId}/wishlist`);
       
-      console.log('✅ [RECOMMENDATIONS] Estado wishlist:', response.data?.data?.inWishlist);
       
       return response.data;
     } catch (error: any) {
@@ -1749,7 +1549,6 @@ export const recommendationsService = {
 
   // Registrar visita a una recomendación
   registerVisit: async (recommendationId: string, childId?: string, visitDate?: Date) => {
-    console.log('👣 [RECOMMENDATIONS] Registrando visita:', recommendationId);
     
     try {
       const response = await api.post(`/api/recommendations/${recommendationId}/visits`, {
@@ -1757,7 +1556,6 @@ export const recommendationsService = {
         visitDate: visitDate || new Date()
       });
       
-      console.log('✅ [RECOMMENDATIONS] Visita registrada');
       
       return response.data;
     } catch (error: any) {
@@ -1769,15 +1567,12 @@ export const recommendationsService = {
 
   // Obtener recomendaciones de una comunidad
   getCommunityRecommendations: async (communityId: string, categoryId?: string, limit: number = 20) => {
-    console.log('👥 [RECOMMENDATIONS] Obteniendo recomendaciones de comunidad:', communityId);
     
     try {
       const response = await api.get(`/api/communities/${communityId}/recommendations`, {
         params: { categoryId, limit }
       });
       
-      console.log('✅ [RECOMMENDATIONS] Recomendaciones de comunidad obtenidas');
-      console.log('📦 [RECOMMENDATIONS] Total:', response.data?.data?.length || 0);
       
       return response.data;
     } catch (error: any) {
@@ -1789,14 +1584,12 @@ export const recommendationsService = {
 
   // Comparar recomendaciones
   compareRecommendations: async (recommendationIds: string[]) => {
-    console.log('⚖️ [RECOMMENDATIONS] Comparando recomendaciones:', recommendationIds);
     
     try {
       const response = await api.get('/api/recommendations/compare', {
         params: { ids: recommendationIds.join(',') }
       });
       
-      console.log('✅ [RECOMMENDATIONS] Comparación obtenida');
       
       return response.data;
     } catch (error: any) {
@@ -1808,14 +1601,12 @@ export const recommendationsService = {
 
   // Obtener recomendaciones personalizadas según perfil del bebé
   getPersonalizedRecommendations: async (childId?: string) => {
-    console.log('🎯 [RECOMMENDATIONS] Obteniendo recomendaciones personalizadas');
     
     try {
       const response = await api.get('/api/recommendations/personalized', {
         params: { childId }
       });
       
-      console.log('✅ [RECOMMENDATIONS] Recomendaciones personalizadas obtenidas');
       
       return response.data;
     } catch (error: any) {
@@ -1872,7 +1663,6 @@ export const guideService = {
     childId?: string; // ✅ AGREGAR childId
   }) => {
     try {
-      console.log('📘 [GUIDE SERVICE] Enviando payload:', payload);
       const response = await api.post('/api/guide/today', payload);
       return response.data;
     } catch (error: any) {
@@ -1912,14 +1702,12 @@ export const marketplaceService = {
 export const adminService = {
   // Fijar o desfijar un post
   pinPost: async (postId: string, isPinned: boolean) => {
-    console.log(`📌 [ADMIN] ${isPinned ? 'Fijando' : 'Desfijando'} post:`, postId);
     
     try {
       const response = await api.patch(`/api/admin/posts/${postId}/pin`, {
         isPinned
       });
       
-      console.log(`✅ [ADMIN] Post ${isPinned ? 'fijado' : 'desfijado'} exitosamente`);
       return response.data;
     } catch (error: any) {
       console.error(`❌ [ADMIN] Error ${isPinned ? 'fijando' : 'desfijando'} post:`, error.response?.data || error.message);
@@ -1974,7 +1762,6 @@ export const sleepService = {
       endTime?: string;
     }>;
   }) => {
-    console.log('📝 [SLEEP] Actualizando evento:', eventId, data);
     
     try {
       const response = await api.put(`/api/sleep/${eventId}`, data);
@@ -1990,7 +1777,6 @@ export const sleepService = {
     startTime?: string;
     endTime?: string | null; // Permitir null para indicar que se debe eliminar
   }) => {
-    console.log('⏰ [SLEEP] Actualizando horarios:', eventId, data);
     
     // Si endTime es undefined, no lo incluimos en el payload
     // Si endTime es null, lo enviamos para indicar que se debe eliminar
@@ -2002,7 +1788,6 @@ export const sleepService = {
       payload.endTime = data.endTime; // Puede ser string o null
     }
     
-    console.log('📤 [SLEEP] Payload a enviar:', payload);
     
     try {
       const response = await api.patch(`/api/sleep/${eventId}/times`, payload);
@@ -2020,7 +1805,6 @@ export const sleepService = {
     endTime?: string;
     reason?: string;
   }) => {
-    console.log('⏸️ [SLEEP] Agregando pausa:', eventId, data);
     
     try {
       const response = await api.post(`/api/sleep/${eventId}/pause`, data);
@@ -2033,7 +1817,6 @@ export const sleepService = {
 
   // Eliminar pausa
   removeSleepPause: async (eventId: string, pauseId: string) => {
-    console.log('🗑️ [SLEEP] Eliminando pausa:', eventId, pauseId);
     
     try {
       const response = await api.delete(`/api/sleep/${eventId}/pause/${pauseId}`);
@@ -2046,7 +1829,6 @@ export const sleepService = {
 
   // Obtener historial de sueño
   getSleepHistory: async (childId: string, days: number = 7) => {
-    console.log(`📋 [SLEEP] Obteniendo historial de sueño (${days} días):`, childId);
     
     try {
       const response = await api.get(`/api/sleep/history/${childId}`, {
@@ -2069,20 +1851,9 @@ export const sleepService = {
       // Log detallado de allNaps
       if (response.data?.prediction?.dailySchedule?.allNaps) {
         response.data.prediction.dailySchedule.allNaps.forEach((nap: any, index: number) => {
-          console.log(`\nSiesta ${index + 1}:`);
-          console.log(`  - Tipo: ${nap.type || 'N/A'}`);
-          console.log(`  - Hora: ${nap.time || nap.startTime || 'N/A'}`);
-          console.log(`  - Duración esperada: ${nap.expectedDuration || nap.duration || 'N/A'} min`);
-          console.log(`  - Estado: ${nap.status || 'N/A'}`);
-          console.log(`  - Source: ${nap.source || 'N/A'}`);
-          console.log(`  - Confidence: ${nap.confidence || 'N/A'}%`);
-          console.log(`  - Completada: ${nap.completed ? 'Sí' : 'No'}`);
           if (nap.actualDuration) {
-            console.log(`  - Duración real: ${nap.actualDuration} min`);
           }
           if (nap.startTime && nap.endTime) {
-            console.log(`  - Inicio real: ${nap.startTime}`);
-            console.log(`  - Fin real: ${nap.endTime}`);
           }
         });
       }
@@ -2096,7 +1867,6 @@ export const sleepService = {
 
   // Obtener análisis detallado de patrones
   getSleepAnalysis: async (childId: string, days: number = 30) => {
-    console.log(`📊 [SLEEP] Obteniendo análisis (${days} días):`, childId);
     
     try {
       const response = await api.get(`/api/sleep/analysis/${childId}`, {
@@ -2111,7 +1881,6 @@ export const sleepService = {
 
   // Obtener estadísticas semanales/mensuales
   getSleepStats: async (childId: string, period: 'week' | 'month' = 'week') => {
-    console.log(`📈 [SLEEP] Obteniendo estadísticas (${period}):`, childId);
     
     try {
       const response = await api.get(`/api/sleep/stats/${childId}`, {
@@ -2137,7 +1906,6 @@ export const sleepService = {
 
   // Eliminar evento de sueño
   deleteSleepEvent: async (eventId: string) => {
-    console.log('🗑️ [SLEEP] Eliminando evento:', eventId);
     
     try {
       const response = await api.delete(`/api/sleep/${eventId}`);
@@ -2197,7 +1965,6 @@ export const appVersionService = {
   checkVersion: async (platform: 'ios' | 'android') => {
     try {
       const response = await api.get(`/api/app/version?platform=${platform}`);
-      console.log(`📱 [APP VERSION] Versión obtenida para ${platform}:`, response.data);
       return response.data;
     } catch (error: any) {
       console.error('❌ [APP VERSION] Error verificando versión:', error.response?.data || error.message);
@@ -2313,7 +2080,6 @@ export const vaccineService = {
   // Obtener vacunas de un niño
   getVaccines: async (childId: string) => {
     const response = await api.get(`/api/children/${childId}/vaccines`);
-    console.log('🔍 [API] getVaccines respuesta cruda:', JSON.stringify(response.data, null, 2));
     return response.data;
   },
   
@@ -2404,7 +2170,6 @@ export const articlesService = {
       const response = await api.get(`/api/articles/category/${categoryId}`, {
         params: { page, limit },
       });
-      console.log(`📰 [ARTICLES] Artículos obtenidos para categoría ${categoryId}:`, response.data);
       return response.data;
     } catch (error: any) {
       console.error('❌ [ARTICLES] Error obteniendo artículos:', error.response?.data || error.message);
@@ -2416,7 +2181,6 @@ export const articlesService = {
   getArticleDetail: async (articleId: string) => {
     try {
       const response = await api.get(`/api/articles/${articleId}`);
-      console.log(`📰 [ARTICLES] Detalle de artículo obtenido:`, response.data);
       return response.data;
     } catch (error: any) {
       console.error('❌ [ARTICLES] Error obteniendo detalle de artículo:', error.response?.data || error.message);
@@ -2428,7 +2192,6 @@ export const articlesService = {
   getArticleCategories: async () => {
     try {
       const response = await api.get('/api/articles/categories');
-      console.log(`📰 [ARTICLES] Categorías de artículos obtenidas:`, response.data);
       return response.data;
     } catch (error: any) {
       console.error('❌ [ARTICLES] Error obteniendo categorías:', error.response?.data || error.message);

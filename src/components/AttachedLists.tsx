@@ -10,18 +10,11 @@ interface AttachedListsProps {
 
 const AttachedLists: React.FC<AttachedListsProps> = ({ lists, onListPress }) => {
   // Debug: verificar qué se está recibiendo
-  console.log('📋 [ATTACHED LISTS] Componente renderizado con:', {
-    lists: lists,
-    listsCount: lists?.length || 0,
-    isArray: Array.isArray(lists)
-  });
   
   if (!lists || lists.length === 0) {
-    console.log('📋 [ATTACHED LISTS] No hay listas para mostrar');
     return null;
   }
   
-  console.log('📋 [ATTACHED LISTS] Mostrando', lists.length, 'listas');
 
   const getProgressPercentage = (completed: number, total: number) => {
     if (total === 0) return 0;

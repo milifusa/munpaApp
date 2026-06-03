@@ -45,7 +45,6 @@ const ProfileScreen: React.FC = () => {
   // Recargar perfil cuando la pantalla reciba foco (ej: después de cambiar ubicación)
   useFocusEffect(
     useCallback(() => {
-      console.log('🔄 Profile screen focused, reloading profile...');
       loadProfile();
     }, [])
   );
@@ -64,7 +63,6 @@ const ProfileScreen: React.FC = () => {
       setEditIsPregnant(userData.isPregnant || false);
       setEditGestationWeeks(userData.gestationWeeks || 0);
       
-      console.log('📊 Perfil cargado:', userData);
     } catch (error) {
       console.error('❌ Error cargando perfil:', error);
       Alert.alert('Error', 'No se pudo cargar el perfil');
@@ -91,7 +89,6 @@ const ProfileScreen: React.FC = () => {
         profileData.gestationWeeks = editGestationWeeks;
       }
 
-      console.log('📤 Actualizando perfil con datos:', profileData);
       await updateProfile(profileData);
       
       setShowEditModal(false);

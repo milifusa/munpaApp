@@ -18,6 +18,7 @@ export interface Recipe {
   mealType: 'breakfast' | 'lunch' | 'dinner';
   name: string;
   description: string;
+  imageUrl?: string;
   ageAppropriate: boolean;
   prepTime: number;
   cookTime: number;
@@ -68,6 +69,48 @@ export interface RecipesResponse {
 }
 
 class NutritionService {
+  async getFavorites(): Promise<{ success: boolean; data: any[] }> {
+    try {
+      const token = await AsyncStorage.getItem('authToken');
+      if (!token) {
+        throw new Error('Token de autenticación no encontrado');
+      }
+
+      const response = await axiosInstance.get('/api/recipes/favorites', {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ [NUTRITION] Error obteniendo favoritos:', error);
+      throw new Error(error.response?.data?.message || 'Error al obtener favoritos');
+    }
+  }
+
+  async deleteFavorite(favoriteId: string): Promise<{ success: boolean }> {
+    try {
+      const token = await AsyncStorage.getItem('authToken');
+      if (!token) {
+        throw new Error('Token de autenticación no encontrado');
+      }
+
+      const response = await axiosInstance.delete(`/api/recipes/favorites/${favoriteId}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ [NUTRITION] Error eliminando favorito:', error);
+      throw new Error(error.response?.data?.message || 'Error al eliminar favorito');
+    }
+  }
+
   /**
    * Obtener una receta del día para el home
    * GET /api/home/recipe?childId=xxx&mealType=xxx
@@ -77,7 +120,6 @@ class NutritionService {
     mealType: 'breakfast' | 'lunch' | 'dinner'
   ): Promise<Recipe | null> {
     try {
-      console.log('🍽️ [NUTRITION] Obteniendo receta del día:', { childId, mealType });
 
       const token = await AsyncStorage.getItem('authToken');
       
@@ -99,7 +141,6 @@ class NutritionService {
         }
       );
 
-      console.log('✅ [NUTRITION] Receta del día obtenida:', response.data.data?.name);
 
       return response.data.data || null;
     } catch (error: any) {
@@ -107,7 +148,6 @@ class NutritionService {
       
       if (error.response?.status === 400 && error.response?.data?.message?.includes('6 meses')) {
         // Bebé menor de 6 meses - lactancia exclusiva
-        console.log('ℹ️ [NUTRITION] Bebé menor de 6 meses, lactancia exclusiva');
         return null;
       }
       
@@ -121,7 +161,6 @@ class NutritionService {
    */
   async getRecipeById(recipeId: string): Promise<Recipe | null> {
     try {
-      console.log('🍽️ [NUTRITION] Obteniendo receta por ID:', recipeId);
 
       const token = await AsyncStorage.getItem('authToken');
       
@@ -139,7 +178,6 @@ class NutritionService {
         }
       );
 
-      console.log('✅ [NUTRITION] Receta obtenida:', response.data.data?.name);
 
       return response.data.data || response.data || null;
     } catch (error: any) {
@@ -157,7 +195,6 @@ class NutritionService {
     regenerate: boolean = false
   ): Promise<RecipesResponse> {
     try {
-      console.log('🍽️ [NUTRITION] Obteniendo recetas:', { childId, mealType, regenerate });
 
       const token = await AsyncStorage.getItem('authToken');
       
@@ -181,28 +218,11 @@ class NutritionService {
         }
       );
 
-      console.log('✅ [NUTRITION] Recetas obtenidas:', {
-        total: response.data.data?.length || 0,
-        cached: response.data.metadata?.cached,
-      });
 
       // DEBUG: Imprimir primera receta para verificar estructura
       if (response.data.data && response.data.data.length > 0) {
-        console.log('🔍 [NUTRITION] Primera receta:', {
-          name: response.data.data[0].name,
-          hasIngredients: !!response.data.data[0].ingredients,
-          ingredientsLength: response.data.data[0].ingredients?.length,
-          hasInstructions: !!response.data.data[0].instructions,
-          instructionsLength: response.data.data[0].instructions?.length,
-          hasTips: !!response.data.data[0].tips,
-          tipsLength: response.data.data[0].tips?.length,
-          hasAllergens: !!response.data.data[0].allergens,
-          allergensLength: response.data.data[0].allergens?.length,
-          hasNutritionalInfo: !!response.data.data[0].nutritionalInfo,
-        });
         
         // DEBUG completo de la primera receta
-        console.log('📦 [NUTRITION] Receta completa:', JSON.stringify(response.data.data[0], null, 2));
       }
 
       return response.data;
@@ -230,7 +250,6 @@ class NutritionService {
     childId: string
   ): Promise<{ success: boolean; data: Recipe[] }> {
     try {
-      console.log('🍽️ [NUTRITION] Obteniendo recetas por ingredientes:', { ingredients: ingredients.substring(0, 50), childId });
 
       const token = await AsyncStorage.getItem('authToken');
       if (!token) {
@@ -250,7 +269,6 @@ class NutritionService {
 
       const data = response.data?.data ?? response.data ?? [];
       const recipes = Array.isArray(data) ? data : [];
-      console.log('✅ [NUTRITION] Recetas por ingredientes:', recipes.length);
 
       return { success: true, data: recipes };
     } catch (error: any) {

@@ -76,13 +76,10 @@ const ShareChildScreen: React.FC = () => {
         expiresInDays: days,
       };
 
-      const response = await shareChildService.shareChild(childId, data);
+      const response: any = await shareChildService.shareChild(childId, data);
       const deepLink = response.data?.invitationLink || response.data?.data?.invitationLink;
       const webLinkValue = response.data?.webLink || response.data?.data?.webLink;
       
-      console.log('✅ [SHARE CHILD] Respuesta completa:', JSON.stringify(response, null, 2));
-      console.log('✅ [SHARE CHILD] Deep link extraído:', deepLink);
-      console.log('✅ [SHARE CHILD] Web link extraído:', webLinkValue);
       
       if (deepLink && typeof deepLink === 'string' && deepLink.startsWith('munpa://')) {
         setInvitationLink(deepLink);
@@ -121,9 +118,6 @@ const ShareChildScreen: React.FC = () => {
       // Formatear el mensaje con el link web (más compatible con apps de mensajería)
       const message = `¡Hola! ${user?.name || 'Alguien'} quiere compartir la información de ${childName} contigo.\n\nAbre este link para aceptar:\n\n${linkToShare}\n\nEl link abrirá la app Munpa automáticamente.`;
       
-      console.log('📤 [SHARE] Compartiendo link:', linkToShare);
-      console.log('📤 [SHARE] Tipo de link:', webLink ? 'Web link' : 'Deep link');
-      console.log('📤 [SHARE] Mensaje completo:', message);
       
       if (Platform.OS === 'ios') {
         // En iOS, usar title y message para mejor compatibilidad
@@ -131,13 +125,11 @@ const ShareChildScreen: React.FC = () => {
           message,
           title: `Compartir ${childName}`,
         });
-        console.log('✅ [SHARE] Resultado iOS:', result);
       } else {
         // En Android, solo message
         const result = await Share.share({
           message,
         });
-        console.log('✅ [SHARE] Resultado Android:', result);
       }
     } catch (error: any) {
       console.error('❌ [SHARE] Error compartiendo:', error);
@@ -151,10 +143,7 @@ const ShareChildScreen: React.FC = () => {
     if (!linkToCopy) return;
     
     try {
-      console.log('📋 [COPY] Copiando link:', linkToCopy);
-      console.log('📋 [COPY] Tipo de link:', webLink ? 'Web link' : 'Deep link');
       Clipboard.setString(linkToCopy);
-      console.log('✅ [COPY] Link copiado al portapapeles');
       Alert.alert('✅ Link copiado', 'El link ha sido copiado al portapapeles');
     } catch (error) {
       console.error('❌ [COPY] Error copiando link:', error);
@@ -618,4 +607,3 @@ const styles = StyleSheet.create({
 });
 
 export default ShareChildScreen;
-

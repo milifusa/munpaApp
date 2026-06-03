@@ -52,12 +52,10 @@ const ProductConversationsScreen = () => {
     
     try {
       setLoading(true);
-      console.log('💬 [CONVERSATIONS] Cargando conversaciones para producto:', productId);
       
       const fetchedConversations = await marketplaceService.getProductConversations(productId, user.id);
       setConversations(fetchedConversations);
       
-      console.log('✅ [CONVERSATIONS] Conversaciones cargadas:', fetchedConversations.length);
     } catch (error) {
       console.error('❌ [CONVERSATIONS] Error cargando conversaciones:', error);
       setConversations([]);

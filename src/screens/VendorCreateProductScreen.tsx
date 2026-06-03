@@ -205,16 +205,13 @@ const VendorCreateProductScreen = () => {
       const uploadedUrls: string[] = [];
 
       for (const asset of assets) {
-        console.log('📤 [VENDOR] Subiendo imagen:', asset.uri);
         const photoUrl = await imageUploadService.uploadImage(asset.uri, 'marketplace', asset.mimeType);
-        console.log('✅ [VENDOR] Imagen subida, URL recibida:', photoUrl);
         
         if (photoUrl) {
           uploadedUrls.push(photoUrl);
         }
       }
 
-      console.log('✅ [VENDOR] Total de URLs subidas:', uploadedUrls.length, uploadedUrls);
       
       if (uploadedUrls.length > 0) {
         setPhotos([...photos, ...uploadedUrls]);
@@ -352,8 +349,6 @@ const VendorCreateProductScreen = () => {
         productData.promoClear = true;
       }
 
-      console.log('📤 [VENDOR] Enviando producto a /api/vendor/products:', productData);
-      console.log('📤 [VENDOR] Datos detallados:', JSON.stringify(productData, null, 2));
 
       if (isEditing) {
         await api.put(`/api/vendor/products/${productId}`, productData);

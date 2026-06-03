@@ -35,27 +35,18 @@ export const useVersionCheck = (): VersionCheckResult => {
   const checkVersion = async () => {
     try {
       const platform = Platform.OS === 'ios' ? 'ios' : 'android';
-      console.log('📱 [VERSION CHECK] Verificando versión para:', platform);
-      console.log('📱 [VERSION CHECK] Versión actual:', versionCheck.currentVersion);
 
       const response = await appVersionService.checkVersion(platform);
 
       if (response.success && response.data) {
         const { minVersion, latestVersion, forceUpdate, message } = response.data;
 
-        console.log('📱 [VERSION CHECK] Datos del servidor:', {
-          minVersion,
-          latestVersion,
-          forceUpdate,
-        });
 
         // Comparar versiones
         const needsUpdate = minVersion
           ? compareVersions(versionCheck.currentVersion, minVersion) < 0
           : false;
 
-        console.log('📱 [VERSION CHECK] ¿Necesita actualización?', needsUpdate);
-        console.log('📱 [VERSION CHECK] ¿Actualización forzada?', forceUpdate);
 
         setVersionCheck({
           needsUpdate,
@@ -68,7 +59,6 @@ export const useVersionCheck = (): VersionCheckResult => {
         });
       } else {
         // No hay configuración, permitir usar la app
-        console.log('📱 [VERSION CHECK] No hay configuración de versión en el servidor');
         setVersionCheck((prev) => ({ ...prev, loading: false }));
       }
     } catch (error) {

@@ -19,16 +19,12 @@ export const setNavigationRef = (ref: NavigationContainerRef<any> | null) => {
   
   // Si hay un deep link pendiente y ahora tenemos el ref, procesarlo
   if (ref && pendingDeepLink) {
-    console.log('📌 [DEEP LINK] Procesando deep link pendiente:', pendingDeepLink);
     handleDeepLinkInternal(pendingDeepLink, currentIsAuthenticated);
     pendingDeepLink = null;
   }
 };
 
 const handleDeepLinkInternal = async (url: string, isAuthenticated: boolean) => {
-    console.log('📌 [DEEP LINK] Procesando URL:', url);
-    console.log('📌 [DEEP LINK] Usuario autenticado:', isAuthenticated);
-    console.log('📌 [DEEP LINK] NavigationRef disponible:', !!globalNavigationRef);
 
     if (!globalNavigationRef) {
       console.warn('⚠️ [DEEP LINK] NavigationRef no disponible aún');
@@ -38,7 +34,6 @@ const handleDeepLinkInternal = async (url: string, isAuthenticated: boolean) => 
     try {
       // Ignorar URLs de desarrollo de Expo
       if (url.includes('expo-development-client')) {
-        console.log('🔧 [DEEP LINK] Ignorando URL de desarrollo de Expo');
         return;
       }
 
@@ -59,7 +54,6 @@ const handleDeepLinkInternal = async (url: string, isAuthenticated: boolean) => 
       
       const parts = route.split('/').filter(part => part.length > 0);
       const queryParams = Object.fromEntries(new URLSearchParams(queryString));
-      console.log('📌 [DEEP LINK] Partes parseadas:', parts);
 
       // munpa://home
       if (parts[0] === 'home') {
@@ -136,7 +130,6 @@ const handleDeepLinkInternal = async (url: string, isAuthenticated: boolean) => 
         const token = parts[1];
         
         if (isAuthenticated) {
-          console.log('🚀 [DEEP LINK] Navegando a AcceptInvitation...');
           try {
             if (globalNavigationRef.isReady()) {
               globalNavigationRef.navigate('AcceptInvitation', { token });
@@ -153,7 +146,6 @@ const handleDeepLinkInternal = async (url: string, isAuthenticated: boolean) => 
         } else {
           // Guardar token para cuando el usuario se autentique
           await AsyncStorage.setItem('pendingShareToken', token);
-          console.log('💾 [DEEP LINK] Token guardado para después del login');
         }
         return;
       }
@@ -163,7 +155,6 @@ const handleDeepLinkInternal = async (url: string, isAuthenticated: boolean) => 
         const postId = parts[1];
         
         if (isAuthenticated) {
-          console.log('🔍 [DEEP LINK] Obteniendo información del post...');
           
           try {
             // Intentar obtener el post usando el endpoint de share que puede tener metadata
@@ -171,18 +162,14 @@ const handleDeepLinkInternal = async (url: string, isAuthenticated: boolean) => 
             const metadata = shareResponse.data?.metadata;
             const communityId = metadata?.communityId;
             
-            console.log('📋 [DEEP LINK] Metadata del post:', metadata);
-            console.log('📋 [DEEP LINK] Community ID:', communityId);
             
             if (communityId) {
               // Si tenemos el communityId, obtener los posts de esa comunidad y encontrar el post
-              console.log('🔍 [DEEP LINK] Obteniendo posts de la comunidad:', communityId);
               const postsResponse = await communitiesService.getCommunityPosts(communityId);
               const posts = postsResponse?.data || postsResponse || [];
               const post = Array.isArray(posts) ? posts.find((p: any) => p.id === postId) : null;
               
             if (post) {
-              console.log('✅ [DEEP LINK] Post encontrado, navegando a PostDetail');
               
               const formatDate = (date: any) => {
                 if (!date) return 'Fecha no disponible';
@@ -238,7 +225,6 @@ const handleDeepLinkInternal = async (url: string, isAuthenticated: boolean) => 
             
             // Si no tenemos communityId o no encontramos el post, navegar a la comunidad si tenemos el ID
             if (communityId) {
-              console.log('🚀 [DEEP LINK] Navegando a la comunidad del post...');
               if (globalNavigationRef.isReady()) {
                 globalNavigationRef.navigate('MainTabs', {
                   screen: 'Communities',
@@ -255,7 +241,6 @@ const handleDeepLinkInternal = async (url: string, isAuthenticated: boolean) => 
             }
             
             // Fallback: navegar a Home
-            console.log('⚠️ [DEEP LINK] No se pudo obtener información del post, navegando a Home...');
             if (globalNavigationRef.isReady()) {
               globalNavigationRef.navigate('MainTabs', {
                 screen: 'Home'
@@ -289,7 +274,6 @@ const handleDeepLinkInternal = async (url: string, isAuthenticated: boolean) => 
         
         if (isAuthenticated) {
           // RecommendationDetail está en RecommendationsStackNavigator
-          console.log('🚀 [DEEP LINK] Navegando a MainTabs -> Recommendations -> RecommendationDetail...');
           try {
             if (globalNavigationRef.isReady()) {
               globalNavigationRef.navigate('MainTabs', {
@@ -324,7 +308,6 @@ const handleDeepLinkInternal = async (url: string, isAuthenticated: boolean) => 
         const productId = parts[2] || (queryParams as any).productId;
         
         if (productId && isAuthenticated) {
-          console.log('🚀 [DEEP LINK] Navegando a ProductDetail...');
           try {
             if (globalNavigationRef.isReady()) {
               globalNavigationRef.navigate('ProductDetail', { productId });
@@ -347,7 +330,6 @@ const handleDeepLinkInternal = async (url: string, isAuthenticated: boolean) => 
         const userId = parts[2];
         
         if (isAuthenticated) {
-          console.log('🚀 [DEEP LINK] Navegando a MarketplaceFavorites...');
           try {
             if (globalNavigationRef.isReady()) {
               globalNavigationRef.navigate('MarketplaceFavorites', { userId });
@@ -370,7 +352,6 @@ const handleDeepLinkInternal = async (url: string, isAuthenticated: boolean) => 
         const userId = parts[2];
         
         if (isAuthenticated) {
-          console.log('🚀 [DEEP LINK] Navegando a MainTabs -> Recommendations -> FavoritesMap...');
           try {
             if (globalNavigationRef.isReady()) {
               globalNavigationRef.navigate('MainTabs', {
@@ -415,20 +396,15 @@ export const useDeepLinking = () => {
   }, [isAuthenticated]);
 
   const handleDeepLink = useCallback(async (url: string) => {
-    console.log('📌 [DEEP LINK] handleDeepLink llamado con URL:', url);
-    console.log('📌 [DEEP LINK] isAuthenticated:', isAuthenticated);
-    console.log('📌 [DEEP LINK] globalNavigationRef:', !!globalNavigationRef);
     
     // Si no tenemos el navigationRef aún, guardar el deep link para procesarlo después
     if (!globalNavigationRef) {
-      console.log('⏳ [DEEP LINK] NavigationRef no disponible, guardando deep link pendiente');
       pendingDeepLink = url;
       return;
     }
     
     // Si el usuario no está autenticado, guardar el deep link (excepto para share-child que puede funcionar sin auth)
     if (!isAuthenticated && !url.includes('share-child')) {
-      console.log('⏳ [DEEP LINK] Usuario no autenticado, guardando deep link pendiente');
       pendingDeepLink = url;
       return;
     }

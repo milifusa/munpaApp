@@ -20,12 +20,10 @@ export const useLocation = () => {
 
   const requestLocationPermission = async () => {
     try {
-      console.log('📍 [LOCATION] Solicitando permisos de ubicación...');
       
       const { status } = await Location.requestForegroundPermissionsAsync();
       
       if (status !== 'granted') {
-        console.log('❌ [LOCATION] Permisos de ubicación denegados');
         setLocationState(prev => ({
           ...prev,
           loading: false,
@@ -35,7 +33,6 @@ export const useLocation = () => {
         return false;
       }
 
-      console.log('✅ [LOCATION] Permisos de ubicación otorgados');
       setLocationState(prev => ({
         ...prev,
         permissionGranted: true,
@@ -56,15 +53,12 @@ export const useLocation = () => {
 
   const getCurrentLocation = async () => {
     try {
-      console.log('📍 [LOCATION] Obteniendo ubicación actual...');
-      
       setLocationState(prev => ({ ...prev, loading: true, error: null }));
 
       const location = await Location.getCurrentPositionAsync({
         accuracy: Location.Accuracy.Balanced,
       });
 
-      console.log('✅ [LOCATION] Ubicación obtenida:', location.coords);
 
       setLocationState({
         latitude: location.coords.latitude,

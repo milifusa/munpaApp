@@ -52,7 +52,8 @@ const AcceptInvitationScreen: React.FC = () => {
   };
 
   const handleAccept = async () => {
-    const childName = invitationDetails?.data.childName || invitationDetails?.data.child?.name || 'el hijo';
+    const data: any = invitationDetails?.data;
+    const childName = data?.childName || data?.child?.name || 'el hijo';
     Alert.alert(
       'Aceptar invitación',
       `¿Aceptas compartir la información de ${childName}?`,
@@ -165,7 +166,7 @@ const AcceptInvitationScreen: React.FC = () => {
   }
 
   // Extraer datos de la respuesta del backend
-  const data = invitationDetails.data;
+  const data: any = invitationDetails.data;
   const childName = data.childName || data.child?.name || 'Hijo';
   const childPhotoUrl = data.childPhotoUrl || data.child?.photoUrl;
   const inviterName = data.inviterName || data.inviter?.name || 'Usuario';
@@ -454,4 +455,3 @@ const styles = StyleSheet.create({
 });
 
 export default AcceptInvitationScreen;
-

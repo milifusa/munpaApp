@@ -95,7 +95,6 @@ const CommunityPostsScreen: React.FC = () => {
   // Limpiar estado cuando el usuario se desconecta
   useEffect(() => {
     if (!isAuthenticated) {
-      console.log('🧹 [POSTS] Usuario desconectado, limpiando estado...');
       setPosts([]);
       setIsLoading(false);
     }
@@ -123,13 +122,7 @@ const CommunityPostsScreen: React.FC = () => {
         const finalPosts = Array.isArray(postsData) ? postsData : [];
         
         // DEBUG: Verificar tipos de posts
-        console.log('🔍 [POSTS DEBUG] Total posts:', finalPosts.length);
         finalPosts.forEach((post: any, index: number) => {
-          console.log(`  Post ${index + 1}:`, {
-            postType: post.postType,
-            hasEventData: !!post.eventData,
-            title: post.eventData?.title || post.content?.substring(0, 30)
-          });
         });
         
         setPosts(finalPosts);
@@ -613,6 +606,10 @@ const CommunityPostsScreen: React.FC = () => {
 
 const styles = StyleSheet.create({
   container: {
+    flex: 1,
+    backgroundColor: '#F7FAFC',
+  },
+  safeArea: {
     flex: 1,
     backgroundColor: '#F7FAFC',
   },

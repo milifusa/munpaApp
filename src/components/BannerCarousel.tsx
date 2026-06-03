@@ -57,7 +57,7 @@ const BannerCarousel: React.FC<BannerCarouselProps> = ({
   const [loading, setLoading] = useState(true);
   const scrollViewRef = useRef<ScrollView>(null);
   const autoScrollTimerRef = useRef<NodeJS.Timeout | null>(null);
-  
+
   // Calcular el índice del banner personalizado
   const customBannerIndex = customBanner ? banners.length : -1;
   const totalItems = banners.length + (customBanner ? 1 : 0);
@@ -74,7 +74,7 @@ const BannerCarousel: React.FC<BannerCarouselProps> = ({
   // Esto permite verificar si se activaron o desactivaron banners
   useFocusEffect(
     useCallback(() => {
-      
+
       // Función para recargar banners
       const reloadBanners = async () => {
         const now = Date.now();
@@ -83,19 +83,17 @@ const BannerCarousel: React.FC<BannerCarouselProps> = ({
         try {
           setLoading(true);
           let fetchedBanners = await bannerService.getActiveBanners(section);
-          
+
           // Si no hay banners y hay fallback a home, intentar cargar banners de home
           if (fetchedBanners.length === 0 && fallbackToHome && section && section !== 'home') {
             const homeBanners = await bannerService.getActiveBanners('home');
             if (homeBanners.length > 0) {
               fetchedBanners = homeBanners;
             }
-          } else if (fetchedBanners.length === 0 && !fallbackToHome) {
-            console.log('⚠️ [BANNER CAROUSEL] No hay banners para', section, 'y fallbackToHome está desactivado, no se mostrará nada');
           }
-          
+
           setBanners(fetchedBanners);
-          
+
           // Registrar vista del primer banner
           if (fetchedBanners.length > 0) {
             viewedBannersRef.current.clear(); // Limpiar vistas previas para registrar de nuevo
@@ -105,8 +103,6 @@ const BannerCarousel: React.FC<BannerCarouselProps> = ({
               viewedBannersRef.current.add(firstBannerId);
               bannerService.registerView(firstBannerId);
             }
-          } else {
-            console.log('⚠️ [BANNER CAROUSEL] No hay banners para mostrar en la sección:', section || 'todas');
           }
         } catch (error) {
           console.error('❌ [BANNER CAROUSEL] Error cargando banners:', error);
@@ -114,7 +110,7 @@ const BannerCarousel: React.FC<BannerCarouselProps> = ({
           setLoading(false);
         }
       };
-      
+
       reloadBanners();
 
       return () => {
@@ -159,7 +155,7 @@ const BannerCarousel: React.FC<BannerCarouselProps> = ({
     const nextBanner = () => {
       const nextIndex = (currentIndex + 1) % totalItems;
       setCurrentIndex(nextIndex);
-      
+
       scrollViewRef.current?.scrollTo({
         x: nextIndex * resolvedBannerWidth,
         animated: true,
@@ -189,8 +185,7 @@ const BannerCarousel: React.FC<BannerCarouselProps> = ({
   };
 
   const handleBannerPress = async (banner: Banner) => {
-    console.log('🎯 [BANNER] Click en banner:', JSON.stringify(banner, null, 2));
-    
+
     // Registrar click
     await bannerService.registerClick(banner.id);
 
@@ -206,11 +201,9 @@ const BannerCarousel: React.FC<BannerCarouselProps> = ({
 
     // Manejar banners de tipo "event"
     if (banner.type === 'event') {
-      console.log('🎉 [BANNER] Banner de tipo evento detectado');
       // Usar eventId si existe, si no, usar el id del banner como postId
       const postId = banner.eventId || banner.id;
-      console.log('🎉 [BANNER] Navegando a evento con postId:', postId);
-      
+
       // EventDetail está en el HomeStackNavigator
       // Navegar directamente - React Navigation manejará la navegación anidada
       try {
@@ -218,7 +211,6 @@ const BannerCarousel: React.FC<BannerCarouselProps> = ({
           screen: 'EventDetail',
           params: { postId }
         });
-        console.log('✅ [BANNER] Navegación a evento iniciada');
       } catch (error) {
         console.error('❌ [BANNER] Error navegando a evento:', error);
       }
@@ -227,32 +219,25 @@ const BannerCarousel: React.FC<BannerCarouselProps> = ({
 
     // Manejar linkType para navegación a pantallas específicas
     if (banner.linkType) {
-      console.log('🔗 [BANNER] linkType detectado:', banner.linkType);
       switch (banner.linkType) {
         case 'denticion':
-          console.log('➡️ [BANNER] Navegando a TeethingTracker');
           navigation.navigate('TeethingTracker');
           return;
         case 'crecimiento':
-          console.log('➡️ [BANNER] Navegando a Growth');
           navigation.navigate('Growth');
           return;
         case 'hitos':
-          console.log('➡️ [BANNER] Navegando a Development');
           navigation.navigate('Development');
           return;
         case 'medicacion':
-          console.log('➡️ [BANNER] Navegando a Medications');
           navigation.navigate('Medications');
           return;
         case 'vacunas':
-          console.log('➡️ [BANNER] Navegando a ChildProfile');
           // Navegar a ChildProfile que contiene las vacunas
           // Nota: Necesitarás pasar el childId apropiado
           navigation.navigate('ChildProfile');
           return;
         case 'solicitud-servicio':
-          console.log('➡️ [BANNER] Navegando a ServiceRequest');
           navigation.navigate('ServiceRequest');
           return;
         case 'recommendation-category':
@@ -265,7 +250,6 @@ const BannerCarousel: React.FC<BannerCarouselProps> = ({
 
     // Si tiene articleId, navegar a la pantalla de detalle del artículo
     if (banner.articleId) {
-      console.log('📰 [BANNER] articleId detectado:', banner.articleId);
       navigation.navigate('ArticleDetail', {
         articleId: banner.articleId,
       });
@@ -274,7 +258,6 @@ const BannerCarousel: React.FC<BannerCarouselProps> = ({
 
     // Si tiene articleCategoryId, navegar a la pantalla de artículos
     if (banner.articleCategoryId) {
-      console.log('📚 [BANNER] articleCategoryId detectado:', banner.articleCategoryId);
       navigation.navigate('Articles', {
         categoryId: banner.articleCategoryId,
         categoryName: banner.title || 'Artículos',
@@ -284,7 +267,6 @@ const BannerCarousel: React.FC<BannerCarouselProps> = ({
 
     // Si tiene recommendationCategoryId o linkType es "recommendation-category", navegar a categoría de recomendaciones
     if (banner.recommendationCategoryId || banner.linkType === 'recommendation-category') {
-      console.log('💡 [BANNER] recommendationCategoryId detectado:', banner.recommendationCategoryId);
       const categoryId = banner.recommendationCategoryId;
       if (categoryId) {
         // Navegar al tab de Recommendations a través de MainTabs
@@ -292,7 +274,7 @@ const BannerCarousel: React.FC<BannerCarouselProps> = ({
           // Intentar obtener el navegador raíz que tiene acceso a MainTabs
           let currentNav: any = navigation;
           let rootNav = navigation;
-          
+
           // Subir hasta encontrar el navegador que puede acceder a 'MainTabs'
           while (currentNav) {
             const state = currentNav.getState();
@@ -307,13 +289,13 @@ const BannerCarousel: React.FC<BannerCarouselProps> = ({
               break;
             }
           }
-          
+
           // Navegar a MainTabs -> Recommendations -> CategoryRecommendations
           rootNav.navigate('MainTabs', {
             screen: 'Recommendations',
             params: {
               screen: 'CategoryRecommendations',
-              params: { 
+              params: {
                 categoryId: categoryId,
                 categoryName: banner.title || 'Recomendaciones',
               },
@@ -328,16 +310,13 @@ const BannerCarousel: React.FC<BannerCarouselProps> = ({
 
     // Navegar si tiene link
     if (banner.link) {
-      console.log('🔗 [BANNER] link detectado:', banner.link);
       try {
         // Parsear el link (ej: "/marketplace/category/carriolas")
         const linkParts = banner.link.split('/').filter(Boolean);
-        console.log('📝 [BANNER] linkParts:', linkParts);
-        
+
         if (linkParts.length > 0) {
           const route = linkParts[0]; // "marketplace", "communities", "lists", "recommendations", etc.
-          console.log('🛤️ [BANNER] route:', route);
-          
+
           // Navegar según el tipo de link
           if (route === 'marketplace') {
             if (linkParts[1] === 'product' && linkParts[2]) {
@@ -373,7 +352,7 @@ const BannerCarousel: React.FC<BannerCarouselProps> = ({
             // Encontrar el navegador que tiene acceso a MainTabs
             let currentNav: any = navigation;
             let rootNav = navigation;
-            
+
             while (currentNav) {
               const state = currentNav.getState();
               if (state?.routeNames?.includes('MainTabs')) {
@@ -386,7 +365,7 @@ const BannerCarousel: React.FC<BannerCarouselProps> = ({
                 break;
               }
             }
-            
+
             if (linkParts[1]) {
               // Navegar a detalle de lista (ahora dentro de Recommendations)
               rootNav.navigate('MainTabs', {
@@ -409,7 +388,7 @@ const BannerCarousel: React.FC<BannerCarouselProps> = ({
             // Encontrar el navegador que tiene acceso a MainTabs
             let currentNav: any = navigation;
             let rootNav = navigation;
-            
+
             while (currentNav) {
               const state = currentNav.getState();
               if (state?.routeNames?.includes('MainTabs')) {
@@ -422,7 +401,7 @@ const BannerCarousel: React.FC<BannerCarouselProps> = ({
                 break;
               }
             }
-            
+
             if (linkParts[1] === 'category' && linkParts[2]) {
               // Navegar a recomendaciones por categoría (usando ruta anidada)
               rootNav.navigate('MainTabs', {
@@ -474,10 +453,10 @@ const BannerCarousel: React.FC<BannerCarouselProps> = ({
   const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
     const offsetX = event.nativeEvent.contentOffset.x;
     const newIndex = Math.round(offsetX / finalBannerWidth);
-    
+
     if (newIndex !== currentIndex && newIndex >= 0 && newIndex < totalItems) {
       setCurrentIndex(newIndex);
-      
+
       // Registrar vista del nuevo banner solo si no es el banner personalizado
       if (newIndex < banners.length) {
         const banner = banners[newIndex];
@@ -490,7 +469,7 @@ const BannerCarousel: React.FC<BannerCarouselProps> = ({
       if (autoScrollTimerRef.current) {
         clearInterval(autoScrollTimerRef.current);
       }
-      
+
       // Solo auto-rotar si autoScroll está activado, hay más de un item y no estamos en el banner personalizado
       if (autoScroll && totalItems > 1 && newIndex < banners.length) {
         const banner = banners[newIndex];
@@ -530,7 +509,6 @@ const BannerCarousel: React.FC<BannerCarouselProps> = ({
 
   // Si no hay banners ni banner personalizado, no mostrar nada
   if (banners.length === 0 && !customBanner) {
-    console.log('⚠️ [BANNER CAROUSEL] No hay banners para mostrar, retornando null');
     return null;
   }
 
@@ -555,10 +533,10 @@ const BannerCarousel: React.FC<BannerCarouselProps> = ({
         {/* Banners del backend */}
         {banners.map((banner, index) => {
           const wrapperMarginLeft = shouldEnlargeSingleBanner ? 0 : (index === 0 ? 20 : 0);
-          
+
           return (
-            <View 
-              key={banner.id} 
+            <View
+              key={banner.id}
               style={[
                 styles.bannerWrapper,
                 { marginLeft: wrapperMarginLeft }
@@ -566,7 +544,7 @@ const BannerCarousel: React.FC<BannerCarouselProps> = ({
             >
               {/* Línea decorativa morada detrás - Solo si hay más de 1 banner */}
               {banners.length > 1 && <View style={styles.decorativeLine} />}
-            
+
             <TouchableOpacity
               style={[
                 styles.bannerContainer,
@@ -590,7 +568,7 @@ const BannerCarousel: React.FC<BannerCarouselProps> = ({
           </View>
           );
         })}
-        
+
         {/* Banner personalizado (ej: economía circular) */}
         {customBanner && (
           <View style={[styles.customBannerContainer, { width: finalBannerWidth }]}>
@@ -628,7 +606,7 @@ const styles = StyleSheet.create({
     paddingLeft: 0,
     paddingRight: 20,
     paddingVertical: 12,
-    gap: 16, 
+    gap: 16,
   },
   bannerWrapper: {
     position: 'relative',

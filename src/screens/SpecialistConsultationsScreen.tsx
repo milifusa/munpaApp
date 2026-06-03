@@ -58,11 +58,9 @@ const SpecialistConsultationsScreen = () => {
   const loadConsultations = async () => {
     try {
       setLoading(true);
-      console.log('📋 [SPECIALIST CONSULTATIONS] Cargando consultas...');
       
       // GET /api/specialist/consultations
       const response = await specialistService.getConsultations();
-      console.log('✅ [SPECIALIST CONSULTATIONS] Consultas obtenidas:', response);
       
       const consultationsData = response?.data ?? response ?? [];
       const consultationsList = Array.isArray(consultationsData) ? consultationsData : [];
@@ -75,7 +73,6 @@ const SpecialistConsultationsScreen = () => {
       });
       
       setConsultations(sorted);
-      console.log(`📊 [SPECIALIST CONSULTATIONS] ${sorted.length} consultas cargadas`);
     } catch (error) {
       console.error('❌ [SPECIALIST CONSULTATIONS] Error cargando consultas:', error);
       setConsultations([]);

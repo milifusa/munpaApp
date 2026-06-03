@@ -127,8 +127,6 @@ const CategoryRecommendationsScreen = ({ route, navigation }: any) => {
   // Recargar cuando la ubicación esté disponible por primera vez
   useEffect(() => {
     if (userLat !== null && userLon !== null && !isLoading && recommendations.length > 0 && !hasRecalculatedWithLocation) {
-      console.log('📍 [CATEGORY RECOMMENDATIONS] ✨ Ubicación obtenida, recalculando distancias...');
-      console.log(`📍 [CATEGORY RECOMMENDATIONS] Ubicación: {${userLat}, ${userLon}}`);
       setHasRecalculatedWithLocation(true); // Marcar como recalculado
       setCurrentPage(1);
       setHasMore(true);
@@ -156,8 +154,6 @@ const CategoryRecommendationsScreen = ({ route, navigation }: any) => {
   }, [sortBy]);
 
   const loadRecommendations = async (page: number = 1, reset: boolean = false) => {
-    console.log('🔄 [CATEGORY RECOMMENDATIONS] Cargando recomendaciones para categoría:', categoryId, `Página: ${page}`);
-    console.log('📍 [CATEGORY RECOMMENDATIONS] Ubicación del usuario:', { userLat, userLon });
     
     if (reset) {
       setIsLoading(true);
@@ -171,7 +167,6 @@ const CategoryRecommendationsScreen = ({ route, navigation }: any) => {
       
       if (response.success && response.data) {
         const newRecommendations = response.data;
-        console.log('✅ [CATEGORY RECOMMENDATIONS] Recomendaciones cargadas:', newRecommendations.length);
         
         // Verificar si hay más páginas
         if (newRecommendations.length < limit) {
@@ -179,7 +174,6 @@ const CategoryRecommendationsScreen = ({ route, navigation }: any) => {
         }
         
         // Cargar estadísticas y estado de favorito para cada recomendación
-        console.log('🔄 [CATEGORY RECOMMENDATIONS] Cargando estadísticas y favoritos...');
         const recommendationsWithData = await Promise.all(
           newRecommendations.map(async (rec: Recommendation) => {
             try {
@@ -231,7 +225,6 @@ const CategoryRecommendationsScreen = ({ route, navigation }: any) => {
           });
         }
         
-        console.log('✅ [CATEGORY RECOMMENDATIONS] Datos cargados y ordenados');
         
         if (reset) {
           setRecommendations(sortedRecommendations);
@@ -241,7 +234,6 @@ const CategoryRecommendationsScreen = ({ route, navigation }: any) => {
         
         setCurrentPage(page);
       } else {
-        console.log('⚠️ [CATEGORY RECOMMENDATIONS] Respuesta sin datos');
         setHasMore(false);
         if (reset) {
           setError('No se pudieron cargar las recomendaciones');
@@ -276,7 +268,6 @@ const CategoryRecommendationsScreen = ({ route, navigation }: any) => {
   };
 
   const handleRecommendationPress = (recommendation: Recommendation) => {
-    console.log('📍 [CATEGORY RECOMMENDATIONS] Recomendación seleccionada:', recommendation.id);
     // Navegar a pantalla de detalle
     navigation.navigate('RecommendationDetail', { 
       recommendationId: recommendation.id,
@@ -291,7 +282,6 @@ const CategoryRecommendationsScreen = ({ route, navigation }: any) => {
         await recommendationAnalyticsService.trackWebsite(recommendationId, url, {
           source: 'category_screen',
         });
-        console.log('✅ [CATEGORY] Evento de website registrado');
       } catch (error) {
         console.error('❌ [CATEGORY] Error registrando website:', error);
       }
@@ -304,14 +294,12 @@ const CategoryRecommendationsScreen = ({ route, navigation }: any) => {
 
   const handleCall = async (phone: string, recommendationId: string) => {
     if (phone) {
-      console.log('📞 [CATEGORY] Iniciando llamada:', phone);
       
       // Trackear llamada
       try {
         await recommendationAnalyticsService.trackCall(recommendationId, phone, {
           source: 'category_screen',
         });
-        console.log('✅ [CATEGORY] Evento de llamada registrado');
       } catch (error) {
         console.error('❌ [CATEGORY] Error registrando llamada:', error);
       }
@@ -324,14 +312,12 @@ const CategoryRecommendationsScreen = ({ route, navigation }: any) => {
 
   const handleWhatsApp = async (phone: string, recommendationId: string) => {
     if (phone) {
-      console.log('💬 [CATEGORY] Iniciando WhatsApp:', phone);
       
       // Trackear contacto por WhatsApp
       try {
         await recommendationAnalyticsService.trackWhatsApp(recommendationId, phone, {
           source: 'category_screen',
         });
-        console.log('✅ [CATEGORY] Evento de WhatsApp registrado');
       } catch (error) {
         console.error('❌ [CATEGORY] Error registrando WhatsApp:', error);
       }
@@ -364,30 +350,21 @@ const CategoryRecommendationsScreen = ({ route, navigation }: any) => {
 
   const handleToggleFavorite = async (recommendationId: string) => {
     try {
-      console.log('❤️ [CATEGORY RECOMMENDATIONS] Toggle favorito:', recommendationId);
       const response = await api.toggleFavorite(recommendationId);
       
-      console.log('📊 [CATEGORY] Respuesta toggleFavorite:', {
-        recommendationId,
-        isFavorite: response.isFavorite,
-        response: response
-      });
       
       // Trackear solo cuando se AGREGA a favoritos (no cuando se quita)
       if (response.isFavorite) {
-        console.log('📊 [CATEGORY] Agregando a favoritos, registrando evento de analytics...');
         try {
           await recommendationAnalyticsService.trackFavorite(recommendationId, {
             source: 'category_screen',
             timestamp: new Date(),
           });
-          console.log('✅ [CATEGORY] Evento de favorito registrado exitosamente');
         } catch (error) {
           console.error('❌ [CATEGORY] Error registrando favorito:', error);
           console.error('❌ [CATEGORY] Error details:', error instanceof Error ? error.message : error);
         }
       } else {
-        console.log('📊 [CATEGORY] Quitando de favoritos, no se registra evento');
       }
       
       // Actualizar el estado local
@@ -405,7 +382,6 @@ const CategoryRecommendationsScreen = ({ route, navigation }: any) => {
 
   const handleAddToWishlist = async (recommendationId: string, recommendationName: string) => {
     try {
-      console.log('💝 [CATEGORY RECOMMENDATIONS] Agregar a wishlist:', recommendationId);
       
       // Abrir modal simple para agregar notas (futuro: modal más completo)
       Alert.alert(
@@ -427,7 +403,6 @@ const CategoryRecommendationsScreen = ({ route, navigation }: any) => {
                   await recommendationAnalyticsService.trackWishlist(recommendationId, {
                     source: 'category_screen',
                   });
-                  console.log('✅ [CATEGORY] Evento de wishlist registrado');
                 } catch (error) {
                   console.error('❌ [CATEGORY] Error registrando wishlist:', error);
                 }

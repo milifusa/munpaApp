@@ -46,14 +46,12 @@ const learningService = {
   // ===== CHAT CON DOULI (MEJORADO CON RAG) =====
   chatWithDouli: async (message: string, conversationId: string | null = null) => {
     try {
-      console.log('🤖 [DOULI] Enviando mensaje:', message);
       
       const response = await api.post('/api/doula/chat', {
         message,
         conversationId
       });
       
-      console.log('✅ [DOULI] Respuesta recibida:', response.data);
       return response.data;
     } catch (error: any) {
       console.error('❌ [DOULI] Error en chat:', error.response?.data || error.message);
@@ -64,7 +62,6 @@ const learningService = {
   // ===== FEEDBACK DEL USUARIO =====
   sendFeedback: async (conversationId: string, feedback: 'positive' | 'negative', details: any = {}) => {
     try {
-      console.log('📝 [FEEDBACK] Enviando feedback:', feedback);
       
       const response = await api.post('/api/doula/feedback', {
         conversationId,
@@ -72,7 +69,6 @@ const learningService = {
         details
       });
       
-      console.log('✅ [FEEDBACK] Feedback enviado:', response.data);
       return response.data;
     } catch (error: any) {
       console.error('❌ [FEEDBACK] Error enviando feedback:', error.response?.data || error.message);
@@ -83,14 +79,12 @@ const learningService = {
   // ===== MEMORIA DEL USUARIO =====
   updateUserMemory: async (notes: string[] = [], preferences: any = {}) => {
     try {
-      console.log('🧠 [MEMORY] Actualizando memoria del usuario');
       
       const response = await api.put('/api/doula/memory', {
         notes,
         preferences
       });
       
-      console.log('✅ [MEMORY] Memoria actualizada:', response.data);
       return response.data;
     } catch (error: any) {
       console.error('❌ [MEMORY] Error actualizando memoria:', error.response?.data || error.message);
@@ -101,14 +95,12 @@ const learningService = {
   // ===== AGREGAR CONOCIMIENTO (ADMIN) =====
   addKnowledge: async (text: string, metadata: any = {}) => {
     try {
-      console.log('📚 [KNOWLEDGE] Agregando conocimiento:', metadata.topic);
       
       const response = await api.post('/api/doula/knowledge', {
         text,
         metadata
       });
       
-      console.log('✅ [KNOWLEDGE] Conocimiento agregado:', response.data);
       return response.data;
     } catch (error: any) {
       console.error('❌ [KNOWLEDGE] Error agregando conocimiento:', error.response?.data || error.message);
@@ -119,7 +111,6 @@ const learningService = {
   // ===== APRENDIZAJE VALIDADO (POST /learn) =====
   learnValidatedKnowledge: async (text: string, metadata: any, validation: any) => {
     try {
-      console.log('🔍 [LEARN] Aprendizaje validado:', metadata.topic);
       
       const response = await api.post('/api/doula/learn', {
         text,
@@ -127,7 +118,6 @@ const learningService = {
         validation
       });
       
-      console.log('✅ [LEARN] Conocimiento validado y aprendido:', response.data);
       return response.data;
     } catch (error: any) {
       console.error('❌ [LEARN] Error en aprendizaje validado:', error.response?.data || error.message);
@@ -138,11 +128,9 @@ const learningService = {
   // ===== TEST DE CALIDAD =====
   runQualityTest: async () => {
     try {
-      console.log('🧪 [QUALITY] Ejecutando test de calidad...');
       
       const response = await api.post('/api/doula/quality-test');
       
-      console.log('✅ [QUALITY] Test completado:', response.data);
       return response.data;
     } catch (error: any) {
       console.error('❌ [QUALITY] Error en test de calidad:', error.response?.data || error.message);
@@ -153,11 +141,9 @@ const learningService = {
   // ===== BORRAR MEMORIA DEL USUARIO =====
   clearUserMemory: async () => {
     try {
-      console.log('🗑️ [MEMORY] Borrando memoria del usuario...');
       
       const response = await api.delete('/api/doula/memory');
       
-      console.log('✅ [MEMORY] Memoria borrada:', response.data);
       return response.data;
     } catch (error: any) {
       console.error('❌ [MEMORY] Error borrando memoria:', error.response?.data || error.message);
@@ -178,7 +164,6 @@ const learningService = {
       let finalPayload = { ...payload };
 
       if (payload.childId) {
-        console.log('📘 [GUIDE] Obteniendo guía para childId:', payload.childId);
         
         const response = await coreApi.get('/api/auth/children');
         const children =
@@ -189,12 +174,6 @@ const learningService = {
         const child = children.find((item: any) => item?.id === payload.childId);
 
         if (child) {
-          console.log('📘 [GUIDE] Datos del niño encontrado:', {
-            id: child.id,
-            name: child.name,
-            birthDate: child.birthDate,
-            isUnborn: child.isUnborn,
-          });
 
           // IMPORTANTE: Siempre mantener el childId en el payload
           if (child.isUnborn) {
@@ -226,8 +205,6 @@ const learningService = {
         }
       }
 
-      console.log('📘 [GUIDE] Payload final enviado:', finalPayload);
-      console.log('📘 [GUIDE] URL completa:', `${API_BASE_URL}/api/guide/today`);
       const response = await api.post('/api/guide/today', finalPayload);
       return response.data;
     } catch (error: any) {
@@ -333,7 +310,6 @@ const learningService = {
   // ===== INICIALIZAR BASE DE CONOCIMIENTO =====
   initializeKnowledgeBase: async () => {
     try {
-      console.log('🧠 [KNOWLEDGE] Inicializando base de conocimiento...');
       
       const baseKnowledge = learningService.getBaseKnowledge();
       let successCount = 0;
@@ -343,16 +319,13 @@ const learningService = {
         try {
           await learningService.addKnowledge(knowledgeItem.text, knowledgeItem.metadata);
           successCount++;
-          console.log(`✅ [KNOWLEDGE] ${successCount}/${totalCount} - ${knowledgeItem.metadata.topic}`);
           
           // Esperar un poco entre peticiones
           await new Promise(resolve => setTimeout(resolve, 1000));
         } catch (error: any) {
-          console.log(`❌ [KNOWLEDGE] Error en ${knowledgeItem.metadata.topic}:`, error.message);
         }
       }
       
-      console.log(`🎉 [KNOWLEDGE] Inicialización completada: ${successCount}/${totalCount}`);
       return { successCount, totalCount };
     } catch (error: any) {
       console.error('💥 [KNOWLEDGE] Error en inicialización:', error);
@@ -364,11 +337,9 @@ const learningService = {
   
   // Obtener historial de conversación (opcional)
   getConversationHistory: async (conversationId: string): Promise<any[]> => {
-    console.log('📚 [DOULI] Obteniendo historial:', conversationId);
     
     try {
       const response = await api.get(`/api/doula/conversation/${conversationId}`);
-      console.log('✅ [DOULI] Historial obtenido:', response.data);
       return response.data.data || [];
     } catch (error: any) {
       console.error('❌ [DOULI] Error obteniendo historial:', error);
@@ -378,11 +349,9 @@ const learningService = {
 
   // Limpiar conversación (opcional)
   clearConversation: async (conversationId: string): Promise<boolean> => {
-    console.log('🗑️ [DOULI] Limpiando conversación:', conversationId);
     
     try {
       const response = await api.delete(`/api/doula/conversation/${conversationId}`);
-      console.log('✅ [DOULI] Conversación limpiada:', response.data);
       return true;
     } catch (error: any) {
       console.error('❌ [DOULI] Error limpiando conversación:', error);
@@ -392,11 +361,9 @@ const learningService = {
 
   // Obtener conocimiento por tema
   getKnowledgeByTopic: async (topic: string): Promise<any[]> => {
-    console.log('🔍 [KNOWLEDGE] Buscando conocimiento por tema:', topic);
     
     try {
       const response = await api.get(`/api/doula/knowledge/topic/${topic}`);
-      console.log('✅ [KNOWLEDGE] Conocimiento encontrado:', response.data);
       return response.data.data || [];
     } catch (error: any) {
       console.error('❌ [KNOWLEDGE] Error buscando conocimiento:', error);
@@ -406,11 +373,9 @@ const learningService = {
 
   // Eliminar conocimiento
   deleteKnowledge: async (knowledgeId: string): Promise<boolean> => {
-    console.log('🗑️ [KNOWLEDGE] Eliminando conocimiento:', knowledgeId);
     
     try {
       const response = await api.delete(`/api/doula/knowledge/${knowledgeId}`);
-      console.log('✅ [KNOWLEDGE] Conocimiento eliminado:', response.data);
       return true;
     } catch (error: any) {
       console.error('❌ [KNOWLEDGE] Error eliminando conocimiento:', error);

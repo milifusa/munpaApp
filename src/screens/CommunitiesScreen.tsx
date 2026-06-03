@@ -84,7 +84,6 @@ const CommunitiesScreen = () => {
   // Recargar comunidades cuando la pantalla recibe el foco
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
-      console.log('🔄 [COMMUNITIES] Pantalla recibió foco, recargando comunidades...');
       loadCommunities();
     });
 
@@ -94,7 +93,6 @@ const CommunitiesScreen = () => {
   // Limpiar estado cuando el usuario se desconecta
   useEffect(() => {
     if (!isAuthenticated) {
-      console.log('🧹 [COMMUNITIES] Usuario desconectado, limpiando estado...');
       setCommunities([]);
       setUserCommunities([]);
       setPublicCommunities([]);
@@ -199,7 +197,6 @@ const CommunitiesScreen = () => {
   const loadCommunities = async (force: boolean = false) => {
     // Verificar que el usuario esté autenticado antes de cargar datos
     if (!isAuthenticated) {
-      console.log('🚫 [COMMUNITIES] Usuario no autenticado, no cargando comunidades');
       setIsLoading(false);
       return;
     }
@@ -290,11 +287,9 @@ const CommunitiesScreen = () => {
 
     try {
       setIsSearching(true);
-      console.log('🔍 [COMMUNITIES] Iniciando búsqueda inteligente:', query);
       
       const result = await communitiesService.searchCommunities(query, 20);
       
-      console.log('🔍 [COMMUNITIES] Estructura completa de respuesta:', JSON.stringify(result, null, 2));
       
       if (result.success) {
         // El backend devuelve la estructura: { data: { results: [...] } }
@@ -305,7 +300,6 @@ const CommunitiesScreen = () => {
         setSearchResults(validResults);
         setShowSearchResults(true);
       } else {
-        console.log('❌ [COMMUNITIES] Búsqueda sin resultados');
         setSearchResults([]);
         setShowSearchResults(true);
       }
@@ -336,8 +330,6 @@ const CommunitiesScreen = () => {
       
       // 1. Si hay imagen, subirla primero para obtener la URL
       if (newCommunity.image) {
-        console.log('🖼️ [COMMUNITIES] Subiendo imagen a /api/communities/upload-photo...');
-        console.log('🖼️ [COMMUNITIES] Tipo MIME de la imagen:', newCommunity.imageMimeType);
         try {
           imageUrl = await imageUploadService.uploadCommunityImage(newCommunity.image, newCommunity.imageMimeType);
 
@@ -386,7 +378,6 @@ const CommunitiesScreen = () => {
 
   const handlePickImage = async () => {
     try {
-      console.log('🖼️ [IMAGE PICKER] Iniciando selección de imagen...');
       
       // Solicitar permisos primero
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -404,14 +395,6 @@ const CommunitiesScreen = () => {
 
       if (!result.canceled && result.assets[0]) {
         const selectedImage = result.assets[0];
-        console.log('🖼️ [IMAGE PICKER] Imagen seleccionada:', {
-          uri: selectedImage.uri,
-          width: selectedImage.width,
-          height: selectedImage.height,
-          fileSize: selectedImage.fileSize,
-          mimeType: selectedImage.mimeType,
-          type: selectedImage.type
-        });
         
         setNewCommunity(prev => ({
           ...prev,
@@ -419,9 +402,7 @@ const CommunitiesScreen = () => {
           imageMimeType: selectedImage.mimeType || undefined // Guardar el tipo MIME real
         }));
         
-        console.log('✅ [IMAGE PICKER] Imagen asignada al estado con tipo MIME:', selectedImage.mimeType);
       } else {
-        console.log('🖼️ [IMAGE PICKER] Selección cancelada por el usuario');
       }
     } catch (error) {
       console.error('❌ [IMAGE PICKER] Error seleccionando imagen:', error);
@@ -431,7 +412,6 @@ const CommunitiesScreen = () => {
 
   const handleTakePhoto = async () => {
     try {
-      console.log('📸 [CAMERA] Iniciando captura de foto...');
       
       // Solicitar permisos de cámara
       const { status } = await ImagePicker.requestCameraPermissionsAsync();
@@ -448,14 +428,6 @@ const CommunitiesScreen = () => {
 
       if (!result.canceled && result.assets[0]) {
         const selectedImage = result.assets[0];
-        console.log('📸 [CAMERA] Foto tomada:', {
-          uri: selectedImage.uri,
-          width: selectedImage.width,
-          height: selectedImage.height,
-          fileSize: selectedImage.fileSize,
-          mimeType: selectedImage.mimeType,
-          type: selectedImage.type
-        });
         
         setNewCommunity(prev => ({
           ...prev,
@@ -463,9 +435,7 @@ const CommunitiesScreen = () => {
           imageMimeType: selectedImage.mimeType || undefined // Guardar el tipo MIME real
         }));
         
-        console.log('✅ [CAMERA] Foto asignada al estado con tipo MIME:', selectedImage.mimeType);
       } else {
-        console.log('📸 [CAMERA] Captura cancelada por el usuario');
       }
     } catch (error) {
       console.error('❌ [CAMERA] Error tomando foto:', error);
@@ -495,7 +465,6 @@ const CommunitiesScreen = () => {
     try {
       if (isUserCommunity(community)) {
         // Si es mi comunidad, navegar a los posts
-        console.log('🏠 [COMMUNITIES] Es mi comunidad, navegando a posts:', community.name);
         analyticsService.logEvent('community_open', {
           community_id: community.id,
           name: community.name,
@@ -535,7 +504,6 @@ const CommunitiesScreen = () => {
       }
 
       // Si es comunidad pública, unirse directamente
-      console.log('🤝 [COMMUNITIES] Uniéndose a comunidad pública:', community.name);
       analyticsService.logEvent('community_join', {
         community_id: community.id,
         name: community.name,
@@ -577,7 +545,6 @@ const CommunitiesScreen = () => {
   // Función para manejar solicitudes a comunidades privadas
   const handleJoinPrivateCommunity = async (community: Community) => {
     try {
-      console.log('🔒 [COMMUNITIES] Enviando solicitud a comunidad privada:', community.name);
       setJoiningCommunityId(community.id);
       
       const result = await communitiesService.joinCommunity(community.id);

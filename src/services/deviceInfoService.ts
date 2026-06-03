@@ -43,7 +43,6 @@ class DeviceInfoService {
         userAgent,
       };
 
-      console.log('📱 [DEVICE INFO] Info del dispositivo:', this.cachedInfo);
       return this.cachedInfo;
     } catch (error) {
       console.error('❌ [DEVICE INFO] Error obteniendo info:', error);
@@ -82,13 +81,11 @@ class DeviceInfoService {
       const token = await AsyncStorage.getItem('authToken');
       
       if (!token) {
-        console.log('⚠️ [DEVICE INFO] No hay token, saltando actualización');
         return;
       }
 
       const deviceInfo = await this.getDeviceInfo();
       
-      console.log('📤 [DEVICE INFO] Actualizando en backend...');
 
       const response = await axiosInstance.post(
         '/api/users/device-info',
@@ -101,7 +98,6 @@ class DeviceInfoService {
       );
 
       if (response.data.success) {
-        console.log('✅ [DEVICE INFO] Actualizado exitosamente');
         
         // Guardar timestamp de última actualización
         await AsyncStorage.setItem(
@@ -146,7 +142,6 @@ class DeviceInfoService {
     if (should) {
       await this.updateDeviceInfo();
     } else {
-      console.log('ℹ️ [DEVICE INFO] No es necesario actualizar todavía');
     }
   }
 

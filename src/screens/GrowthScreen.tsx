@@ -125,8 +125,9 @@ const GrowthScreen: React.FC = () => {
           childToSelect = data.find((c: Child) => c.id === savedChildId) || null;
         }
         if (!childToSelect && data.length > 0) {
-          childToSelect = data[0];
-          await AsyncStorage.setItem('selectedChildId', childToSelect.id);
+          const firstChild = data[0]!;
+          childToSelect = firstChild;
+          await AsyncStorage.setItem('selectedChildId', firstChild.id);
         }
         setSelectedChild(childToSelect);
       } else {
@@ -222,7 +223,6 @@ const GrowthScreen: React.FC = () => {
         response = await growthService.getHeadMeasurements(child.id);
       }
       const items = Array.isArray(response?.data) ? response.data : [];
-      console.log('📈 [GROWTH] Mediciones recibidas:', items);
       setMeasurements(items);
       await loadPercentiles(type, child);
     } catch (error) {
@@ -662,7 +662,7 @@ const GrowthScreen: React.FC = () => {
                     </View>
                     <View style={styles.summaryRight}>
                       <Text style={styles.summaryPercentile}>
-                        {activeTab === 'summary' ? getSummaryPercentile(summary?.latest) : percentileLabel}
+                        {percentileLabel}
                       </Text>
                       <Text style={styles.summaryHint}>Percentil</Text>
                     </View>

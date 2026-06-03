@@ -17,7 +17,9 @@ export type BannerSection =
   | 'denticion'
   | 'hitos'
   | 'nutricion'
-  | 'menu-lateral';
+  | 'menu-lateral'
+  | 'menu-lateral-specialist'
+  | 'desarrollo';
 
 export interface Banner {
   id: string;
@@ -151,4 +153,3 @@ class BannerService {
 
 const bannerService = new BannerService();
 export default bannerService;
-

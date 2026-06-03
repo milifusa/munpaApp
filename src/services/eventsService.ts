@@ -26,11 +26,9 @@ class EventsService {
     waitlistCount?: number;
     message?: string;
   }> {
-    console.log('✅ [EVENTS] Confirmando asistencia al evento:', postId);
     
     try {
       const response = await api.post(`/api/posts/${postId}/attend`);
-      console.log('✅ [EVENTS] Asistencia confirmada:', response.data);
       return response.data.data || response.data;
     } catch (error: any) {
       console.error('❌ [EVENTS] Error confirmando asistencia:', error.response?.data || error.message);
@@ -42,11 +40,9 @@ class EventsService {
    * Cancelar asistencia a un evento
    */
   async cancelAttendance(postId: string): Promise<{ attendeeCount: number; userAttending: boolean }> {
-    console.log('❌ [EVENTS] Cancelando asistencia al evento:', postId);
     
     try {
       const response = await api.delete(`/api/posts/${postId}/attend`);
-      console.log('✅ [EVENTS] Asistencia cancelada:', response.data);
       return response.data.data || response.data;
     } catch (error: any) {
       console.error('❌ [EVENTS] Error cancelando asistencia:', error.response?.data || error.message);
@@ -58,11 +54,9 @@ class EventsService {
    * Obtener lista de asistentes de un evento
    */
   async getAttendees(postId: string): Promise<AttendeesResponse> {
-    console.log('👥 [EVENTS] Obteniendo asistentes del evento:', postId);
     
     try {
       const response = await api.get(`/api/posts/${postId}/attendees`);
-      console.log('✅ [EVENTS] Asistentes obtenidos:', response.data);
       return response.data.data || response.data;
     } catch (error: any) {
       console.error('❌ [EVENTS] Error obteniendo asistentes:', error.response?.data || error.message);
@@ -74,7 +68,6 @@ class EventsService {
    * Obtener eventos de una comunidad
    */
   async getCommunityEvents(communityId: string, filters: EventsFilter = {}): Promise<{ data: Post[]; pagination: any }> {
-    console.log('📅 [EVENTS] Obteniendo eventos de la comunidad:', communityId, filters);
     
     try {
       const params = new URLSearchParams();
@@ -86,7 +79,6 @@ class EventsService {
       const url = `/api/communities/${communityId}/events${queryString ? `?${queryString}` : ''}`;
       
       const response = await api.get(url);
-      console.log('✅ [EVENTS] Eventos obtenidos:', response.data);
       
       return {
         data: response.data.data || response.data || [],
@@ -102,11 +94,9 @@ class EventsService {
    * Actualizar un evento (solo el autor puede hacerlo)
    */
   async updateEvent(postId: string, data: Partial<CreatePostData>): Promise<Post> {
-    console.log('📝 [EVENTS] Actualizando evento:', postId, data);
     
     try {
       const response = await api.put(`/api/posts/${postId}`, data);
-      console.log('✅ [EVENTS] Evento actualizado:', response.data);
       return response.data.data || response.data;
     } catch (error: any) {
       console.error('❌ [EVENTS] Error actualizando evento:', error.response?.data || error.message);
@@ -118,7 +108,6 @@ class EventsService {
    * Cancelar un evento (cambia status a 'cancelled')
    */
   async cancelEvent(postId: string): Promise<Post> {
-    console.log('🚫 [EVENTS] Cancelando evento:', postId);
     
     try {
       const response = await api.put(`/api/posts/${postId}`, {
@@ -126,7 +115,6 @@ class EventsService {
           status: 'cancelled'
         }
       });
-      console.log('✅ [EVENTS] Evento cancelado:', response.data);
       return response.data.data || response.data;
     } catch (error: any) {
       console.error('❌ [EVENTS] Error cancelando evento:', error.response?.data || error.message);
@@ -237,11 +225,9 @@ class EventsService {
    * Salir de la lista de espera
    */
   async leaveWaitlist(postId: string): Promise<{ waitlistCount: number; userInWaitlist: boolean }> {
-    console.log('📋 [EVENTS] Saliendo de lista de espera:', postId);
     
     try {
       const response = await api.delete(`/api/posts/${postId}/waitlist`);
-      console.log('✅ [EVENTS] Saliste de la lista de espera:', response.data);
       return response.data.data || response.data;
     } catch (error: any) {
       console.error('❌ [EVENTS] Error saliendo de lista de espera:', error.response?.data || error.message);
@@ -259,11 +245,9 @@ class EventsService {
     checkInUrl: string;
     qrData: string;
   }> {
-    console.log('🔲 [EVENTS] Generando código QR:', postId);
     
     try {
       const response = await api.get(`/api/posts/${postId}/qr-code`);
-      console.log('✅ [EVENTS] Código QR generado:', response.data);
       return response.data.data || response.data;
     } catch (error: any) {
       console.error('❌ [EVENTS] Error generando QR:', error.response?.data || error.message);
@@ -280,11 +264,9 @@ class EventsService {
     userCheckedIn: boolean;
     checkInTime: string;
   }> {
-    console.log('✅ [EVENTS] Haciendo check-in:', postId, code);
     
     try {
       const response = await api.post(`/api/posts/${postId}/checkin`, { code });
-      console.log('✅ [EVENTS] Check-in exitoso:', response.data);
       return response.data.data || response.data;
     } catch (error: any) {
       console.error('❌ [EVENTS] Error en check-in:', error.response?.data || error.message);
@@ -301,11 +283,9 @@ class EventsService {
     eventDate: string;
     eventEndDate?: string;
   }> {
-    console.log('📅 [EVENTS] Obteniendo URL de Google Calendar:', postId);
     
     try {
       const response = await api.get(`/api/posts/${postId}/calendar/google`);
-      console.log('✅ [EVENTS] URL de Google Calendar obtenida:', response.data);
       return response.data.data || response.data;
     } catch (error: any) {
       console.error('❌ [EVENTS] Error obteniendo URL de Google Calendar:', error.response?.data || error.message);

@@ -31,7 +31,6 @@ const SpecialistStatsScreen = () => {
     try {
       setLoading(true);
       const response = await axiosInstance.get(`/api/specialist/stats?period=${period}`);
-      console.log('📊 [STATS] Estadísticas cargadas:', response.data);
       
       const statsData = response.data?.data || response.data;
       setStats(statsData);

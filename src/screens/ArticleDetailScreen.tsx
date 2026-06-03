@@ -63,7 +63,7 @@ interface ArticleDetail {
   categoryId: string;
   categoryName?: string | { id: string; name: string };
   keywords?: Array<string | { id: string; name: string; slug?: string }>;
-  tags?: Array<string | { id: string; name: string; slug?: string }>;
+  tags?: string[];
   readingTimeMinutes?: number;
   readTime?: number;
   createdAt: string | { _seconds: number; _nanoseconds: number };
@@ -105,13 +105,6 @@ const ArticleDetailScreen: React.FC<ArticleDetailScreenProps> = ({ route, naviga
         ).filter(Boolean),
       };
       
-      console.log('📰 [ARTICLE DETAIL] Datos normalizados:', {
-        id: articleData.id,
-        title: articleData.title,
-        categoryName: articleData.categoryName,
-        author: articleData.author,
-        tags: articleData.tags,
-      });
       
       setArticle(articleData);
       
@@ -359,7 +352,6 @@ const ArticleDetailScreen: React.FC<ArticleDetailScreenProps> = ({ route, naviga
                     });
                   } else if (banner?.link) {
                     // Abrir link externo si existe
-                    console.log('Banner link:', banner.link);
                   }
                 }}
                 activeOpacity={0.9}
@@ -468,6 +460,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#FFFFFF',
+  },
+  safeArea: {
+    flex: 1,
   },
   headerWrapper: {
     backgroundColor: '#59C6C0',

@@ -60,7 +60,6 @@ const NotificationsScreen = () => {
 
   const loadNotifications = async () => {
     try {
-      console.log('📬 [NOTIFICATIONS] Cargando notificaciones...');
       const response = await api.get('/api/notifications');
       
       if (response.data?.success) {
@@ -154,7 +153,6 @@ const NotificationsScreen = () => {
       '';
     const data: any = { ...nestedData, ...rawData, type };
 
-    console.log('🔍 [NOTIFICATIONS] Navegando desde notificación:', { type, data });
 
     try {
       switch (type) {
@@ -178,13 +176,11 @@ const NotificationsScreen = () => {
         case 'recipe_daily_reminder':
           // Navegar a la pantalla de detalle de receta si hay recipeId
           if (data.recipeId) {
-            console.log('🍽️ [NOTIFICATIONS] Navegando a RecipeDetail con ID:', data.recipeId);
             navigation.navigate('RecipeDetail', {
               recipeId: data.recipeId,
             });
           } else {
             // Si no hay recipeId, navegar a Feeding
-            console.log('🍽️ [NOTIFICATIONS] Navegando a Feeding para ver recetas');
             navigation.navigate('Feeding', {
               mealType: data.mealType,
             });
@@ -196,14 +192,12 @@ const NotificationsScreen = () => {
         case 'community_post':
           // Navegar al detalle del post
           if (data.postId) {
-            console.log('🚀 [NOTIFICATIONS] Navegando a PostDetail:', data.postId);
             navigation.navigate('PostDetail', {
               postId: data.postId,
               communityId: data.communityId,
               communityName: data.communityName || 'Comunidad',
             });
           } else if (data.communityId) {
-            console.log('🚀 [NOTIFICATIONS] Navegando a CommunityPosts:', data.communityId);
             navigation.navigate('MainTabs', {
               screen: 'Communities',
               params: {
@@ -291,7 +285,6 @@ const NotificationsScreen = () => {
 
   const markAllAsRead = async () => {
     try {
-      console.log('📬 [NOTIFICATIONS] Marcando todas las notificaciones como leídas...');
       const response = await api.patch('/api/notifications/mark-all-read');
       
       
@@ -528,7 +521,6 @@ const NotificationsScreen = () => {
                       await api.post(`/api/medications/reminders/${medicationReminderId}/taken`, {
                         status: 'skipped',
                       });
-                      console.log('🟡 [MED] Marcado como no tomado (skipped)');
                     } catch (error) {
                       console.error('❌ [MED] Error registrando skipped:', error);
                     } finally {
@@ -550,7 +542,6 @@ const NotificationsScreen = () => {
                       await api.post(`/api/medications/reminders/${medicationReminderId}/taken`, {
                         status: 'taken',
                       });
-                      console.log('✅ [MED] Tomado registrado');
                     } catch (error) {
                       console.error('❌ [MED] Error registrando tomado:', error);
                     } finally {

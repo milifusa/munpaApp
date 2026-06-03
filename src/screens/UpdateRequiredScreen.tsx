@@ -25,31 +25,22 @@ const UpdateRequiredScreen: React.FC<UpdateRequiredScreenProps> = ({
   latestVersion,
   message,
 }) => {
-  console.log('🎨 [UPDATE SCREEN] Renderizando pantalla de actualización');
-  console.log('📱 [UPDATE SCREEN] Versión actual:', currentVersion);
-  console.log('📱 [UPDATE SCREEN] Versión requerida:', latestVersion);
 
   const handleUpdate = async () => {
-    console.log('🔄 [UPDATE] Botón presionado');
     
     const storeUrl = Platform.select({
       ios: 'https://apps.apple.com/us/app/munpa/id6754290929',
       android: 'https://play.google.com/store/apps/details?id=com.munpaapp',
     });
 
-    console.log('🔗 [UPDATE] URL seleccionada:', storeUrl);
 
     if (storeUrl) {
       try {
         const canOpen = await Linking.canOpenURL(storeUrl);
-        console.log('✅ [UPDATE] ¿Puede abrir URL?:', canOpen);
         
         if (canOpen) {
-          console.log('🚀 [UPDATE] Abriendo URL...');
           await Linking.openURL(storeUrl);
-          console.log('✅ [UPDATE] URL abierta exitosamente');
         } else {
-          console.log('⚠️ [UPDATE] No se puede abrir la URL');
           Alert.alert(
             'Error',
             'No se puede abrir la App Store. Por favor, búsca "Munpa" manualmente en la tienda.',
@@ -109,7 +100,6 @@ const UpdateRequiredScreen: React.FC<UpdateRequiredScreenProps> = ({
         {/* Botón de prueba simple */}
         <TouchableOpacity
           onPress={() => {
-            console.log('🧪 [TEST] Botón de prueba presionado!');
             Alert.alert('Prueba', '¡El botón funciona!');
           }}
           style={{
@@ -131,7 +121,6 @@ const UpdateRequiredScreen: React.FC<UpdateRequiredScreenProps> = ({
             pressed && styles.updateButtonPressed,
           ]}
           onPress={() => {
-            console.log('🔘 [UPDATE] Pressable presionado!');
             handleUpdate();
           }}
           testID="update-button"

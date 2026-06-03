@@ -43,7 +43,6 @@ class SleepTrackingNotification {
         return false;
       }
       
-      console.log('✅ [NAP-NOTIF] Permisos de notificaciones otorgados');
       return true;
     } catch (error) {
       console.error('❌ [NAP-NOTIF] Error solicitando permisos:', error);
@@ -56,14 +55,14 @@ class SleepTrackingNotification {
    */
   async setupNotificationCategories(): Promise<void> {
     try {
-      console.log('⚙️ [NAP-NOTIF] Configurando categorías de notificaciones...');
       
       // Configurar handler PRIMERO
       Notifications.setNotificationHandler({
         handleNotification: async () => {
-          console.log('📬 [NAP-NOTIF] Handler de notificación llamado');
           return {
             shouldShowAlert: true,
+            shouldShowBanner: true,
+            shouldShowList: true,
             shouldPlaySound: false,
             shouldSetBadge: false,
           };
@@ -108,7 +107,6 @@ class SleepTrackingNotification {
         },
       ]);
 
-      console.log('✅ [NAP-NOTIF] Categorías de notificación configuradas');
     } catch (error) {
       console.error('❌ [NAP-NOTIF] Error configurando categorías:', error);
     }
@@ -119,7 +117,6 @@ class SleepTrackingNotification {
    */
   async startTracking(napData: ActiveNapData): Promise<void> {
     try {
-      console.log('🚀 [NAP-NOTIF] Iniciando tracking de siesta...');
       
       // Verificar y solicitar permisos
       const hasPermission = await this.requestPermissions();
@@ -136,12 +133,13 @@ class SleepTrackingNotification {
       
       // SEGUNDO: Guardar los datos ANTES de actualizar
       this.currentNapData = napData;
-      console.log('💾 [NAP-NOTIF] Datos de siesta guardados:', napData);
 
       // TERCERO: Configurar handler de comportamiento de notificaciones
       Notifications.setNotificationHandler({
         handleNotification: async () => ({
           shouldShowAlert: true,
+          shouldShowBanner: true,
+          shouldShowList: true,
           shouldPlaySound: false,
           shouldSetBadge: false,
         }),
@@ -153,7 +151,6 @@ class SleepTrackingNotification {
       // NO actualizar periódicamente porque en iOS cada actualización crea una nueva notificación
       // La barra visual en HomeScreen se actualiza en tiempo real
       
-      console.log('✅ [NAP-NOTIF] Notificación inicial mostrada (sin actualizaciones automáticas)');
     } catch (error) {
       console.error('❌ [NAP-NOTIF] Error iniciando tracking:', error);
     }
@@ -179,18 +176,11 @@ class SleepTrackingNotification {
     }
 
     try {
-      console.log('🔄 [NAP-NOTIF] Actualizando notificación...');
-      console.log('📊 [NAP-NOTIF] Datos actuales:', {
-        startTime: this.currentNapData.startTime,
-        expectedDuration: this.currentNapData.expectedDuration,
-        isPaused: this.currentNapData.isPaused
-      });
       
       const now = new Date();
       const startTime = new Date(this.currentNapData.startTime);
       const elapsedMinutes = Math.floor((now.getTime() - startTime.getTime()) / 1000 / 60);
       
-      console.log('⏱️ [NAP-NOTIF] Tiempo transcurrido:', elapsedMinutes, 'minutos');
       
       const hours = Math.floor(elapsedMinutes / 60);
       const mins = elapsedMinutes % 60;
@@ -216,17 +206,11 @@ class SleepTrackingNotification {
       const title = this.currentNapData.isPaused ? '⏸️ Siesta pausada' : '😴 Siesta';
       const categoryId = this.currentNapData.isPaused ? 'nap-tracking-paused' : 'nap-tracking-running';
 
-      console.log('📱 [NAP-NOTIF] Mostrando notificación:', {
-        title,
-        body: bodyText,
-        categoryId
-      });
 
       // Cancelar notificación anterior programada
       await Notifications.cancelScheduledNotificationAsync(this.notificationId);
       // También dismissar si ya está mostrada
       await Notifications.dismissNotificationAsync(this.notificationId);
-      console.log('🗑️ [NAP-NOTIF] Notificación anterior cancelada');
       
       // Programar notificación persistente con acciones
       const notificationId = await Notifications.scheduleNotificationAsync({
@@ -250,7 +234,6 @@ class SleepTrackingNotification {
         trigger: null, // Mostrar inmediatamente
       });
       
-      console.log('✅ [NAP-NOTIF] Notificación programada con ID:', notificationId);
 
     } catch (error) {
       console.error('❌ [NAP-NOTIF] Error actualizando notificación:', error);
@@ -274,7 +257,6 @@ class SleepTrackingNotification {
       
       this.currentNapData = null;
       
-      console.log('✅ [NAP-NOTIF] Tracking de siesta detenido');
     } catch (error) {
       console.error('❌ [NAP-NOTIF] Error deteniendo tracking:', error);
     }

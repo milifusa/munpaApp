@@ -49,16 +49,8 @@ const MarketplaceMessagesScreen = () => {
 
   const loadProductInfo = async () => {
     try {
-      console.log('📦 [MESSAGES] Cargando información del producto:', productId);
       const product = await marketplaceService.getProductById(productId);
       
-      console.log('📦 [MESSAGES] Información del producto recibida:', {
-        productId: product.id,
-        title: product.title,
-        sellerId: product.userId,
-        sellerName: product.userName || 'NO TIENE NOMBRE',
-        sellerPhoto: product.userPhoto || 'NO TIENE FOTO',
-      });
       
       setProductInfo({
         title: product.title,
@@ -74,22 +66,10 @@ const MarketplaceMessagesScreen = () => {
         ? otherUserId  // Si soy el vendedor, el otro es el comprador
         : product.userId; // Si soy el comprador, el otro es el vendedor
       
-      console.log('👥 [MESSAGES] Identificando otro usuario:', {
-        usuarioActualId: user?.id,
-        productUserId: product.userId,
-        otherUserIdParam: otherUserId,
-        theOtherUserId,
-        esVendedor: user?.id === product.userId,
-      });
       
       if (theOtherUserId && theOtherUserId !== user?.id) {
         // Si el otro usuario es el vendedor, usar la información del producto
         if (theOtherUserId === product.userId) {
-          console.log('✅ [MESSAGES] Otro usuario es el vendedor, usando info del producto:', {
-            id: product.userId,
-            name: product.userName || 'NO TIENE NOMBRE',
-            photo: product.userPhoto || 'NO TIENE FOTO',
-          });
           setOtherUserInfo({
             id: product.userId,
             name: product.userName,
@@ -97,10 +77,6 @@ const MarketplaceMessagesScreen = () => {
           });
         } else {
           // Si el otro usuario es un comprador, la información vendrá de los mensajes
-          console.log('⚠️ [MESSAGES] Otro usuario es comprador, información vendrá de mensajes:', {
-            id: theOtherUserId,
-            nota: '⚠️ BACKEND DEBE ENVIAR senderName y senderPhoto en los mensajes',
-          });
           setOtherUserInfo(prev => ({
             id: theOtherUserId,
             name: prev.name,
@@ -115,13 +91,8 @@ const MarketplaceMessagesScreen = () => {
 
   const loadMessages = async () => {
     try {
-      console.log('💬 [MESSAGES] Cargando mensajes para producto:', productId);
-      console.log('👤 [MESSAGES] Usuario actual ID:', user?.id);
-      console.log('👤 [MESSAGES] Otro usuario ID:', otherUserId);
-      console.log('👤 [MESSAGES] Usuario actual nombre:', user?.name || user?.displayName);
       
       const fetchedMessages = await marketplaceService.getProductMessages(productId);
-      console.log('✅ [MESSAGES] Mensajes cargados del backend:', fetchedMessages?.length || 0);
       
       const messagesArray = Array.isArray(fetchedMessages) ? fetchedMessages : [];
       
@@ -142,9 +113,6 @@ const MarketplaceMessagesScreen = () => {
         return belongsToThisConversation;
       });
       
-      console.log('✅ [MESSAGES] Mensajes filtrados para esta conversación:', filteredMessages.length);
-      console.log('📊 [MESSAGES] Total mensajes del producto:', messagesArray.length);
-      console.log('📊 [MESSAGES] Mensajes filtrados:', filteredMessages.length);
       
       // Encontrar información del otro usuario desde los mensajes FILTRADOS
       const otherUserMessages = filteredMessages.filter((m: any) => m.senderId !== user?.id);
@@ -154,19 +122,9 @@ const MarketplaceMessagesScreen = () => {
         m.senderName !== 'Usuario'
       );
       
-      console.log('✅ [MESSAGES] Mensaje con información válida del otro usuario:', otherUserMessage ? {
-        senderId: otherUserMessage.senderId,
-        senderName: otherUserMessage.senderName,
-        senderPhoto: otherUserMessage.senderPhoto ? 'Presente' : 'Ausente',
-      } : 'NO ENCONTRADO');
       
       // Si encontramos información del otro usuario en los mensajes, guardarla
       if (otherUserMessage && (!otherUserInfo.id || otherUserInfo.id === otherUserMessage.senderId)) {
-        console.log('💾 [MESSAGES] Guardando información del otro usuario:', {
-          id: otherUserMessage.senderId,
-          name: otherUserMessage.senderName,
-          photo: otherUserMessage.senderPhoto ? 'Presente' : 'Ausente',
-        });
         setOtherUserInfo({
           id: otherUserMessage.senderId,
           name: otherUserMessage.senderName,
@@ -218,56 +176,27 @@ const MarketplaceMessagesScreen = () => {
         if (msg.senderId === user?.id) {
           senderName = user?.name || user?.displayName || msg.senderName || 'Tú';
           senderPhoto = user?.photoURL || msg.senderPhoto;
-          console.log('✅ [MESSAGES] Mensaje propio normalizado:', {
-            senderId: msg.senderId,
-            senderName,
-            senderPhoto: senderPhoto ? 'Presente' : 'Ausente',
-          });
         } 
         // Si es el otro usuario
         else if (msg.senderId !== user?.id) {
           const hasOriginalSenderName = !!(msg.senderName && msg.senderName !== 'Usuario');
           const hasOriginalSenderPhoto = !!msg.senderPhoto;
           
-          console.log('🔍 [MESSAGES] Normalizando mensaje del otro usuario:', {
-            senderId: msg.senderId,
-            senderNameOriginal: msg.senderName || '❌ NO TIENE',
-            senderPhotoOriginal: msg.senderPhoto || '❌ NO TIENE',
-            tieneSenderName: hasOriginalSenderName ? '✅ SÍ' : '❌ NO',
-            tieneSenderPhoto: hasOriginalSenderPhoto ? '✅ SÍ' : '❌ NO',
-            productInfoSellerId: productInfo.sellerId,
-            productInfoSellerName: productInfo.sellerName,
-            productInfoSellerPhoto: productInfo.sellerPhoto ? 'Presente' : 'Ausente',
-            otherUserInfoId: otherUserInfo.id,
-            otherUserInfoName: otherUserInfo.name,
-            otherUserInfoPhoto: otherUserInfo.photo ? 'Presente' : 'Ausente',
-          });
           
           // PRIORIDAD 1: Usar la información que viene directamente del mensaje (del backend)
           if (hasOriginalSenderName) {
             senderName = msg.senderName;
             senderPhoto = msg.senderPhoto;
-            console.log('✅ [MESSAGES] ✅✅✅ USANDO INFORMACIÓN DEL BACKEND (MENSAJE) ✅✅✅');
-            console.log('✅ [MESSAGES] senderName del backend:', senderName);
-            console.log('✅ [MESSAGES] senderPhoto del backend:', senderPhoto || 'No tiene foto');
           }
           // PRIORIDAD 2: Si el senderId coincide con el sellerId del producto, usar la info del producto
           else if (productInfo.sellerId && msg.senderId === productInfo.sellerId) {
             senderName = productInfo.sellerName || msg.senderName || 'Usuario';
             senderPhoto = productInfo.sellerPhoto || msg.senderPhoto;
-            console.log('✅ [MESSAGES] Usando información del producto (vendedor):', {
-              senderName,
-              senderPhoto: senderPhoto ? 'Presente' : 'Ausente',
-            });
           }
           // PRIORIDAD 3: Si tenemos información del otro usuario guardada
           else if (otherUserInfo.id && otherUserInfo.id === msg.senderId) {
             senderName = otherUserInfo.name || msg.senderName || 'Usuario';
             senderPhoto = otherUserInfo.photo || msg.senderPhoto;
-            console.log('✅ [MESSAGES] Usando información guardada del otro usuario:', {
-              senderName,
-              senderPhoto: senderPhoto ? 'Presente' : 'Ausente',
-            });
           }
           // Si no hay información, usar la del mensaje aunque sea "Usuario"
           else {
@@ -325,13 +254,6 @@ const MarketplaceMessagesScreen = () => {
       // Enviar notificación push al receptor (si no es el mismo usuario)
       // El backend debería manejar esto automáticamente, pero lo enviamos como respaldo
       const receiverId = otherUserId || productInfo.sellerId;
-      console.log('🔔 [MESSAGES] Intentando enviar notificación:', {
-        receiverId,
-        otherUserId,
-        productInfoSellerId: productInfo.sellerId,
-        usuarioActualId: user?.id,
-        esMismoUsuario: receiverId === user?.id,
-      });
       
       if (receiverId && receiverId !== user?.id) {
         try {
@@ -345,12 +267,7 @@ const MarketplaceMessagesScreen = () => {
             type: 'new_message',
           };
           
-          console.log('📤 [MESSAGES] Enviando notificación push:', notificationPayload);
           const notifResponse = await api.post('/api/notifications/new-message', notificationPayload);
-          console.log('✅ [MESSAGES] Notificación de nuevo mensaje enviada:', {
-            status: notifResponse.status,
-            data: notifResponse.data,
-          });
         } catch (notifError: any) {
           // No fallar si la notificación no se puede enviar (el backend puede manejarlo)
           console.error('❌ [MESSAGES] Error enviando notificación:', {

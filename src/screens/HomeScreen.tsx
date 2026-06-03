@@ -17,6 +17,7 @@ import {
 } from "react-native";
 import { useNavigation, useRoute, DrawerActions } from "@react-navigation/native";
 import { Ionicons, FontAwesome5 } from "@expo/vector-icons";
+import DateTimePicker from '@react-native-community/datetimepicker';
 import * as ImagePicker from "expo-image-picker";
 import * as Notifications from "expo-notifications";
 import { Audio } from "expo-av";
@@ -67,21 +68,21 @@ const PREGNANCY_SIZE_IMAGE_HEIGHT = Math.min(Dimensions.get('window').width - 40
 const formatDuration = (totalMinutes: number, showSeconds: boolean = false): string => {
   const hours = Math.floor(totalMinutes / 60);
   const mins = Math.floor(totalMinutes % 60);
-  
+
   if (showSeconds) {
     // Para mostrar tiempo con segundos (tiempo transcurrido en tiempo real)
     const totalSeconds = Math.floor(totalMinutes * 60);
     const h = Math.floor(totalSeconds / 3600);
     const m = Math.floor((totalSeconds % 3600) / 60);
     const s = totalSeconds % 60;
-    
+
     if (h > 0) {
       return `${h}h ${m.toString().padStart(2, '0')}m ${s.toString().padStart(2, '0')}s`;
     } else {
       return `${m}m ${s.toString().padStart(2, '0')}s`;
     }
   }
-  
+
   return hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
 };
 
@@ -103,6 +104,13 @@ const formatTimeAgo = (dateValue?: string): string => {
   if (diffMonths < 12) return `hace ${diffMonths} meses`;
   const diffYears = Math.floor(diffDays / 365);
   return `hace ${diffYears} años`;
+};
+
+const formatDateForApi = (date: Date): string => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 };
 
 interface Child {
@@ -145,12 +153,12 @@ interface TodayRecommendation {
 // Helper function para calcular recomendaciones (reviews de 4-5 estrellas)
 const calculateRecommendations = (totalReviews: number, averageRating: number): number => {
   if (totalReviews === 0) return 0;
-  
+
   // Estimación: Si el promedio es X, calculamos cuántas son de 4-5 estrellas
   // Por ejemplo: promedio 4.5 con 10 reviews -> ~9 son de 4-5 estrellas
   // Fórmula aproximada: (avgRating - 2.5) / 2.5 * totalReviews
   // Esto da una estimación razonable del % de reviews positivas
-  
+
   if (averageRating >= 4.5) {
     // Si el promedio es 4.5+, casi todas son positivas (90-100%)
     return Math.round(totalReviews * 0.95);
@@ -180,9 +188,11 @@ interface TodayProduct {
 
 interface TodayCommunityPost {
   id: string;
+  title?: string;
   content?: string;
   imageUrl?: string;
   authorName?: string;
+  communityName?: string;
   communityId?: string;
   likeCount?: number;
   commentCount?: number;
@@ -701,6 +711,9 @@ const HomeScreen: React.FC = () => {
   const [pregnancyContractions, setPregnancyContractions] = useState<PregnancyContractionRecord[]>([]);
   const [activeContractionStartedAt, setActiveContractionStartedAt] = useState<number | null>(null);
   const [contractionTick, setContractionTick] = useState(Date.now());
+  const [showPregnancyBirthDatePicker, setShowPregnancyBirthDatePicker] = useState(false);
+  const [pregnancyBirthDate, setPregnancyBirthDate] = useState(new Date());
+  const [updatingPregnancyStatus, setUpdatingPregnancyStatus] = useState(false);
 
   const [showActivityDetailModal, setShowActivityDetailModal] = useState(false);
   const [selectedActivityDetail, setSelectedActivityDetail] = useState<any>(null);
@@ -740,7 +753,7 @@ const HomeScreen: React.FC = () => {
     if (typeof value === 'object') return JSON.stringify(value, null, 2);
     return String(value);
   };
-  
+
   // Refs para scroll
   const scrollViewRef = useRef<ScrollView>(null);
   const activitiesSectionRef = useRef<View>(null);
@@ -788,10 +801,10 @@ const HomeScreen: React.FC = () => {
   useEffect(() => {
     loadData();
     loadUserProfile();
-    
+
     // Configurar handler de respuestas a notificaciones
     const subscription = Notifications.addNotificationResponseReceivedListener(() => {});
-    
+
     return () => {
       subscription.remove();
     };
@@ -902,28 +915,25 @@ const HomeScreen: React.FC = () => {
   useEffect(() => {
     const unsubscribe = navigation.addListener("focus", () => {
       const now = Date.now();
-      
+
       // Evitar múltiples recargas si se ejecuta muy rápido (debounce de 2 segundos)
       if (now - lastFocusReloadRef.current < 2000) {
-        console.log('⏭️ [HOME] Saltando recarga, muy pronto desde la última');
         return;
       }
-      
+
       lastFocusReloadRef.current = now;
-      console.log('🏠 [HOME] Pantalla enfocada, recargando datos...');
-      
+
       // Ejecutar cargas de forma no-bloqueante
       setTimeout(() => {
         loadData();
       }, 0);
-      
+
       setTimeout(() => {
         loadUserProfile();
       }, 100);
-      
+
       // Registrar token de notificaciones después de un delay
       setTimeout(() => {
-        console.log('🔔 [HOME] Registrando token de notificaciones...');
         notificationService.registerToken().catch((error) => {
           console.error('❌ [HOME] Error registrando token:', error);
         });
@@ -940,7 +950,6 @@ const HomeScreen: React.FC = () => {
       if (savedChildId && savedChildId !== selectedChild?.id && children.length > 0) {
         const child = children.find((c: Child) => c.id === savedChildId);
         if (child) {
-          console.log('🔄 [HOME] Cambiando hijo seleccionado desde header:', child.name);
           setSelectedChild(child);
         }
       }
@@ -956,7 +965,6 @@ const HomeScreen: React.FC = () => {
       if (savedChildId && savedChildId !== selectedChild?.id && children.length > 0) {
         const child = children.find((c: Child) => c.id === savedChildId);
         if (child) {
-          console.log('🔄 [HOME] Hijo seleccionado desde header:', child.name);
           setSelectedChild(child);
         }
       }
@@ -965,41 +973,39 @@ const HomeScreen: React.FC = () => {
     // Recargar cuando se reciban parámetros de navegación
     const forceReload = route?.params?.forceReload;
     const locationChanged = route?.params?.locationChanged;
-    
+
     // Evitar ejecutar múltiples veces con el mismo forceReload
     if (forceReload && lastForceReloadRef.current === forceReload) {
       return;
     }
-    
+
     if (route?.params?.refresh || route?.params?.selectedChildId || forceReload || locationChanged) {
-      console.log('🔄 [HOME] Parámetros de recarga detectados:', route.params);
-      
+
       // Marcar este forceReload como procesado
       if (forceReload) {
         lastForceReloadRef.current = forceReload;
       }
-      
+
       if (locationChanged) {
-        console.log('📍 [HOME] Ubicación cambió, recargando perfil y datos...');
         // Resetear el debounce para permitir recarga inmediata
         lastFocusReloadRef.current = 0;
-        
+
         // Resetear la clave de carga de "Hoy" para forzar recarga en el próximo ciclo
         lastTodayLoadKeyRef.current = null;
         todayLoadInFlightRef.current = false;
         todayLoadInFlightKeyRef.current = null;
-        
+
         // Recargar perfil
         setTimeout(() => {
           loadUserProfile();
         }, 100);
-        
+
         // Recargar datos de hijos
         setTimeout(() => {
           loadData();
         }, 200);
       }
-      
+
       handleHeaderSelection();
     }
   }, [route?.params?.refresh, route?.params?.selectedChildId, route?.params?.forceReload, route?.params?.locationChanged, children]);
@@ -1007,7 +1013,6 @@ const HomeScreen: React.FC = () => {
   // 🔔 Iniciar verificaciones periódicas de notificaciones cuando hay hijo seleccionado
   useEffect(() => {
     if (selectedChild?.id) {
-      console.log('🔄 [HOME] Hijo seleccionado:', selectedChild.name);
       // Ya no se programan notificaciones de sueño
     }
   }, [selectedChild?.id]);
@@ -1033,19 +1038,14 @@ const HomeScreen: React.FC = () => {
         const locationKey = `${todayLat.toFixed(4)}|${todayLon.toFixed(4)}`;
         if (lastLocationSyncRef.current !== locationKey) {
           lastLocationSyncRef.current = locationKey;
-          
+
           // Solo actualizar la ubicación automáticamente si el usuario NO tiene ciudad ni país
           // Si ya tiene ubicación configurada, debe cambiarla manualmente desde el header
           if (!profile?.cityName && !profile?.countryName) {
-            console.log('📍 Usuario sin ubicación, sincronizando automáticamente...');
             await syncUserLocation(todayLat, todayLon);
             // Recargar el perfil después de sincronizar
             await loadUserProfile();
           } else {
-            console.log('📍 Usuario ya tiene ubicación configurada:', {
-              city: profile?.cityName,
-              country: profile?.countryName
-            });
           }
         }
       }
@@ -1066,16 +1066,15 @@ const HomeScreen: React.FC = () => {
         todayLoadInFlightRef.current = true;
         todayLoadInFlightKeyRef.current = loadKey;
         lastTodayLoadKeyRef.current = loadKey;
-        
-        console.log('🔄 [HOME] Cargando datos de sección "Hoy"...');
-        
+
+
         // Ejecutar las cargas con un timeout de 15 segundos cada una
         // Esto evita que la app se congele si alguna API no responde
-        const timeout = (ms: number) => new Promise((_, reject) => 
+        const timeout = (ms: number) => new Promise((_, reject) =>
           setTimeout(() => reject(new Error('Timeout')), ms)
         );
-        
-        const withTimeout = (promise: Promise<any>, name: string) => 
+
+        const withTimeout = (promise: Promise<any>, name: string) =>
           Promise.race([
             promise,
             timeout(15000)
@@ -1083,7 +1082,7 @@ const HomeScreen: React.FC = () => {
             console.warn(`⚠️ [HOME] ${name} falló o timeout:`, error.message);
             return null;
           });
-        
+
         await Promise.allSettled([
           withTimeout(loadTodayRecommendations(), 'Recomendaciones'),
           withTimeout(loadTodayMarket(), 'Market'),
@@ -1094,8 +1093,7 @@ const HomeScreen: React.FC = () => {
           withTimeout(loadTodayRecipe(childForLoad), 'Receta'),
           withTimeout(loadActiveConsultations(), 'Consultas'),
         ]);
-        
-        console.log('✅ [HOME] Datos de sección "Hoy" cargados');
+
       } catch (error) {
         console.error('❌ [HOME] Error cargando datos:', error);
       } finally {
@@ -1105,7 +1103,7 @@ const HomeScreen: React.FC = () => {
         }
       }
     };
-    
+
     // Ejecutar con un pequeño delay para no bloquear el render
     setTimeout(() => {
       loadAll();
@@ -1126,26 +1124,25 @@ const HomeScreen: React.FC = () => {
 
       if (childrenResponse.success && childrenResponse.data) {
         setChildren(childrenResponse.data);
-        
+
         // Cargar el hijo seleccionado desde AsyncStorage
         const savedChildId = await AsyncStorage.getItem('selectedChildId');
         let childToSelect = null;
-        
+
         if (savedChildId) {
           childToSelect = childrenResponse.data.find((c: Child) => c.id === savedChildId);
         }
-        
+
         // Si no hay hijo guardado o no se encuentra, seleccionar el primero
         if (!childToSelect && childrenResponse.data.length > 0) {
           childToSelect = childrenResponse.data[0];
           await AsyncStorage.setItem('selectedChildId', childToSelect.id);
         }
-        
+
         if (childToSelect) {
           setSelectedChild(childToSelect);
         }
       } else {
-        console.log("ℹ️ No hay hijos registrados o respuesta vacía");
         setChildren([]);
       }
     } catch (error) {
@@ -1163,31 +1160,25 @@ const HomeScreen: React.FC = () => {
 
   const loadUserProfile = async () => {
     if (loadProfileInFlightRef.current) {
-      console.log('⏳ [PROFILE] Ya hay una carga de perfil en progreso, saltando...');
       return;
     }
-    
+
     try {
       loadProfileInFlightRef.current = true;
-      
+
       if (user?.id) {
         const profileResponse = await profileService.getProfile();
         if (profileResponse.success && profileResponse.data) {
-          console.log('📍 [PROFILE] Perfil cargado:', {
-            city: profileResponse.data.cityName,
-            country: profileResponse.data.countryName,
-          });
-          
+
           // Actualizar el estado local del perfil primero
           setProfile(profileResponse.data);
-          
+
           // Solo actualizar el contexto de usuario si hay cambios significativos
           // Esto evita loops infinitos
           if (
             profileResponse.data.cityName !== user.cityName ||
             profileResponse.data.countryName !== user.countryName
           ) {
-            console.log('🔄 [PROFILE] Ubicación cambió, actualizando contexto');
             // @ts-ignore
             setUser((prevUser: any) => ({
               ...prevUser!,
@@ -1219,9 +1210,9 @@ const HomeScreen: React.FC = () => {
       activitySuggestionsInFlightRef.current = true;
       activitySuggestionsInFlightChildRef.current = childId;
       setLoadingActivities(true);
-      
+
       const response = await activitiesService.getActivitySuggestions(childId);
-      
+
       if (selectedChildIdRef.current !== childId) return;
 
       if (response.success) {
@@ -1338,20 +1329,11 @@ const HomeScreen: React.FC = () => {
         return;
       }
 
-      console.log('📘 [HOME GUIDE] Cargando guía para el niño:', {
-        childId: child.id,
-        name: child.name,
-        birthDate: child.birthDate,
-        isUnborn: child.isUnborn,
-      });
-      console.log('📘 [HOME GUIDE] Payload enviado a learningService:', { childId });
-      
+
       const response = await learningService.getTodayGuide({ childId });
-      
-      console.log('📘 [HOME GUIDE] Respuesta recibida:', response);
 
       if (selectedChildIdRef.current !== childId) return;
-      
+
       if (response?.success && response?.data) {
         setTodayGuide(response.data);
       } else {
@@ -1390,7 +1372,7 @@ const HomeScreen: React.FC = () => {
       // Determinar qué tipo de comida mostrar basado en la hora
       const currentHour = new Date().getHours();
       let mealType: 'breakfast' | 'lunch' | 'dinner';
-      
+
       if (currentHour < 11) {
         mealType = 'breakfast';
       } else if (currentHour < 17) {
@@ -1399,16 +1381,9 @@ const HomeScreen: React.FC = () => {
         mealType = 'dinner';
       }
 
-      console.log('🍽️ [HOME RECIPE] Cargando receta del día:', {
-        childId,
-        name: child.name,
-        mealType,
-        hour: currentHour,
-      });
 
       const recipe = await nutritionService.getTodayRecipe(childId, mealType);
 
-      console.log('✅ [HOME RECIPE] Receta obtenida:', recipe?.name);
       if (selectedChildIdRef.current !== childId) return;
       setTodayRecipe(recipe);
     } catch (error: any) {
@@ -1448,59 +1423,42 @@ const HomeScreen: React.FC = () => {
   const loadActiveConsultations = async () => {
     try {
       setLoadingConsultations(true);
-      console.log('🏥 [HOME] Cargando consultas activas y pendientes...');
-      
       const response = await consultationsService.getConsultations();
-      console.log('✅ [HOME] Consultas obtenidas:', response);
-      
+
       // Extraer el array de consultas de la respuesta
       const consultations = response.data || response;
-      console.log('🔍 [HOME] Total de consultas:', consultations.length);
-      
+
       // Log de cada consulta y su estado
       consultations.forEach((c: any, index: number) => {
-        console.log(`📋 [HOME] Consulta ${index + 1}:`, {
-          id: c.consultationId || c.id,
-          status: c.status,
-          specialist: c.specialistName,
-          child: c.childName,
-          type: c.type,
-          createdAt: c.createdAt,
-          requestedAt: c.schedule?.requestedAt,
-        });
       });
-      
+
       // Filtrar consultas activas (pending, accepted, in_progress) y completadas recientes (últimas 24h)
       const now = new Date();
       const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-      
+
       const relevant = consultations.filter((c: any) => {
         // Incluir todas las pendientes, aceptadas y en progreso
         if (['pending', 'accepted', 'in_progress'].includes(c.status)) {
-          console.log(`✅ [HOME] Consulta ${c.consultationId || c.id} incluida (status: ${c.status})`);
           return true;
         }
-        
+
         // Incluir completadas de las últimas 24 horas
         if (c.status === 'completed' && c.schedule?.completedAt) {
           const completedDate = new Date(c.schedule.completedAt);
           const isRecent = completedDate >= oneDayAgo;
-          console.log(`${isRecent ? '✅' : '❌'} [HOME] Consulta completada ${c.consultationId || c.id} (${isRecent ? 'reciente' : 'antigua'})`);
           return isRecent;
         }
-        
-        console.log(`❌ [HOME] Consulta ${c.consultationId || c.id} excluida (status: ${c.status})`);
+
         return false;
       });
-      
-      console.log(`📊 [HOME] Consultas filtradas: ${relevant.length} de ${consultations.length}`);
-      
+
+
       // Normalizar el campo consultationId (el backend puede devolver 'id' o 'consultationId')
       const normalized = relevant.map((c: any) => ({
         ...c,
         consultationId: c.consultationId || c.id,
       }));
-      
+
       // Ordenar por fecha: pendientes y en progreso primero, luego por fecha más reciente
       normalized.sort((a: any, b: any) => {
         // Prioridad: in_progress > accepted > pending > completed
@@ -1510,25 +1468,23 @@ const HomeScreen: React.FC = () => {
           'pending': 3,
           'completed': 4,
         };
-        
+
         const priorityA = priorityOrder[a.status] || 5;
         const priorityB = priorityOrder[b.status] || 5;
-        
+
         if (priorityA !== priorityB) {
           return priorityA - priorityB;
         }
-        
+
         // Si tienen la misma prioridad, ordenar por fecha más reciente
         const dateA = new Date(a.schedule?.requestedAt || a.createdAt || 0);
         const dateB = new Date(b.schedule?.requestedAt || b.createdAt || 0);
         return dateB.getTime() - dateA.getTime();
       });
-      
-      console.log('🏥 [HOME] Consultas finales ordenadas:');
+
       normalized.forEach((c: any, index: number) => {
-        console.log(`  ${index + 1}. ${c.status} - ${c.specialistName} (${c.childName})`);
       });
-      
+
       setActiveConsultations(normalized);
     } catch (error) {
       console.error('❌ [HOME] Error cargando consultas:', error);
@@ -1587,7 +1543,7 @@ const HomeScreen: React.FC = () => {
     analyticsService.logEvent('development_section_open', {
       source: 'home_tools',
     });
-    
+
     // @ts-ignore
     navigation.navigate('Development');
   };
@@ -1596,13 +1552,13 @@ const HomeScreen: React.FC = () => {
     try {
       // Navegar directamente al artículo de Primeros Auxilios
       const articleId = 'FBB5VZEVSairFBWblAre';
-      
+
       // Log analytics
       await analyticsService.logEvent('first_aid_guide_open', {
         articleId,
         source: 'home_tools',
       });
-      
+
       // @ts-ignore
       navigation.navigate('ArticleDetail', {
         articleId,
@@ -1728,9 +1684,7 @@ const HomeScreen: React.FC = () => {
   };
 
   const openWhiteNoiseModal = async () => {
-    console.log('🎵 [HOME] Abriendo modal de ruido blanco...');
     setShowWhiteNoiseModal(true);
-    console.log('🎵 [HOME] showWhiteNoiseModal actualizado a true');
     analyticsService.logEvent('white_noise_open', {
       child_id: selectedChild?.id || null,
     });
@@ -1841,13 +1795,13 @@ const HomeScreen: React.FC = () => {
     try {
       const sound = whiteNoiseSound || (await loadWhiteNoiseSound());
       if (!sound) return;
-      
+
       const status = await sound.getStatusAsync();
       if (!status.isLoaded) return;
-      
+
       await sound.playAsync();
       setWhiteNoisePlaying(true);
-      
+
       if (whiteNoiseDurationMinutes) {
         const ms = whiteNoiseDurationMinutes * 60 * 1000;
         const timer = setTimeout(async () => {
@@ -1862,7 +1816,7 @@ const HomeScreen: React.FC = () => {
         }, ms);
         setWhiteNoiseTimer(timer);
       }
-      
+
       analyticsService.logEvent('white_noise_play', {
         child_id: selectedChild?.id || null,
       });
@@ -1876,18 +1830,18 @@ const HomeScreen: React.FC = () => {
     try {
       const sound = whiteNoiseSound;
       if (!sound) return;
-      
+
       const status = await sound.getStatusAsync();
       if (!status.isLoaded || !status.isPlaying) return;
-      
+
       await sound.pauseAsync();
       setWhiteNoisePlaying(false);
-      
+
       if (whiteNoiseTimer) {
         clearTimeout(whiteNoiseTimer);
         setWhiteNoiseTimer(null);
       }
-      
+
       analyticsService.logEvent('white_noise_pause', {
         child_id: selectedChild?.id || null,
       });
@@ -1931,7 +1885,7 @@ const HomeScreen: React.FC = () => {
 
     // Si no tiene foto o la imagen falló, usar las caritas por defecto
     const caritaIndex = index % 3;
-    
+
     // Retornar directamente el require según el índice
     switch (caritaIndex) {
       case 0:
@@ -1946,7 +1900,6 @@ const HomeScreen: React.FC = () => {
   };
 
   const handleImageError = (childId: string) => {
-    console.log("❌ [IMAGE] Error cargando imagen para hijo:", childId);
     setImageErrors((prev) => new Set(prev).add(childId));
   };
 
@@ -2036,6 +1989,155 @@ const HomeScreen: React.FC = () => {
     setPregnancyContractions([]);
     setActiveContractionStartedAt(null);
     savePregnancyWeekState({ contractions: [] });
+  };
+
+  const syncPregnancyProfileAfterChildrenChange = async (nextChildren: Child[]) => {
+    const unbornChildren = nextChildren.filter((child) => child.isUnborn);
+    const isStillPregnant = unbornChildren.length > 0;
+    const nextPregnancyWeeks = normalizePregnancyWeek(
+      unbornChildren[0]?.currentGestationWeeks ??
+      unbornChildren[0]?.gestationWeeks ??
+      unbornChildren[0]?.registeredGestationWeeks ??
+      null
+    );
+    const profilePayload: {
+      isPregnant: boolean;
+      gestationWeeks?: number;
+    } = {
+      isPregnant: isStillPregnant,
+    };
+
+    if (isStillPregnant && nextPregnancyWeeks) {
+      profilePayload.gestationWeeks = nextPregnancyWeeks;
+    }
+
+    await profileService.updateProfile(profilePayload);
+
+    const storedUser = await AsyncStorage.getItem('userData');
+    const storedUserData = storedUser ? JSON.parse(storedUser) : {};
+    const updatedUserData = {
+      ...storedUserData,
+      ...(user || {}),
+      isPregnant: isStillPregnant,
+      updatedAt: new Date().toISOString(),
+    };
+
+    if (isStillPregnant && nextPregnancyWeeks) {
+      updatedUserData.gestationWeeks = nextPregnancyWeeks;
+    } else {
+      delete updatedUserData.gestationWeeks;
+    }
+
+    await AsyncStorage.setItem('userData', JSON.stringify(updatedUserData));
+    setUser(updatedUserData);
+    setProfile((prevProfile: any) => ({
+      ...(prevProfile || {}),
+      isPregnant: isStillPregnant,
+      gestationWeeks: isStillPregnant ? nextPregnancyWeeks ?? prevProfile?.gestationWeeks : undefined,
+    }));
+  };
+
+  const finishPregnancyStatusUpdate = async (
+    nextChildren: Child[],
+    nextSelectedChild: Child | null
+  ) => {
+    setChildren(nextChildren);
+    setSelectedChild(nextSelectedChild);
+
+    if (nextSelectedChild?.id) {
+      await AsyncStorage.setItem('selectedChildId', nextSelectedChild.id);
+      selectedChildIdRef.current = nextSelectedChild.id;
+      DeviceEventEmitter.emit('selectedChildChanged', nextSelectedChild.id);
+    } else {
+      await AsyncStorage.removeItem('selectedChildId');
+      selectedChildIdRef.current = null;
+      DeviceEventEmitter.emit('selectedChildChanged', null);
+    }
+
+    await syncPregnancyProfileAfterChildrenChange(nextChildren);
+    DeviceEventEmitter.emit('childrenUpdated');
+  };
+
+  const handlePregnancyBorn = async (birthDate: Date) => {
+    if (!selectedChild?.id || !selectedChild.isUnborn || updatingPregnancyStatus) return;
+
+    setUpdatingPregnancyStatus(true);
+    try {
+      const birthDateText = formatDateForApi(birthDate);
+      const response = await childrenService.updateChild(selectedChild.id, {
+        isUnborn: false,
+        birthDate: birthDateText,
+        ageInMonths: 0,
+      });
+      const responseChild = response?.data || response?.child || response || {};
+      const bornChild: Child = {
+        ...selectedChild,
+        ...responseChild,
+        isUnborn: false,
+        birthDate: responseChild.birthDate || birthDateText,
+        ageInMonths: responseChild.ageInMonths ?? responseChild.currentAgeInMonths ?? 0,
+        currentAgeInMonths: responseChild.currentAgeInMonths ?? 0,
+        gestationWeeks: null,
+        currentGestationWeeks: null,
+        registeredGestationWeeks: null,
+      };
+      const nextChildren = children.map((child) =>
+        child.id === selectedChild.id ? bornChild : child
+      );
+
+      await finishPregnancyStatusUpdate(nextChildren, bornChild);
+      setShowPregnancyBirthDatePicker(false);
+      setShowPregnancyDetailModal(false);
+      setShowPregnancyModuleModal(false);
+      Alert.alert('Listo', 'Actualizamos el perfil: ahora este bebé aparece como nacido.');
+    } catch (error) {
+      console.error('❌ [PREGNANCY] Error marcando bebé como nacido:', error);
+      Alert.alert('Error', 'No pudimos actualizar el estado. Intenta nuevamente.');
+    } finally {
+      setUpdatingPregnancyStatus(false);
+    }
+  };
+
+  const handleEndPregnancy = async () => {
+    if (!selectedChild?.id || !selectedChild.isUnborn || updatingPregnancyStatus) return;
+
+    setUpdatingPregnancyStatus(true);
+    try {
+      await childrenService.deleteChild(selectedChild.id);
+      const remainingChildren = children.filter((child) => child.id !== selectedChild.id);
+      const nextSelectedChild = remainingChildren[0] || null;
+
+      await finishPregnancyStatusUpdate(remainingChildren, nextSelectedChild);
+      setShowPregnancyBirthDatePicker(false);
+      setShowPregnancyDetailModal(false);
+      setShowPregnancyModuleModal(false);
+      Alert.alert('Listo', 'Dimos de baja este embarazo de tus bebés activos.');
+    } catch (error) {
+      console.error('❌ [PREGNANCY] Error dando de baja embarazo:', error);
+      Alert.alert('Error', 'No pudimos dar de baja este embarazo. Intenta nuevamente.');
+    } finally {
+      setUpdatingPregnancyStatus(false);
+    }
+  };
+
+  const confirmEndPregnancy = () => {
+    Alert.alert(
+      'Ya no estoy embarazada',
+      'Esto quitará este embarazo de tus bebés activos. Úsalo si hubo una pérdida o si necesitas cerrar este registro.',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Dar de baja',
+          style: 'destructive',
+          onPress: handleEndPregnancy,
+        },
+      ]
+    );
+  };
+
+  const openPregnancyBirthDatePicker = () => {
+    setPregnancyBirthDate(new Date());
+    setShowPregnancyBirthDatePicker(true);
   };
 
 
@@ -2129,8 +2231,8 @@ const HomeScreen: React.FC = () => {
               <Ionicons name="scale-outline" size={20} color="#FFFFFF" />
               <Text style={styles.quickActionLabel}>Crecimiento</Text>
             </TouchableOpacity>
-            <TouchableOpacity 
-              style={[styles.quickActionButton, styles.quickActionGreen]} 
+            <TouchableOpacity
+              style={[styles.quickActionButton, styles.quickActionGreen]}
               onPress={() => {
                 analyticsService.logEvent('quick_action_clicked', {
                   action: 'vacunas',
@@ -2156,8 +2258,8 @@ const HomeScreen: React.FC = () => {
               <FontAwesome5 name="briefcase-medical" size={20} color="#FFFFFF" />
               <Text style={styles.quickActionLabel}>Medicación</Text>
             </TouchableOpacity>
-            <TouchableOpacity 
-              style={[styles.quickActionButton, styles.quickActionPurple]} 
+            <TouchableOpacity
+              style={[styles.quickActionButton, styles.quickActionPurple]}
               onPress={() => {
                 analyticsService.logEvent('quick_action_clicked', {
                   action: 'denticion',
@@ -2170,8 +2272,8 @@ const HomeScreen: React.FC = () => {
               <FontAwesome5 name="tooth" size={20} color="#FFFFFF" />
               <Text style={styles.quickActionLabel}>Dentición</Text>
             </TouchableOpacity>
-            <TouchableOpacity 
-              style={[styles.quickActionButton, styles.quickActionPink]} 
+            <TouchableOpacity
+              style={[styles.quickActionButton, styles.quickActionPink]}
               onPress={() => {
                 analyticsService.logEvent('quick_action_clicked', {
                   action: 'hitos',
@@ -2184,15 +2286,15 @@ const HomeScreen: React.FC = () => {
               <Ionicons name="trophy-outline" size={20} color="#FFFFFF" />
               <Text style={styles.quickActionLabel}>Hitos</Text>
             </TouchableOpacity>
-            <TouchableOpacity 
-              style={[styles.quickActionButton, styles.quickActionOrange]} 
+            <TouchableOpacity
+              style={[styles.quickActionButton, styles.quickActionOrange]}
               onPress={() => {
                 // Calcular edad desde birthDate si está disponible
                 let ageInMonths = selectedChild?.ageInMonths ?? 0;
-                
+
                 if (selectedChild?.birthDate) {
                   let birthDate: Date;
-                  
+
                   // Manejar Firestore Timestamp
                   if (typeof selectedChild.birthDate === 'object' && '_seconds' in selectedChild.birthDate) {
                     birthDate = new Date((selectedChild.birthDate as any)._seconds * 1000);
@@ -2201,21 +2303,14 @@ const HomeScreen: React.FC = () => {
                   } else {
                     birthDate = new Date(selectedChild.birthDate as any);
                   }
-                  
+
                   const today = new Date();
                   const diffTime = Math.abs(today.getTime() - birthDate.getTime());
                   const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
                   ageInMonths = diffDays / 30.44; // Promedio de días por mes
                 }
-                
-                console.log('🍎 [NUTRICION] Edad del niño:', {
-                  name: selectedChild?.name,
-                  ageInMonths: ageInMonths,
-                  ageFloor: Math.floor(ageInMonths),
-                  birthDate: selectedChild?.birthDate,
-                  canAccess: Math.floor(ageInMonths) >= 5
-                });
-                
+
+
                 const ageFloor = Math.floor(ageInMonths);
                 if (ageFloor < 5) {
                   const monthsRemaining = 5 - ageFloor;
@@ -2239,10 +2334,10 @@ const HomeScreen: React.FC = () => {
                 navigation.navigate('Feeding');
               }}
             >
-              <Ionicons 
-                name="restaurant-outline" 
-                size={20} 
-                color="#FFFFFF" 
+              <Ionicons
+                name="restaurant-outline"
+                size={20}
+                color="#FFFFFF"
               />
               <Text style={styles.quickActionLabel}>Nutrición</Text>
             </TouchableOpacity>
@@ -2263,7 +2358,6 @@ const HomeScreen: React.FC = () => {
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
                 <TouchableOpacity
                   onPress={() => {
-                    console.log('🔄 [HOME] Recargando consultas manualmente...');
                     loadActiveConsultations();
                   }}
                   style={{ padding: 4 }}
@@ -2394,7 +2488,7 @@ const HomeScreen: React.FC = () => {
                     <View style={styles.consultationFooter}>
                       <Ionicons name="time-outline" size={16} color="#887CBC" />
                       <Text style={styles.consultationTime}>
-                        {consultation.status === 'completed' 
+                        {consultation.status === 'completed'
                           ? `Completada ${formatTimeAgo(consultation.schedule?.completedAt)}`
                           : formatTimeAgo(consultation.schedule?.requestedAt)
                         }
@@ -2412,8 +2506,8 @@ const HomeScreen: React.FC = () => {
           <View style={styles.todaySection}>
             {/* Banner Home 1 - Debajo de los botones de acción rápida */}
             <View style={styles.bannerHome1Container}>
-              <BannerCarousel 
-                section="home1" 
+              <BannerCarousel
+                section="home1"
                 fallbackToHome={false}
                 imageResizeMode="cover"
                 bannerHeight={140}
@@ -2581,15 +2675,15 @@ const HomeScreen: React.FC = () => {
 
                 {/* Banner Home 2 - Debajo del título Herramientas */}
                 <View style={styles.bannerHome2Container}>
-                  <BannerCarousel 
-                    section="home2" 
+                  <BannerCarousel
+                    section="home2"
                     fallbackToHome={false}
                   />
                 </View>
 
                 <View style={styles.todayToolsRow}>
-                  <TouchableOpacity 
-                    style={[styles.todayToolCard, styles.todayToolCardSounds]} 
+                  <TouchableOpacity
+                    style={[styles.todayToolCard, styles.todayToolCardSounds]}
                     onPress={openWhiteNoiseModal}
                   >
                     <Ionicons name="musical-notes" size={22} color="#FFF" />
@@ -2788,8 +2882,8 @@ const HomeScreen: React.FC = () => {
 
             {/* Banner Home 3 - Sobre Popular en la comunidad */}
             <View style={styles.bannerHome3Container}>
-            <BannerCarousel 
-                section="home3" 
+            <BannerCarousel
+                section="home3"
                 fallbackToHome={false}
                 imageResizeMode="cover"
                 bannerHeight={140}
@@ -3283,12 +3377,113 @@ const HomeScreen: React.FC = () => {
                   <Text style={styles.pregnancyDetailDisclaimer}>
                     Información orientativa. Tu obstetra o matrona puede ajustar controles según tu historia y tu embarazo.
                   </Text>
+
+                  {selectedChild?.isUnborn && (
+                    <View style={styles.pregnancyStatusCard}>
+                      <Text style={styles.pregnancyStatusTitle}>Actualizar estado</Text>
+                      <Text style={styles.pregnancyStatusSubtitle}>
+                        Cambia esta etapa solo cuando quieras cerrar el embarazo en la app.
+                      </Text>
+
+                      <TouchableOpacity
+                        style={[
+                          styles.pregnancyStatusButton,
+                          updatingPregnancyStatus && styles.pregnancyStatusButtonDisabled,
+                        ]}
+                        onPress={openPregnancyBirthDatePicker}
+                        disabled={updatingPregnancyStatus}
+                      >
+                        {updatingPregnancyStatus ? (
+                          <ActivityIndicator size="small" color="#FFFFFF" />
+                        ) : (
+                          <Ionicons name="happy-outline" size={19} color="#FFFFFF" />
+                        )}
+                        <Text style={styles.pregnancyStatusButtonText}>Ya nació</Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={[
+                          styles.pregnancyStatusButton,
+                          styles.pregnancyStatusButtonDanger,
+                          updatingPregnancyStatus && styles.pregnancyStatusButtonDisabled,
+                        ]}
+                        onPress={confirmEndPregnancy}
+                        disabled={updatingPregnancyStatus}
+                      >
+                        <Ionicons name="heart-dislike-outline" size={19} color="#B42318" />
+                        <Text style={styles.pregnancyStatusButtonDangerText}>
+                          Ya no estoy embarazada
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
                 </>
               )}
             </ScrollView>
           </View>
         </View>
       </Modal>
+
+      {showPregnancyBirthDatePicker && Platform.OS === 'ios' && (
+        <Modal
+          visible={showPregnancyBirthDatePicker}
+          transparent={true}
+          animationType="slide"
+          onRequestClose={() => setShowPregnancyBirthDatePicker(false)}
+        >
+          <View style={styles.pregnancyDatePickerOverlay}>
+            <View style={styles.pregnancyDatePickerContent}>
+              <Text style={styles.pregnancyDatePickerTitle}>Fecha de nacimiento</Text>
+              <DateTimePicker
+                value={pregnancyBirthDate}
+                mode="date"
+                display="spinner"
+                maximumDate={new Date()}
+                locale="es-ES"
+                onChange={(_, selectedDate) => {
+                  if (selectedDate) setPregnancyBirthDate(selectedDate);
+                }}
+              />
+              <View style={styles.pregnancyDatePickerActions}>
+                <TouchableOpacity
+                  style={styles.pregnancyDatePickerCancel}
+                  onPress={() => setShowPregnancyBirthDatePicker(false)}
+                  disabled={updatingPregnancyStatus}
+                >
+                  <Text style={styles.pregnancyDatePickerCancelText}>Cancelar</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.pregnancyDatePickerConfirm}
+                  onPress={() => handlePregnancyBorn(pregnancyBirthDate)}
+                  disabled={updatingPregnancyStatus}
+                >
+                  {updatingPregnancyStatus ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  ) : (
+                    <Text style={styles.pregnancyDatePickerConfirmText}>Confirmar</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+      )}
+
+      {showPregnancyBirthDatePicker && Platform.OS !== 'ios' && (
+        <DateTimePicker
+          value={pregnancyBirthDate}
+          mode="date"
+          display="default"
+          maximumDate={new Date()}
+          onChange={(event, selectedDate) => {
+            setShowPregnancyBirthDatePicker(false);
+            if (event.type === 'dismissed') return;
+            const nextDate = selectedDate || pregnancyBirthDate;
+            setPregnancyBirthDate(nextDate);
+            handlePregnancyBorn(nextDate);
+          }}
+        />
+      )}
 
       {/* Modal de Ruido Blanco */}
       <Modal
@@ -3560,7 +3755,7 @@ const styles = StyleSheet.create({
   quickActionOrange: {
     backgroundColor: "#FF9244",
   },
-  
+
   // Consultas Activas
   activeConsultationsContainer: {
     backgroundColor: '#FFFFFF',
@@ -3716,7 +3911,7 @@ const styles = StyleSheet.create({
     color: '#6B7280',
     fontWeight: '600',
   },
-  
+
   bannerHome1Container: {
     marginTop: -15,
     marginBottom: -28,
@@ -4716,7 +4911,7 @@ const styles = StyleSheet.create({
     fontFamily: 'Montserrat',
     flex: 1,
   },
-  
+
   // Timeline del horario del día - Rediseñado
   dailyProgressCard: {
     backgroundColor: '#FFF',
@@ -5156,7 +5351,7 @@ const styles = StyleSheet.create({
     fontFamily: 'Montserrat',
     flex: 1,
   },
-  
+
   // Card vacío
   emptySleepCard: {
     backgroundColor: '#33737d',
@@ -5204,7 +5399,7 @@ const styles = StyleSheet.create({
     marginRight: 8,
     fontFamily: 'Montserrat',
   },
-  
+
   // Estilos del modal de hora de despertar
   modalOverlay: {
     flex: 1,
@@ -5333,7 +5528,7 @@ const styles = StyleSheet.create({
     color: '#FFF',
     fontFamily: 'Montserrat',
   },
-  
+
   // Estilos para el planeta animado de presión de sueño
   sleepPlanetContainer: {
     alignItems: 'center',
@@ -5639,7 +5834,7 @@ const styles = StyleSheet.create({
     color: '#FFF',
     fontFamily: 'Montserrat',
   },
-  
+
   // Estilos para modal de detalles de órbita
   orbitDetailOverlay: {
     flex: 1,
@@ -6762,6 +6957,107 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     paddingHorizontal: 10,
   },
+  pregnancyStatusCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 14,
+    marginTop: 4,
+    marginBottom: 18,
+    borderWidth: 1,
+    borderColor: '#EEF0F3',
+  },
+  pregnancyStatusTitle: {
+    fontSize: 15,
+    fontWeight: '900',
+    color: '#2D3748',
+    marginBottom: 4,
+  },
+  pregnancyStatusSubtitle: {
+    fontSize: 12,
+    color: '#718096',
+    lineHeight: 17,
+    marginBottom: 12,
+  },
+  pregnancyStatusButton: {
+    minHeight: 48,
+    borderRadius: 14,
+    backgroundColor: '#E84D8A',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginBottom: 10,
+  },
+  pregnancyStatusButtonDanger: {
+    backgroundColor: '#FFF5F5',
+    borderWidth: 1,
+    borderColor: '#FECACA',
+    marginBottom: 0,
+  },
+  pregnancyStatusButtonDisabled: {
+    opacity: 0.65,
+  },
+  pregnancyStatusButtonText: {
+    fontSize: 14,
+    fontWeight: '900',
+    color: '#FFFFFF',
+  },
+  pregnancyStatusButtonDangerText: {
+    fontSize: 14,
+    fontWeight: '900',
+    color: '#B42318',
+  },
+  pregnancyDatePickerOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(45, 55, 72, 0.45)',
+    justifyContent: 'flex-end',
+  },
+  pregnancyDatePickerContent: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingTop: 18,
+    paddingHorizontal: 18,
+    paddingBottom: 28,
+  },
+  pregnancyDatePickerTitle: {
+    fontSize: 18,
+    fontWeight: '900',
+    color: '#2D3748',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  pregnancyDatePickerActions: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 10,
+  },
+  pregnancyDatePickerCancel: {
+    flex: 1,
+    minHeight: 46,
+    borderRadius: 14,
+    backgroundColor: '#F3F4F6',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pregnancyDatePickerConfirm: {
+    flex: 1,
+    minHeight: 46,
+    borderRadius: 14,
+    backgroundColor: '#E84D8A',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pregnancyDatePickerCancelText: {
+    fontSize: 14,
+    fontWeight: '900',
+    color: '#4A5568',
+  },
+  pregnancyDatePickerConfirmText: {
+    fontSize: 14,
+    fontWeight: '900',
+    color: '#FFFFFF',
+  },
   todayGuideCard: {
     backgroundColor: "#FFF7D6",
     borderRadius: 18,
@@ -6902,7 +7198,7 @@ const styles = StyleSheet.create({
     color: "#2D3748",
     marginBottom: 10,
   },
-  
+
   // Estilos para sección de Receta
   recipeSection: {
     marginBottom: 20,
@@ -6982,7 +7278,7 @@ const styles = StyleSheet.create({
   },
   todayBanner: {
     width: '110%',
-    
+
   },
   todayDouliSection: {
     backgroundColor: "#FFF",

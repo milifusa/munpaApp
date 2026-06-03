@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../contexts/AuthContext';
-import { locationsService, authService } from '../services/api';
+import { locationsService, profileService } from '../services/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface LocationModalProps {
@@ -60,11 +60,9 @@ const RequiredLocationModal: React.FC<LocationModalProps> = ({ visible, onComple
     try {
       setLoadingCountries(true);
       
-      console.log('🌍 [LOCATION MODAL] Cargando países...');
       
       const response = await locationsService.getCountries();
       
-      console.log('🌍 [LOCATION MODAL] Respuesta países:', response);
       
       // Intentar diferentes estructuras de respuesta
       let countriesData = [];
@@ -80,7 +78,6 @@ const RequiredLocationModal: React.FC<LocationModalProps> = ({ visible, onComple
         countriesData = response.data;
       }
       
-      console.log('🌍 [LOCATION MODAL] Países procesados:', countriesData.length);
       setCountries(countriesData);
       
       if (countriesData.length === 0) {
@@ -99,11 +96,9 @@ const RequiredLocationModal: React.FC<LocationModalProps> = ({ visible, onComple
     try {
       setLoadingCities(true);
       
-      console.log('🏙️ [LOCATION MODAL] Cargando ciudades para país:', countryId);
       
       const response = await locationsService.getCities(countryId);
       
-      console.log('🏙️ [LOCATION MODAL] Respuesta ciudades:', response);
       
       // Intentar diferentes estructuras de respuesta
       let citiesData = [];
@@ -119,7 +114,6 @@ const RequiredLocationModal: React.FC<LocationModalProps> = ({ visible, onComple
         citiesData = response.data;
       }
       
-      console.log('🏙️ [LOCATION MODAL] Ciudades procesadas:', citiesData.length);
       setCities(citiesData);
       
       if (citiesData.length === 0) {
@@ -145,19 +139,12 @@ const RequiredLocationModal: React.FC<LocationModalProps> = ({ visible, onComple
       const selectedCountry = countries.find(c => c.id === selectedCountryId);
       const selectedCity = cities.find(c => c.id === selectedCityId);
 
-      console.log('💾 [LOCATION MODAL] Guardando ubicación:', {
-        countryId: selectedCountryId,
-        cityId: selectedCityId,
-        countryName: selectedCountry?.name,
-        cityName: selectedCity?.name,
-      });
 
-      const response = await authService.updateLocation({
+      const response = await profileService.updateProfile({
         countryId: selectedCountryId,
         cityId: selectedCityId,
       });
 
-      console.log('✅ [LOCATION MODAL] Ubicación guardada:', response);
 
       if (response.success) {
         // Actualizar el usuario en el contexto

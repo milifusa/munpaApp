@@ -118,7 +118,6 @@ const RecommendationsScreen = ({ navigation }: any) => {
   }, [searchQuery]);
 
   const loadCategories = async () => {
-    console.log('🔄 [RECOMMENDATIONS] Cargando categorías...');
     setIsLoadingCategories(true);
     setCategoriesError(null);
     
@@ -126,10 +125,8 @@ const RecommendationsScreen = ({ navigation }: any) => {
       const response = await api.getCategories();
       
       if (response.success && response.data) {
-        console.log('✅ [RECOMMENDATIONS] Categorías cargadas:', response.data.length);
         setCategories(response.data);
       } else {
-        console.log('⚠️ [RECOMMENDATIONS] Respuesta sin datos de categorías');
         setCategoriesError('No se pudieron cargar las categorías');
       }
     } catch (error: any) {
@@ -141,7 +138,6 @@ const RecommendationsScreen = ({ navigation }: any) => {
   };
 
   const loadRecentRecommendations = async () => {
-    console.log('🔄 [RECOMMENDATIONS] Cargando recomendaciones recientes...');
     setIsLoadingRecent(true);
     setRecentError(null);
     
@@ -149,10 +145,8 @@ const RecommendationsScreen = ({ navigation }: any) => {
       const response = await api.getRecentRecommendations(10);
       
       if (response.success && response.data) {
-        console.log('✅ [RECOMMENDATIONS] Recomendaciones recientes cargadas:', response.data.length);
         setRecentRecommendations(response.data);
       } else {
-        console.log('⚠️ [RECOMMENDATIONS] Respuesta sin datos de recomendaciones recientes');
         setRecentError('No se pudieron cargar las recomendaciones');
       }
     } catch (error: any) {
@@ -171,7 +165,6 @@ const RecommendationsScreen = ({ navigation }: any) => {
 
   const handleCategoryPress = (category: Category) => {
     setSelectedCategory(category.id);
-    console.log(`📍 [RECOMMENDATIONS] Categoría seleccionada: ${category.id}`);
     
     // Navegar a la pantalla de recomendaciones de la categoría
     navigation.navigate('CategoryRecommendations', {
@@ -227,7 +220,6 @@ const RecommendationsScreen = ({ navigation }: any) => {
   );
 
   const handleRecommendationPress = (recommendation: RecentRecommendation) => {
-    console.log('📍 [RECOMMENDATIONS] Recomendación seleccionada:', recommendation.id);
     navigation.navigate('RecommendationDetail', {
       recommendationId: recommendation.id,
     });

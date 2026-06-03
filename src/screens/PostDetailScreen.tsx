@@ -277,7 +277,6 @@ const PostDetailScreen: React.FC = () => {
             onListPress={(listId) => {
               // Navegar a la lista cuando se presione
               // ListDetail está en RecommendationsStackNavigator dentro del tab Recommendations
-              console.log('📋 [POST DETAIL] Navegando a lista:', listId);
               // Navegar al tab de Recommendations y luego a ListDetail
               navigation.getParent()?.navigate('Recommendations', {
                 screen: 'ListDetail',

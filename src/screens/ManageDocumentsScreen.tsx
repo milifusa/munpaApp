@@ -145,7 +145,6 @@ const ManageDocumentsScreen = () => {
   const uploadDocument = async (uri: string, fileType: 'image' | 'pdf', fileName: string, mimeType?: string | null) => {
     try {
       setUploading(true);
-      console.log('📤 [DOCUMENTS] Subiendo documento:', fileName);
 
       const formData = new FormData();
       
@@ -171,7 +170,6 @@ const ManageDocumentsScreen = () => {
         },
       });
 
-      console.log('✅ [DOCUMENTS] Documento subido:', response.data);
       
       const uploadedUrl = response.data?.data?.url || response.data?.url;
       

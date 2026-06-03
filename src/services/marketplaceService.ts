@@ -157,8 +157,6 @@ class MarketplaceService {
   // Headers para las peticiones
   private async getHeaders(): Promise<HeadersInit> {
     const token = await this.getAuthToken();
-    console.log('🔑 [MARKETPLACE] Token disponible:', token ? 'SÍ' : 'NO');
-    console.log('🔑 [MARKETPLACE] Longitud del token:', token?.length || 0);
     
     return {
       'Content-Type': 'application/json',
@@ -209,17 +207,13 @@ class MarketplaceService {
       }
 
       const data = await response.json();
-      console.log('📦 [MARKETPLACE] Respuesta completa del servidor:', JSON.stringify(data).substring(0, 300));
       
       // Manejar diferentes formatos de respuesta
       if (data.products) {
-        console.log('✅ [MARKETPLACE] Productos encontrados en data.products:', data.products.length);
         return { products: data.products, total: data.total || data.products.length };
       } else if (data.data && Array.isArray(data.data)) {
-        console.log('✅ [MARKETPLACE] Productos encontrados en data.data:', data.data.length);
         return { products: data.data, total: data.total || data.data.length };
       } else if (Array.isArray(data)) {
-        console.log('✅ [MARKETPLACE] Respuesta es un array directo:', data.length);
         return { products: data, total: data.length };
       } else {
         console.warn('⚠️ [MARKETPLACE] Formato de respuesta desconocido:', Object.keys(data));
@@ -300,7 +294,6 @@ class MarketplaceService {
   // Obtener detalle de un producto
   async getProductById(productId: string): Promise<MarketplaceProduct> {
     try {
-      console.log('🔍 [MARKETPLACE] Obteniendo producto:', productId);
       
       const response = await fetch(
         `${API_BASE_URL}/marketplace/products/${productId}`,
@@ -321,7 +314,6 @@ class MarketplaceService {
       }
 
       const data = await response.json();
-      console.log('📦 [MARKETPLACE] Respuesta completa del servidor (getProductById):', JSON.stringify(data).substring(0, 500));
       
       // Manejar diferentes formatos de respuesta
       const product = data.product || data.data || data;
@@ -332,18 +324,6 @@ class MarketplaceService {
       }
       
       // Log detallado de la información del vendedor
-      console.log('👤 [MARKETPLACE] Información del vendedor recibida:', {
-        userId: product.userId || product.user_id,
-        userName: product.userName || product.user_name || 'NO TIENE',
-        userPhoto: product.userPhoto || product.user_photo ? 'Presente' : 'Ausente',
-        sellerName: product.sellerName || product.seller_name || 'NO TIENE',
-        sellerPhoto: product.sellerPhoto || product.seller_photo ? 'Presente' : 'Ausente',
-        allKeys: Object.keys(product).filter(key => 
-          key.toLowerCase().includes('user') || 
-          key.toLowerCase().includes('seller') ||
-          key.toLowerCase().includes('name')
-        ),
-      });
       
       // Normalizar el nombre del usuario - intentar diferentes campos
       if (!product.userName || product.userName === 'Usuario' || product.userName === '') {
@@ -358,14 +338,11 @@ class MarketplaceService {
         
         if (possibleNames.length > 0) {
           product.userName = possibleNames[0];
-          console.log('✅ [MARKETPLACE] Nombre del vendedor normalizado desde:', possibleNames[0]);
         } else {
           console.warn('⚠️ [MARKETPLACE] No se encontró nombre válido del vendedor. El backend debe enviar userName o sellerName');
         }
       }
       
-      console.log('✅ [MARKETPLACE] Producto encontrado:', product.id || product._id);
-      console.log('✅ [MARKETPLACE] Nombre del vendedor final:', product.userName);
       return product as MarketplaceProduct;
     } catch (error) {
       console.error('❌ [MARKETPLACE] Error en getProductById:', error);
@@ -376,7 +353,6 @@ class MarketplaceService {
   // Crear nuevo producto
   async createProduct(productData: CreateProductData): Promise<MarketplaceProduct> {
     try {
-      console.log('📤 [MARKETPLACE] Creando producto:', productData);
       
       const response = await fetch(
         `${API_BASE_URL}/marketplace/products`,
@@ -387,11 +363,6 @@ class MarketplaceService {
         }
       );
 
-      console.log('📥 [MARKETPLACE] Respuesta del servidor:', {
-        status: response.status,
-        statusText: response.statusText,
-        ok: response.ok,
-      });
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ message: 'Error desconocido' }));
@@ -416,7 +387,6 @@ class MarketplaceService {
       }
 
       const data = await response.json();
-      console.log('✅ [MARKETPLACE] Producto creado:', data);
       return data.product;
     } catch (error: any) {
       console.error('❌ [MARKETPLACE] Error en createProduct:', {
@@ -501,7 +471,6 @@ class MarketplaceService {
   // Obtener mis productos
   async getMyProducts(): Promise<MarketplaceProduct[]> {
     try {
-      console.log('📦 [MARKETPLACE] Obteniendo mis productos');
       
       const response = await fetch(
         `${API_BASE_URL}/marketplace/my-products`,
@@ -522,7 +491,6 @@ class MarketplaceService {
       }
 
       const data = await response.json();
-      console.log('📦 [MARKETPLACE] Respuesta completa del servidor (getMyProducts):', JSON.stringify(data).substring(0, 300));
       
       // Manejar diferentes formatos de respuesta
       const myProducts = data.products || data.data || (Array.isArray(data) ? data : []);
@@ -532,7 +500,6 @@ class MarketplaceService {
         return [];
       }
       
-      console.log('✅ [MARKETPLACE] Mis productos encontrados:', myProducts.length);
       return myProducts as MarketplaceProduct[];
     } catch (error) {
       console.error('❌ [MARKETPLACE] Error en getMyProducts:', error);
@@ -546,7 +513,6 @@ class MarketplaceService {
   // Obtener favoritos
   async getFavorites(): Promise<MarketplaceProduct[]> {
     try {
-      console.log('❤️ [MARKETPLACE] Obteniendo favoritos');
       
       const response = await fetch(
         `${API_BASE_URL}/marketplace/favorites`,
@@ -568,26 +534,16 @@ class MarketplaceService {
       }
 
       const data = await response.json();
-      console.log('📦 [MARKETPLACE] Respuesta completa del servidor (getFavorites):', JSON.stringify(data).substring(0, 500));
-      console.log('📦 [MARKETPLACE] Estructura de respuesta:', {
-        hasProducts: !!data.products,
-        hasData: !!data.data,
-        isArray: Array.isArray(data),
-        keys: Object.keys(data || {}),
-      });
       
       // Manejar diferentes formatos de respuesta
       let favorites: MarketplaceProduct[] = [];
       
       if (data.products && Array.isArray(data.products)) {
         favorites = data.products;
-        console.log('✅ [MARKETPLACE] Favoritos encontrados en data.products:', favorites.length);
       } else if (data.data && Array.isArray(data.data)) {
         favorites = data.data;
-        console.log('✅ [MARKETPLACE] Favoritos encontrados en data.data:', favorites.length);
       } else if (Array.isArray(data)) {
         favorites = data;
-        console.log('✅ [MARKETPLACE] Respuesta es un array directo:', favorites.length);
       } else {
         console.warn('⚠️ [MARKETPLACE] Formato de respuesta desconocido, retornando array vacío');
         return [];
@@ -595,13 +551,7 @@ class MarketplaceService {
       
       // Validar que realmente sean favoritos (opcional: verificar que tengan isFavorite: true)
       // Por ahora solo retornamos lo que viene del backend
-      console.log('✅ [MARKETPLACE] Total de favoritos a retornar:', favorites.length);
       if (favorites.length > 0) {
-        console.log('📦 [MARKETPLACE] Primer favorito:', {
-          id: favorites[0].id,
-          title: favorites[0].title,
-          isFavorite: (favorites[0] as any).isFavorite,
-        });
       }
       
       return favorites as MarketplaceProduct[];
@@ -615,7 +565,6 @@ class MarketplaceService {
   // Agregar a favoritos
   async addToFavorites(productId: string): Promise<void> {
     try {
-      console.log('❤️ [MARKETPLACE] Agregando a favoritos:', productId);
       
       const response = await fetch(
         `${API_BASE_URL}/marketplace/favorites/${productId}`,
@@ -636,7 +585,6 @@ class MarketplaceService {
       }
 
       const data = await response.json().catch(() => ({}));
-      console.log('✅ [MARKETPLACE] Agregado a favoritos exitosamente');
     } catch (error) {
       console.error('❌ [MARKETPLACE] Error en addToFavorites:', error);
       throw error;
@@ -646,7 +594,6 @@ class MarketplaceService {
   // Quitar de favoritos
   async removeFromFavorites(productId: string): Promise<void> {
     try {
-      console.log('💔 [MARKETPLACE] Quitando de favoritos:', productId);
       
       const response = await fetch(
         `${API_BASE_URL}/marketplace/favorites/${productId}`,
@@ -667,7 +614,6 @@ class MarketplaceService {
       }
 
       const data = await response.json().catch(() => ({}));
-      console.log('✅ [MARKETPLACE] Quitado de favoritos exitosamente');
     } catch (error) {
       console.error('❌ [MARKETPLACE] Error en removeFromFavorites:', error);
       throw error;
@@ -710,8 +656,6 @@ class MarketplaceService {
     totalMessages: number;
   }>> {
     try {
-      console.log('💬 [MARKETPLACE] Obteniendo conversaciones para producto:', productId);
-      console.log('👤 [MARKETPLACE] Usuario actual:', currentUserId);
       
       const messages = await this.getProductMessages(productId);
       
@@ -769,7 +713,6 @@ class MarketplaceService {
         new Date(b.lastMessageDate).getTime() - new Date(a.lastMessageDate).getTime()
       );
 
-      console.log('✅ [MARKETPLACE] Conversaciones encontradas:', conversations.length);
       return conversations;
     } catch (error) {
       console.error('❌ [MARKETPLACE] Error obteniendo conversaciones del producto:', error);
@@ -780,7 +723,6 @@ class MarketplaceService {
   // Obtener mensajes de un producto
   async getProductMessages(productId: string): Promise<MarketplaceMessage[]> {
     try {
-      console.log('💬 [MARKETPLACE] Obteniendo mensajes para producto:', productId);
       
       const response = await fetch(
         `${API_BASE_URL}/marketplace/messages/${productId}`,
@@ -801,15 +743,6 @@ class MarketplaceService {
       }
 
       const data = await response.json();
-      console.log('📦 [MARKETPLACE] Respuesta completa del servidor (getProductMessages):', JSON.stringify(data, null, 2).substring(0, 2000));
-      console.log('📦 [MARKETPLACE] Estructura de la respuesta (getProductMessages):', {
-        success: data.success,
-        message: data.message,
-        hasMessages: !!data.messages,
-        hasData: !!data.data,
-        isArray: Array.isArray(data),
-        keys: Object.keys(data),
-      });
       
       // Manejar diferentes formatos de respuesta
       // Formato esperado: { success: true, message: "...", data: [...] } o { messages: [...] }
@@ -820,27 +753,14 @@ class MarketplaceService {
         return [];
       }
       
-      console.log('✅ [MARKETPLACE] Mensajes encontrados:', messages.length);
       
       // Log detallado de la estructura de los mensajes
       if (messages.length > 0) {
-        console.log('📋 [MARKETPLACE] Estructura del primer mensaje:', {
-          id: messages[0].id,
-          senderId: messages[0].senderId,
-          senderName: messages[0].senderName || 'NO TIENE senderName',
-          senderPhoto: messages[0].senderPhoto || 'NO TIENE senderPhoto',
-          receiverId: messages[0].receiverId,
-          receiverName: messages[0].receiverName || 'NO TIENE receiverName',
-          message: messages[0].message?.substring(0, 50),
-          createdAt: messages[0].createdAt,
-          allKeys: Object.keys(messages[0]),
-        });
         
         // Verificar si algún mensaje tiene información del remitente
         const messagesWithSenderInfo = messages.filter((m: any) => 
           m.senderName && m.senderName !== 'Usuario' && m.senderName !== ''
         );
-        console.log('📊 [MARKETPLACE] Mensajes con información del remitente:', messagesWithSenderInfo.length, 'de', messages.length);
         
         if (messagesWithSenderInfo.length === 0) {
           console.warn('⚠️ [MARKETPLACE] ⚠️⚠️⚠️ NINGÚN MENSAJE TIENE senderName VÁLIDO ⚠️⚠️⚠️');
@@ -862,7 +782,6 @@ class MarketplaceService {
   // Enviar mensaje
   async sendMessage(productId: string, message: string): Promise<MarketplaceMessage> {
     try {
-      console.log('📤 [MARKETPLACE] Enviando mensaje para producto:', productId);
       
       const response = await fetch(
         `${API_BASE_URL}/marketplace/messages`,
@@ -880,15 +799,6 @@ class MarketplaceService {
       }
 
       const data = await response.json();
-      console.log('📦 [MARKETPLACE] Respuesta completa del servidor (sendMessage):', JSON.stringify(data, null, 2));
-      console.log('📦 [MARKETPLACE] Estructura de la respuesta:', {
-        success: data.success,
-        message: data.message,
-        hasMessage: !!data.message,
-        hasData: !!data.data,
-        isArray: Array.isArray(data),
-        keys: Object.keys(data),
-      });
       
       // Manejar diferentes formatos de respuesta
       // Formato esperado: { success: true, message: "...", data: { ... } }
@@ -906,23 +816,9 @@ class MarketplaceService {
         const hasReceiverName = !!(sentMessage.receiverName && sentMessage.receiverName !== 'Usuario');
         const hasReceiverPhoto = !!sentMessage.receiverPhoto;
         
-        console.log('📋 [MARKETPLACE] Mensaje extraído de la respuesta:', {
-          id: sentMessage.id,
-          senderId: sentMessage.senderId,
-          senderName: sentMessage.senderName || '❌ NO TIENE senderName',
-          senderPhoto: sentMessage.senderPhoto || '❌ NO TIENE senderPhoto',
-          receiverId: sentMessage.receiverId,
-          receiverName: sentMessage.receiverName || '❌ NO TIENE receiverName',
-          receiverPhoto: sentMessage.receiverPhoto || '❌ NO TIENE receiverPhoto',
-          message: sentMessage.message?.substring(0, 50),
-          createdAt: sentMessage.createdAt,
-        });
         
         // Verificación clara de la información recibida
         if (hasSenderName && hasSenderPhoto) {
-          console.log('✅ [MARKETPLACE] ✅✅✅ INFORMACIÓN COMPLETA DEL REMITENTE RECIBIDA ✅✅✅');
-          console.log('✅ [MARKETPLACE] senderName:', sentMessage.senderName);
-          console.log('✅ [MARKETPLACE] senderPhoto:', sentMessage.senderPhoto);
         } else {
           console.warn('⚠️ [MARKETPLACE] ⚠️⚠️⚠️ FALTA INFORMACIÓN DEL REMITENTE ⚠️⚠️⚠️');
           if (!hasSenderName) console.warn('⚠️ [MARKETPLACE] Falta senderName');
@@ -974,18 +870,6 @@ class MarketplaceService {
         };
       }
       
-      console.log('✅ [MARKETPLACE] Mensaje enviado exitosamente:', sentMessage.id);
-      console.log('📋 [MARKETPLACE] Información del mensaje enviado:', {
-        id: sentMessage.id,
-        senderId: sentMessage.senderId,
-        senderName: sentMessage.senderName || 'NO TIENE senderName',
-        senderPhoto: sentMessage.senderPhoto || 'NO TIENE senderPhoto',
-        receiverId: sentMessage.receiverId,
-        receiverName: sentMessage.receiverName || 'NO TIENE receiverName',
-        message: sentMessage.message?.substring(0, 50),
-        createdAt: sentMessage.createdAt,
-        allKeys: Object.keys(sentMessage),
-      });
       
       // Verificar si el mensaje tiene la información necesaria
       if (!sentMessage.senderName || sentMessage.senderName === 'Usuario') {
@@ -1032,12 +916,9 @@ class MarketplaceService {
     try {
       // Si hay categorías en caché y no se fuerza el refresh, retornarlas
       if (cachedCategories && !forceRefresh) {
-        console.log('📦 [MARKETPLACE] Usando categorías en caché');
         return cachedCategories;
       }
 
-      console.log('🔄 [MARKETPLACE] Obteniendo categorías del servidor...');
-      console.log('🔄 [MARKETPLACE] URL:', `${API_BASE_URL}/marketplace/categories`);
       
       const response = await fetch(
         `${API_BASE_URL}/marketplace/categories`,
@@ -1047,11 +928,9 @@ class MarketplaceService {
         }
       );
 
-      console.log('📡 [MARKETPLACE] Response status:', response.status);
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.log('❌ [MARKETPLACE] Error response:', errorText);
         
         // Si el backend no está disponible, usar categorías por defecto
         if (response.status === 404) {
@@ -1063,21 +942,17 @@ class MarketplaceService {
       }
 
       const data = await response.json();
-      console.log('📦 [MARKETPLACE] Data recibida:', JSON.stringify(data).substring(0, 200));
       const categories = data.data || data;
       
       // Ordenar por order
       categories.sort((a: MarketplaceCategory, b: MarketplaceCategory) => a.order - b.order);
       
       // Log detallado de categorías
-      console.log('📋 [MARKETPLACE] Categorías recibidas del backend:');
       categories.forEach((cat: MarketplaceCategory, index: number) => {
-        console.log(`  ${index + 1}. ${cat.name} (slug: ${cat.slug}, id: ${cat.id})`);
       });
       
       // Guardar en caché
       cachedCategories = categories;
-      console.log('✅ [MARKETPLACE] Categorías cargadas:', categories.length);
       
       return categories;
     } catch (error) {

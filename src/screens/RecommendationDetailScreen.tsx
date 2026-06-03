@@ -179,7 +179,6 @@ const RecommendationDetailScreen = ({ route, navigation }: any) => {
     try {
       setLoadingProfProducts(true);
       const response = await api.getRecommendationProducts(recommendationId, { limit: 20 });
-      console.log('🛍️ [DETAIL] Respuesta productos:', JSON.stringify(response)?.slice(0, 300));
 
       // Normalizar respuesta — varios formatos posibles
       let products: any[] = [];
@@ -205,7 +204,6 @@ const RecommendationDetailScreen = ({ route, navigation }: any) => {
 
       setProfessionalProducts(products);
       setProfessional(prof);
-      console.log('✅ [DETAIL] Productos normalizados:', products.length);
     } catch (error: any) {
       if (error.response?.status !== 404 && error.status !== 404) {
         console.error('❌ [DETAIL] Error cargando productos:', error);
@@ -246,13 +244,11 @@ const RecommendationDetailScreen = ({ route, navigation }: any) => {
   };
 
   const loadRecommendation = async () => {
-    console.log('🔄 [DETAIL] Cargando recomendación:', recommendationId);
     
     try {
       const response = await api.getRecommendationById(recommendationId);
       
       if (response.success && response.data) {
-        console.log('✅ [DETAIL] Recomendación cargada');
         setRecommendation(response.data);
 
         // Extraer banners si vienen en la respuesta
@@ -286,15 +282,12 @@ const RecommendationDetailScreen = ({ route, navigation }: any) => {
   };
 
   const loadReviews = async () => {
-    console.log('🔄 [DETAIL] Cargando reviews');
     setIsLoadingReviews(true);
     
     try {
       const response = await api.getRecommendationReviews(recommendationId);
       
       if (response.success) {
-        console.log('✅ [DETAIL] Reviews cargadas:', response.data?.length);
-        console.log('📋 [DETAIL] JSON response completo:', JSON.stringify({ data: response.data, stats: response.stats }, null, 2));
         setReviews(response.data);
         setStats(response.stats);
       }
@@ -309,13 +302,11 @@ const RecommendationDetailScreen = ({ route, navigation }: any) => {
   };
 
   const loadMyReview = async () => {
-    console.log('🔄 [DETAIL] Cargando mi review');
     
     try {
       const response = await api.getMyReview(recommendationId);
       
       if (response.success && response.data) {
-        console.log('✅ [DETAIL] Mi review cargada');
         setMyReview(response.data);
       } else {
         setMyReview(null);
@@ -495,7 +486,6 @@ const RecommendationDetailScreen = ({ route, navigation }: any) => {
           await recommendationAnalyticsService.trackEmail(recommendationId, email, {
             source: 'detail_screen',
           });
-          console.log('✅ [DETAIL] Evento de email registrado');
         } catch (error) {
           console.error('❌ [DETAIL] Error registrando email:', error);
         }
@@ -505,7 +495,6 @@ const RecommendationDetailScreen = ({ route, navigation }: any) => {
           await recommendationAnalyticsService.trackWebsite(recommendationId, url, {
             source: 'detail_screen',
           });
-          console.log('✅ [DETAIL] Evento de website registrado');
         } catch (error) {
           console.error('❌ [DETAIL] Error registrando website:', error);
         }
@@ -517,14 +506,12 @@ const RecommendationDetailScreen = ({ route, navigation }: any) => {
 
   const handleCall = async (phone: string) => {
     if (phone) {
-      console.log('📞 [DETAIL] Iniciando llamada:', phone);
       
       // Trackear llamada
       try {
         await recommendationAnalyticsService.trackCall(recommendationId, phone, {
           source: 'detail_screen',
         });
-        console.log('✅ [DETAIL] Evento de llamada registrado');
       } catch (error) {
         console.error('❌ [DETAIL] Error registrando llamada:', error);
       }
@@ -535,14 +522,12 @@ const RecommendationDetailScreen = ({ route, navigation }: any) => {
 
   const handleWhatsApp = async (phone: string) => {
     if (phone) {
-      console.log('💬 [DETAIL] Iniciando WhatsApp:', phone);
       
       // Trackear contacto por WhatsApp
       try {
         await recommendationAnalyticsService.trackWhatsApp(recommendationId, phone, {
           source: 'detail_screen',
         });
-        console.log('✅ [DETAIL] Evento de WhatsApp registrado');
       } catch (error) {
         console.error('❌ [DETAIL] Error registrando WhatsApp:', error);
       }
@@ -1377,7 +1362,6 @@ const RecommendationDetailScreen = ({ route, navigation }: any) => {
                           key={index}
                           onPress={() => {
                             // TODO: Abrir modal de vista previa de foto
-                            console.log('Ver foto:', photo);
                           }}
                         >
                           <Image 
@@ -2184,8 +2168,6 @@ const styles = StyleSheet.create({
     right: 0,
     padding: 12,
     paddingTop: 24,
-    background: 'transparent',
-    backgroundImage: 'linear-gradient(transparent, rgba(0,0,0,0.55))',
     backgroundColor: 'rgba(0,0,0,0.3)',
     justifyContent: 'flex-end',
     gap: 6,
@@ -2309,4 +2291,3 @@ const styles = StyleSheet.create({
 });
 
 export default RecommendationDetailScreen;
-

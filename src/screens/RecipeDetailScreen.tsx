@@ -40,7 +40,6 @@ const RecipeDetailScreen: React.FC = () => {
     try {
       setLoading(true);
       setError(null);
-      console.log('🍽️ [RECIPE DETAIL] Cargando receta:', recipeId);
       
       const recipeData = await nutritionService.getRecipeById(recipeId);
       

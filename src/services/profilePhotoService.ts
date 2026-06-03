@@ -81,17 +81,14 @@ export const takePhotoWithCamera = async () => {
  */
 export const uploadProfilePhoto = async (photo: ImagePicker.ImagePickerAsset) => {
   try {
-    console.log('📸 Subiendo foto de perfil...');
 
     // 1. Subir imagen a Firebase Storage usando el servicio existente
     const photoURL = await imageUploadService.uploadProfileImage(photo.uri);
     
-    console.log('📸 Imagen subida a Firebase:', photoURL);
 
     // 2. Actualizar perfil con la nueva URL de foto
     const response = await authService.updateProfilePhoto(photoURL);
 
-    console.log('✅ Foto de perfil actualizada exitosamente');
 
     return {
       success: true,
@@ -119,11 +116,9 @@ export const uploadProfilePhoto = async (photo: ImagePicker.ImagePickerAsset) =>
  */
 export const updateProfilePhotoURL = async (photoURL: string) => {
   try {
-    console.log('📸 Actualizando URL de foto de perfil...');
 
     const response = await authService.updateProfilePhoto(photoURL);
 
-    console.log('✅ URL de foto actualizada exitosamente');
 
     return {
       success: true,
@@ -151,12 +146,10 @@ export const updateProfilePhotoURL = async (photoURL: string) => {
  */
 export const deleteProfilePhoto = async () => {
   try {
-    console.log('🗑️ Eliminando foto de perfil...');
 
     // Actualizar perfil con photoURL nulo/vacío
     await authService.updateProfilePhoto('');
 
-    console.log('✅ Foto eliminada exitosamente');
 
     return {
       success: true,
@@ -183,7 +176,6 @@ export const deleteProfilePhoto = async () => {
  */
 export const selectAndUploadProfilePhoto = async (source: 'gallery' | 'camera' = 'gallery') => {
   try {
-    console.log(`📸 Seleccionando foto desde ${source}...`);
 
     // 1. Seleccionar foto
     const photo = source === 'camera' 

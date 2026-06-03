@@ -128,7 +128,6 @@ const MedicationsScreen: React.FC = () => {
         (Array.isArray(response?.medications) && response.medications) ||
         (Array.isArray(response) && response) ||
         [];
-      console.log('💊 [MED] Medicamentos recibidos:', items);
       if (response?.success !== false) {
         setMedications(items);
       } else {

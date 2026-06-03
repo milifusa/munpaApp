@@ -10,7 +10,7 @@ const DouliChatOverlay: React.FC = () => {
 
   // Usar listener de navegación para obtener la ruta actual
   useEffect(() => {
-    const unsubscribe = navigation.addListener('state', (e) => {
+    const unsubscribe = navigation.addListener('state', (e: any) => {
       // Obtener la ruta activa del estado de navegación
       const state = e.data.state;
       if (state) {

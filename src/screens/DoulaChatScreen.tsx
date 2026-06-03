@@ -61,15 +61,12 @@ const DouliChat = () => {
 
   // Log cuando cambian los mensajes
   useEffect(() => {
-    console.log('💬 [DOULI CHAT] Mensajes actualizados:', messages.length);
-    console.log('💬 [DOULI CHAT] Contenido de mensajes:', messages.map(m => ({ id: m.id, sender: m.sender, text: m.text.substring(0, 50) })));
   }, [messages]);
 
   useEffect(() => {
     if (initialQuestion) {
       initialQuestionSentRef.current = false;
       setPendingQuestion(initialQuestion);
-      console.log('🟣 [DOULI] Pregunta recibida:', initialQuestion);
     }
   }, [initialQuestion]);
 
@@ -92,14 +89,12 @@ const DouliChat = () => {
     try {
       const response = await learningService.chatWithDouli(inputText.trim(), conversationId);
       
-      console.log('📋 Respuesta completa del chat:', response);
       
       // Extraer la respuesta del formato correcto
       const responseText = response.data?.response || response.response || 'No se pudo obtener la respuesta';
       const source = response.data?.source || response.source;
       const usedFallback = response.data?.usedFallback || response.usedFallback;
       
-      console.log('📝 Texto extraído:', responseText);
       
       const douliMessage: Message = {
         id: Date.now() + 1,
@@ -137,7 +132,6 @@ const DouliChat = () => {
 
     try {
       const response = await learningService.chatWithDouli(text.trim(), conversationId);
-      console.log('📋 Respuesta completa del chat:', response);
 
       const responseText = response.data?.response || response.response || 'No se pudo obtener la respuesta';
       const source = response.data?.source || response.source;
@@ -163,12 +157,6 @@ const DouliChat = () => {
   };
 
   useEffect(() => {
-    console.log('🟣 [DOULI] Estado auto-envio:', {
-      pendingQuestion,
-      conversationId,
-      isLoading,
-      alreadySent: initialQuestionSentRef.current,
-    });
     if (!pendingQuestion) return;
     if (!conversationId) {
       initializeChat();

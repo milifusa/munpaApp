@@ -41,7 +41,6 @@ export const ViewModeProvider: React.FC<ViewModeProviderProps> = ({ children }) 
   // Si el usuario no tiene perfil profesional, forzar modo munpa
   useEffect(() => {
     if (user && !user.professionalProfile?.isActive && viewMode === 'specialist') {
-      console.log('⚠️ [VIEW MODE] Usuario sin perfil profesional, cambiando a modo Munpa');
       setViewMode('munpa');
     }
   }, [user]);
@@ -50,10 +49,8 @@ export const ViewModeProvider: React.FC<ViewModeProviderProps> = ({ children }) 
     try {
       const savedMode = await AsyncStorage.getItem('viewMode');
       if (savedMode === 'specialist' || savedMode === 'munpa') {
-        console.log('📱 [VIEW MODE] Modo cargado desde storage:', savedMode);
         setViewModeState(savedMode);
       } else {
-        console.log('📱 [VIEW MODE] No hay modo guardado, usando Munpa por defecto');
         setViewModeState('munpa');
       }
     } catch (error) {
@@ -64,7 +61,6 @@ export const ViewModeProvider: React.FC<ViewModeProviderProps> = ({ children }) 
 
   const setViewMode = async (mode: ViewMode) => {
     try {
-      console.log('🔄 [VIEW MODE] Cambiando modo a:', mode);
       
       // Guardar en AsyncStorage
       await AsyncStorage.setItem('viewMode', mode);
@@ -81,7 +77,6 @@ export const ViewModeProvider: React.FC<ViewModeProviderProps> = ({ children }) 
         profile_type: profileType || 'none',
       });
       
-      console.log('✅ [VIEW MODE] Modo cambiado exitosamente a:', mode, 'tipo:', profileType);
     } catch (error) {
       console.error('❌ [VIEW MODE] Error guardando modo:', error);
     }
@@ -95,12 +90,6 @@ export const ViewModeProvider: React.FC<ViewModeProviderProps> = ({ children }) 
   // Debug log
   useEffect(() => {
     if (user?.professionalProfile) {
-      console.log('🔍 [VIEW MODE] Perfil detectado:', {
-        accountType: profileType,
-        isMedicalProfile,
-        isServiceProfile,
-        isSpecialistMode: viewMode === 'specialist',
-      });
     }
   }, [user?.professionalProfile, viewMode]);
 

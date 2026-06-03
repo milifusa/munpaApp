@@ -42,7 +42,7 @@ const ProfilePhoto: React.FC<ProfilePhotoProps> = ({
     setShowOptionsModal(false);
     setLoading(true);
 
-    const result = await selectAndUploadProfilePhoto(source);
+    const result: any = await selectAndUploadProfilePhoto(source);
 
     setLoading(false);
 
@@ -284,4 +284,3 @@ const styles = StyleSheet.create({
 });
 
 export default ProfilePhoto;
-

@@ -34,7 +34,6 @@ const RecipeFavoritesScreen: React.FC = () => {
       const response = await nutritionService.getFavorites();
       const raw = (response.data as any[]) || [];
       if (raw.length > 0) {
-        console.log('🔍 [FAVORITES] Estructura item[0]:', JSON.stringify(raw[0], null, 2));
       }
       const items: FavoriteItem[] = raw
         .map((item: any) => {

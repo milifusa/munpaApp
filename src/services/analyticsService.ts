@@ -4,7 +4,7 @@ import { ensureFirebaseApp } from './firebaseApp';
 const analyticsService = {
   setEnabled: async (enabled: boolean) => {
     try {
-      const app = ensureFirebaseApp();
+      const app = await ensureFirebaseApp();
       const analytics = getAnalytics(app);
       await setAnalyticsCollectionEnabled(analytics, enabled);
     } catch (error) {
@@ -14,7 +14,7 @@ const analyticsService = {
 
   logScreenView: async (screenName: string, screenClass?: string) => {
     try {
-      const app = ensureFirebaseApp();
+      const app = await ensureFirebaseApp();
       const analytics = getAnalytics(app);
       await firebaseLogScreenView(analytics, {
         screen_name: screenName,
@@ -27,7 +27,7 @@ const analyticsService = {
 
   logEvent: async (name: string, params?: Record<string, any>) => {
     try {
-      const app = ensureFirebaseApp();
+      const app = await ensureFirebaseApp();
       const analytics = getAnalytics(app);
       await firebaseLogEvent(analytics, name, params);
     } catch (error) {
@@ -37,7 +37,7 @@ const analyticsService = {
 
   setUser: async (userId: string | null, properties?: Record<string, any>) => {
     try {
-      const app = ensureFirebaseApp();
+      const app = await ensureFirebaseApp();
       const analytics = getAnalytics(app);
       await setUserId(analytics, userId);
       if (properties) {

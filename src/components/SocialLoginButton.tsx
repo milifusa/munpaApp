@@ -47,12 +47,12 @@ const SocialLoginButton: React.FC<SocialLoginButtonProps> = ({
     if (type === 'google') {
       return {
         color: '#000000',
-        fontWeight: '700',
+        fontWeight: '700' as const,
       };
     } else {
       return {
         color: '#FFFFFF',
-        fontWeight: '700',
+        fontWeight: '700' as const,
       };
     }
   };

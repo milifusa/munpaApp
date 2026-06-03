@@ -98,7 +98,6 @@ const ChildProfileScreen: React.FC = () => {
   // Recargar datos del hijo cuando la pantalla recibe el foco
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
-      console.log('🔄 [CHILD PROFILE] Pantalla recibió foco, recargando datos...');
       loadChildData();
     });
 
@@ -124,7 +123,6 @@ const ChildProfileScreen: React.FC = () => {
     
     // Usar el campo calculado por el backend si está disponible
     if (child.currentAgeInMonths !== null && child.currentAgeInMonths !== undefined) {
-      console.log('📅 Usando edad calculada por backend:', child.currentAgeInMonths);
       return child.currentAgeInMonths;
     }
     
@@ -151,12 +149,6 @@ const ChildProfileScreen: React.FC = () => {
     // Sumar la edad registrada más los meses transcurridos
     const currentAge = (child.ageInMonths || 0) + monthsDiff;
     
-    console.log('📅 Cálculo manual de edad actual:', {
-      edadRegistrada: child.ageInMonths || 0,
-      fechaRegistro: registrationDate.toLocaleDateString('es-ES'),
-      mesesTranscurridos: monthsDiff,
-      edadActual: currentAge
-    });
     
     return currentAge;
   };
@@ -431,7 +423,7 @@ const ChildProfileScreen: React.FC = () => {
               },
               {
                 text: 'Guardar',
-                onPress: async (notes) => {
+                onPress: async (notes?: string) => {
                   try {
                     await vaccinesService.updateVaccine(childId, vaccine.id, {
                       notes: notes || '',
@@ -516,7 +508,7 @@ const ChildProfileScreen: React.FC = () => {
           },
           {
             text: 'Continuar',
-            onPress: (vaccineName) => {
+            onPress: (vaccineName?: string) => {
               if (vaccineName && vaccineName.trim()) {
                 // Preguntar si ya fue aplicada
                 Alert.alert(
@@ -809,7 +801,6 @@ const ChildProfileScreen: React.FC = () => {
 
   const loadChildData = async () => {
     try {
-      console.log('🔄 [CHILD PROFILE] Recargando datos del hijo:', childId);
       const response = await childrenService.getChildren();
       
       if (response.success && response.data) {
@@ -817,7 +808,6 @@ const ChildProfileScreen: React.FC = () => {
         const updatedChild = children.find((c: Child) => c.id === childId);
         
         if (updatedChild) {
-          console.log('✅ [CHILD PROFILE] Datos actualizados recibidos:', updatedChild);
           setChild(updatedChild);
           setProfileImage(updatedChild.photoUrl || null);
           
@@ -846,12 +836,6 @@ const ChildProfileScreen: React.FC = () => {
       const currentAge = childData.currentAgeInMonths || calculateCurrentAge();
       const currentWeeks = childData.currentGestationWeeks || childData.gestationWeeks;
       
-      console.log('👶 [DEVELOPMENT] Cargando info para:', {
-        nombre: childData.name,
-        edadActual: currentAge,
-        semanasActuales: currentWeeks,
-        esNoNacido: childData.isUnborn
-      });
       
       const info = await childrenService.getChildDevelopmentInfo(
         childData.name,
@@ -921,7 +905,6 @@ const ChildProfileScreen: React.FC = () => {
   const getChildAvatar = (index: number) => {
     // Usar las tres caritas disponibles sin repetir
     const caritaIndex = index % 3;
-    console.log('🎨 [CHILD PROFILE] Cargando carita por defecto, índice:', caritaIndex);
     
     // Retornar directamente el require según el índice
     switch (caritaIndex) {
@@ -1094,8 +1077,8 @@ const ChildProfileScreen: React.FC = () => {
                 style={styles.childAvatar}
                 resizeMode="cover"
                 key={profileImage || 'default'}
-                onLoad={() => console.log('✅ [PROFILE IMAGE] Imagen cargada')}
-                onError={(error) => console.log('❌ [PROFILE IMAGE ERROR]', error.nativeEvent)}
+                onLoad={() => undefined}
+                onError={(error) => undefined}
               />
               {loading && (
                 <View style={styles.loadingOverlay}>
@@ -2326,7 +2309,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#96d2d3',
   },
   actionButtonText: {
-    fontSize: typography.sizes.md,
+    fontSize: typography.sizes.base,
     fontWeight: typography.weights.semibold,
     color: colors.white,
   },

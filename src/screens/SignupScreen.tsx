@@ -47,7 +47,6 @@ const SignupScreen: React.FC<SignupScreenProps> = ({ navigation }) => {
       const userData = await AsyncStorage.getItem('userData');
       
       if (needsCompletion === 'true' && userData) {
-        console.log('📝 Modo completar perfil activado');
         setIsProfileCompletionMode(true);
         const parsedUser = JSON.parse(userData);
         setDisplayName(parsedUser.name || parsedUser.displayName || '');
@@ -76,12 +75,9 @@ const SignupScreen: React.FC<SignupScreenProps> = ({ navigation }) => {
   };
 
   const handleSignup = async () => {
-    console.log('📝 Iniciando validación...');
-    console.log('🔄 Modo completar perfil:', isProfileCompletionMode);
     
     // Validación del nombre (siempre requerido)
     if (!displayName.trim()) {
-      console.log('❌ Validación fallida: Nombre vacío');
       Alert.alert('Error', 'Por favor ingresa tu nombre completo');
       return;
     }
@@ -89,25 +85,21 @@ const SignupScreen: React.FC<SignupScreenProps> = ({ navigation }) => {
     // Validaciones de email y contraseña solo si NO estamos en modo completar perfil
     if (!isProfileCompletionMode) {
       if (!email.trim()) {
-        console.log('❌ Validación fallida: Email vacío');
         Alert.alert('Error', 'Por favor ingresa tu correo electrónico');
         return;
       }
 
       if (!password.trim()) {
-        console.log('❌ Validación fallida: Contraseña vacía');
         Alert.alert('Error', 'Por favor ingresa una contraseña');
         return;
       }
 
       if (!validateEmail(email)) {
-        console.log('❌ Validación fallida: Email inválido');
         Alert.alert('Error', 'Por favor ingresa un email válido');
         return;
       }
 
       if (!validatePassword(password)) {
-        console.log('❌ Validación fallida: Contraseña no cumple requisitos');
         Alert.alert(
           'Error',
           'La contraseña debe tener al menos 6 caracteres, una mayúscula, una minúscula y un número'
@@ -117,14 +109,12 @@ const SignupScreen: React.FC<SignupScreenProps> = ({ navigation }) => {
     }
 
     if (!gender) {
-      console.log('❌ Validación fallida: Género no seleccionado');
       Alert.alert('Error', 'Por favor selecciona si eres papá o mamá');
       return;
     }
 
     // Si no tiene hijos, debe especificar estado de embarazo/espera
     if (childrenCount === 0 && pregnancyStatus === 'none') {
-      console.log('❌ Validación fallida: Estado de embarazo/espera no especificado');
       const genderText = gender === 'F' ? 'embarazada' : 'esperando bebé(s)';
       Alert.alert(
         'App para familias',
@@ -135,7 +125,6 @@ const SignupScreen: React.FC<SignupScreenProps> = ({ navigation }) => {
             text: 'Continuar de todas formas', 
             onPress: () => {
               // Permitir continuar pero mostrar advertencia
-              console.log(`⚠️ Usuario decidió continuar sin estar ${genderText} o tener hijos`);
             }
           }
         ]
@@ -145,7 +134,6 @@ const SignupScreen: React.FC<SignupScreenProps> = ({ navigation }) => {
 
     // Si no tiene hijos y no está esperando bebé(s), mostrar mensaje informativo
     if (childrenCount === 0 && pregnancyStatus === 'none') {
-      console.log('⚠️ Usuario sin hijos ni esperando bebé(s) - mostrando mensaje informativo');
       const genderText = gender === 'F' ? 'embarazada' : 'esperando bebé(s)';
       Alert.alert(
         'App para familias',
@@ -156,7 +144,6 @@ const SignupScreen: React.FC<SignupScreenProps> = ({ navigation }) => {
             text: 'Continuar de todas formas', 
             onPress: () => {
               // Permitir continuar pero mostrar advertencia
-              console.log(`⚠️ Usuario decidió continuar sin tener hijos ni estar ${genderText}`);
             }
           }
         ]
@@ -172,12 +159,10 @@ const SignupScreen: React.FC<SignupScreenProps> = ({ navigation }) => {
       }
     }
 
-    console.log('✅ Validación exitosa...');
     setIsLoading(true);
     try {
       if (isProfileCompletionMode) {
         // Modo completar perfil: actualizar perfil existente
-        console.log('📊 Actualizando perfil con:', { displayName, gender, childrenCount, isPregnant: pregnancyStatus === 'pregnant' });
         const weeks = pregnancyStatus === 'pregnant' ? parseInt(gestationWeeks, 10) : undefined;
         await profileService.updateProfile({
           displayName: displayName.trim(),
@@ -186,7 +171,6 @@ const SignupScreen: React.FC<SignupScreenProps> = ({ navigation }) => {
           isPregnant: pregnancyStatus === 'pregnant',
           gestationWeeks: weeks,
         });
-        console.log('✅ Perfil actualizado exitosamente');
         
         // Limpiar flag de completar perfil
         await AsyncStorage.removeItem('needsProfileCompletion');
@@ -194,15 +178,12 @@ const SignupScreen: React.FC<SignupScreenProps> = ({ navigation }) => {
         // Modo registro normal
         const totalChildrenForSignup = childrenCount + (pregnancyStatus === 'pregnant' ? (isMultiplePregnancy ? 2 : 1) : 0);
         const weeks = pregnancyStatus === 'pregnant' ? parseInt(gestationWeeks, 10) : undefined;
-        console.log('📊 Datos a enviar:', { email, displayName, gender, childrenCount: totalChildrenForSignup, pregnancyStatus });
         const isPregnantForSignup = pregnancyStatus === 'pregnant';
         await signup(email, password, displayName.trim(), gender, totalChildrenForSignup, isPregnantForSignup, weeks);
-        console.log('✅ Registro completado exitosamente');
       }
       
       // Si hay hijos o está embarazada/esperando, navegar a la pantalla de datos de hijos
       if (childrenCount > 0 || pregnancyStatus !== 'none') {
-        console.log('👶 Navegando a pantalla de datos de hijos...');
         
         // Calcular el total de hijos a registrar
         let totalChildren = childrenCount;
@@ -218,7 +199,6 @@ const SignupScreen: React.FC<SignupScreenProps> = ({ navigation }) => {
         });
       } else {
         // Si no hay hijos, establecer el usuario como autenticado y ir al Home
-        console.log('🏠 No hay hijos, estableciendo usuario como autenticado...');
         const { setUser } = useAuth();
         const userData = await AsyncStorage.getItem('userData');
         if (userData) {
@@ -228,7 +208,6 @@ const SignupScreen: React.FC<SignupScreenProps> = ({ navigation }) => {
     } catch (error: any) {
       console.error('❌ Error en registro:', error);
       const errorMessage = error.response?.data?.message || 'Error al crear la cuenta';
-      console.log('📋 Mensaje de error:', errorMessage);
       Alert.alert('Error de registro', errorMessage);
     } finally {
       setIsLoading(false);

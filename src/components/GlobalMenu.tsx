@@ -59,7 +59,6 @@ const GlobalMenu: React.FC<GlobalMenuProps> = ({ visible, onClose }) => {
         onClose={onClose}
         onSwitchToMunpa={async () => {
           try {
-            console.log('🔄 [MENU] Iniciando cambio a modo Munpa...');
             
             // Cambiar el modo
             await setViewMode('munpa');
@@ -67,7 +66,6 @@ const GlobalMenu: React.FC<GlobalMenuProps> = ({ visible, onClose }) => {
             // Cerrar el menú
             onClose();
             
-            console.log('✅ [MENU] Modo cambiado, navegando al Home...');
             
             // Navegar al Home con parámetro para forzar recarga
             // @ts-ignore
@@ -99,12 +97,6 @@ const GlobalMenu: React.FC<GlobalMenuProps> = ({ visible, onClose }) => {
   // Verificar si el usuario tiene perfil profesional activo
   const hasProfessionalProfile = user?.professionalProfile?.isActive === true;
   
-  console.log('👤 [MENU] Usuario:', {
-    name: user?.displayName,
-    hasProfessionalProfile,
-    professionalProfile: user?.professionalProfile,
-    viewMode,
-  });
 
   const handleProfilePress = () => {
     onClose();
@@ -114,7 +106,6 @@ const GlobalMenu: React.FC<GlobalMenuProps> = ({ visible, onClose }) => {
 
   const toggleViewMode = async () => {
     try {
-      console.log('🔄 [MENU] Iniciando cambio a modo especialista...');
       
       // Cambiar el modo
       await setViewMode('specialist');
@@ -122,7 +113,6 @@ const GlobalMenu: React.FC<GlobalMenuProps> = ({ visible, onClose }) => {
       // Cerrar el menú
       onClose();
       
-      console.log('✅ [MENU] Modo cambiado, navegando al Home...');
       
       // Navegar al Home con parámetro para forzar recarga
       // @ts-ignore
@@ -204,12 +194,6 @@ const GlobalMenu: React.FC<GlobalMenuProps> = ({ visible, onClose }) => {
       const selectedCountry = countries.find(c => c.id === selectedCountryId);
       const selectedCity = cities.find(c => c.id === selectedCityId);
       
-      console.log('🌍 [LOCATION] Actualizando ubicación:', {
-        countryId: selectedCountryId,
-        cityId: selectedCityId,
-        countryName: selectedCountry?.name,
-        cityName: selectedCity?.name,
-      });
       
       const response = await authService.updateLocation({
         latitude: 0,
@@ -219,7 +203,6 @@ const GlobalMenu: React.FC<GlobalMenuProps> = ({ visible, onClose }) => {
       });
       
       if (response?.success && user) {
-        console.log('✅ [LOCATION] Ubicación actualizada exitosamente');
         
         // Actualizar el usuario en el contexto
         setUser({
@@ -230,26 +213,21 @@ const GlobalMenu: React.FC<GlobalMenuProps> = ({ visible, onClose }) => {
           cityName: selectedCity?.name,
         });
         
-        console.log('🔄 [LOCATION] Cerrando modales y recargando...');
         
         // Primero limpiar el estado de loading
         setLoadingLocation(false);
-        console.log('✅ [LOCATION] Loading desactivado');
         
         // Cerrar el modal de ubicación inmediatamente
         setShowLocationModal(false);
-        console.log('✅ [LOCATION] Modal de ubicación cerrado');
         
         // Cerrar el menú principal después de un pequeño delay
         setTimeout(() => {
           onClose();
-          console.log('✅ [LOCATION] Menú principal cerrado');
         }, 100);
         
         // Navegar al Home con parámetro de recarga
         setTimeout(() => {
           try {
-            console.log('📍 [LOCATION] Navegando al Home...');
             // @ts-ignore - Navegar al stack principal y luego al Home
             navigation.navigate('MainTabs', {
               screen: 'Home',
@@ -261,7 +239,6 @@ const GlobalMenu: React.FC<GlobalMenuProps> = ({ visible, onClose }) => {
                 }
               }
             });
-            console.log('✅ [LOCATION] Navegación completada');
           } catch (error) {
             console.error('❌ [LOCATION] Error navegando:', error);
           }

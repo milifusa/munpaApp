@@ -55,7 +55,6 @@ const CommentsScreen: React.FC = () => {
   // Limpiar estado cuando el usuario se desconecta
   useEffect(() => {
     if (!isAuthenticated) {
-      console.log('🧹 [COMMENTS] Usuario desconectado, limpiando estado...');
       setComments([]);
       setIsLoading(false);
     }

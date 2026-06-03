@@ -178,7 +178,6 @@ const ChildrenHeaderTitle = () => {
     
     // Escuchar evento de actualización de hijos
     const subscription = DeviceEventEmitter.addListener('childrenUpdated', () => {
-      console.log('🔄 [HEADER] Recargando hijos después de aceptar invitación...');
       loadChildren();
     });
 
@@ -333,7 +332,6 @@ const AuthenticatedNavigator = () => {
       
       // Si cambió el usuario, limpiar el flag para volver a verificar
       if (user && userIdRef.current !== null && userIdRef.current !== user.id) {
-        console.log('🔄 Usuario cambió, limpiando flag hasChildren');
         await AsyncStorage.removeItem('hasChildren');
       }
       
@@ -352,7 +350,6 @@ const AuthenticatedNavigator = () => {
             const authToken = await AsyncStorage.getItem('authToken');
             
             if (!authToken) {
-              console.log('⚠️ No hay token, ir a MainTabs por defecto');
               setInitialRoute('MainTabs');
               await AsyncStorage.setItem('hasChildren', 'true');
               return;
@@ -367,13 +364,11 @@ const AuthenticatedNavigator = () => {
             });
             
             const profileData = await profileResponse.json();
-            console.log('👤 Perfil del usuario:', profileData);
             
             const userGender = profileData?.data?.gender;
             
             // Si no tiene género, ir a pantalla especial para completar perfil
             if (!userGender) {
-              console.log('⚠️ Usuario sin género, debe completar datos básicos primero');
               // Marcar que necesita completar perfil
               await AsyncStorage.setItem('needsProfileCompletion', 'true');
               setInitialRoute('Signup'); // Irá a SignupScreen en modo "completar perfil"
@@ -388,9 +383,7 @@ const AuthenticatedNavigator = () => {
               }
             });
             
-            console.log('📡 Response status:', response.status);
             const data = await response.json();
-            console.log('📦 Response completa del backend:', JSON.stringify(data, null, 2));
             
             // Intentar diferentes formatos de respuesta del backend
             let childrenCount = 0;
@@ -404,7 +397,6 @@ const AuthenticatedNavigator = () => {
               childrenCount = data.data.length;
             }
             
-            console.log('📊 Hijos encontrados en backend:', childrenCount);
             
             const hasKids = childrenCount > 0;
             await AsyncStorage.setItem('hasChildren', hasKids ? 'true' : 'false');
@@ -419,7 +411,6 @@ const AuthenticatedNavigator = () => {
           // Si ya existe el flag, usarlo
           const hasKids = hasChildrenStored === 'true';
           setInitialRoute(hasKids ? 'MainTabs' : 'ChildrenData');
-          console.log(`✅ Usuario ${hasKids ? 'tiene' : 'no tiene'} hijos → ${hasKids ? 'MainTabs' : 'ChildrenData'}`);
         }
       } catch (error) {
         console.error('❌ Error en checkChildren:', error);
@@ -432,7 +423,6 @@ const AuthenticatedNavigator = () => {
       checkChildren();
     } else {
       // Si no hay usuario (logout), resetear inmediatamente
-      console.log('🚪 Usuario hizo logout, reseteando estado');
       userIdRef.current = null;
       setInitialRoute(null);
     }
@@ -635,7 +625,7 @@ const AuthenticatedNavigator = () => {
       />
       <Stack.Screen
         name="Articles"
-        component={ArticlesScreen}
+        component={ArticlesScreen as React.ComponentType<any>}
         options={{
           title: 'Artículos',
           headerShown: false,
@@ -643,7 +633,7 @@ const AuthenticatedNavigator = () => {
       />
       <Stack.Screen
         name="ArticleDetail"
-        component={ArticleDetailScreen}
+        component={ArticleDetailScreen as React.ComponentType<any>}
         options={{
           title: 'Artículo',
           headerShown: false,
@@ -1666,22 +1656,15 @@ const AppNavigator = () => {
       if (isAuthenticated && user && !isLoading) {
         // Solo verificar una vez
         if (hasCheckedLocation.current) {
-          console.log('🌍 [LOCATION CHECK] Ya se verificó, saltando...');
           return;
         }
 
         // Pequeño delay para asegurar que los datos del usuario estén completos
         await new Promise(resolve => setTimeout(resolve, 300));
 
-        console.log('🌍 [LOCATION CHECK] Usuario completo:', JSON.stringify(user, null, 2));
         
         const needsLocation = !user.countryId || !user.cityId;
-        console.log('🌍 [LOCATION CHECK] Usuario:', user.id, 'Necesita ubicación:', needsLocation, {
-          countryId: user.countryId,
-          cityId: user.cityId,
-          countryName: user.countryName,
-          cityName: user.cityName,
-        });
+
         
         setShowLocationModal(needsLocation);
         setCheckingLocation(false);
@@ -1730,13 +1713,9 @@ const AppNavigator = () => {
           return;
         }
 
-        console.log('🧭 [NAV] Navegando desde notificación:', { type, screen, data });
 
       try {
         // Log adicional para debugging
-        console.log('🔍 [NAV DEBUG] Type recibido:', type, 'Tipo:', typeof type);
-        console.log('🔍 [NAV DEBUG] Screen:', screen);
-        console.log('🔍 [NAV DEBUG] Data completa:', JSON.stringify(data));
 
         switch (type) {
           case 'new_message':
@@ -1764,7 +1743,6 @@ const AppNavigator = () => {
         case 'community_post':
           // Navegar al detalle del post
           if (data?.postId) {
-            console.log('🚀 [NAV] Navegando a PostDetail:', data.postId);
             navigationRef.current.navigate('PostDetail', {
               postId: data.postId,
               communityId: data?.communityId,
@@ -1772,7 +1750,6 @@ const AppNavigator = () => {
             });
           } else if (data?.communityId) {
             // Si no hay postId pero sí communityId, navegar a la comunidad
-            console.log('🚀 [NAV] Navegando a CommunityPosts:', data.communityId);
             navigationRef.current.navigate('MainTabs', {
               screen: 'Communities',
               params: {
@@ -1785,7 +1762,6 @@ const AppNavigator = () => {
             });
           } else {
             // Sin datos suficientes, ir a Communities
-            console.log('🚀 [NAV] Sin postId ni communityId, navegando a Communities');
             navigationRef.current.navigate('MainTabs', {
               screen: 'Communities',
             });
@@ -1818,15 +1794,11 @@ const AppNavigator = () => {
         case 'recipe_daily_reminder':
           // Navegar a la pantalla de detalle de receta si hay recipeId
           if (data?.recipeId) {
-            console.log('🍽️ [NAV] ✅ CASO RECIPE DETECTADO - Navegando a RecipeDetail');
-            console.log('🍽️ [NAV] recipeId:', data.recipeId);
             navigationRef.current.navigate('RecipeDetail', {
               recipeId: data.recipeId,
             });
           } else {
             // Si no hay recipeId, navegar a Feeding
-            console.log('🍽️ [NAV] ✅ CASO RECIPE DETECTADO - Navegando a Feeding');
-            console.log('🍽️ [NAV] mealType:', data?.mealType);
             navigationRef.current.navigate('Feeding', {
               mealType: data?.mealType,
             });
@@ -1874,8 +1846,6 @@ const AppNavigator = () => {
 
           default:
             // Navegar a MainTabs por defecto (que tiene Home como tab por defecto)
-            console.log('⚠️ [NAV] Tipo de notificación no reconocido:', type);
-            console.log('⚠️ [NAV] Navegando a MainTabs por defecto');
             navigationRef.current.navigate('MainTabs');
         }
       } catch (error) {
@@ -1961,7 +1931,6 @@ const AppNavigator = () => {
         <RequiredLocationModal
           visible={showLocationModal}
           onComplete={() => {
-            console.log('✅ [LOCATION] Ubicación guardada, cerrando modal');
             setShowLocationModal(false);
             // NO resetear hasCheckedLocation - ya se validó la ubicación
           }}

@@ -53,7 +53,7 @@ const ConsultationRequestScreen = () => {
 
   useEffect(() => {
     loadInitialData();
-    analyticsService.logScreenView('ConsultationRequest', { specialist_id: specialistId });
+    analyticsService.logScreenView('ConsultationRequest');
   }, []);
 
   useEffect(() => {
@@ -116,7 +116,6 @@ const ConsultationRequestScreen = () => {
       const specialistData = results[2];
 
       const childrenData = await childrenResponse.json();
-      console.log('👶 [CONSULTATION] Respuesta de hijos del backend:', JSON.stringify(childrenData, null, 2));
       
       let childrenList = [];
       if (Array.isArray(childrenData)) {
@@ -129,34 +128,25 @@ const ConsultationRequestScreen = () => {
         childrenList = childrenData.data;
       }
       
-      console.log('👶 [CONSULTATION] Lista de hijos procesada:', JSON.stringify(childrenList, null, 2));
       
       const validChildren = childrenList.filter((c: any) => c && c.id && c.name);
-      console.log('👶 [CONSULTATION] Hijos válidos:', validChildren.length, validChildren.map((c: any) => ({ id: c.id, name: c.name })));
       
       setChildren(validChildren);
       
       if (validChildren.length > 0) {
         setSelectedChild(validChildren[0]);
-        console.log('✅ [CONSULTATION] Hijo preseleccionado:', validChildren[0].id, validChildren[0].name);
       }
 
       const symptomsDataList = symptomsData.data || symptomsData;
-      console.log('🩺 [CONSULTATION] Síntomas cargados:', Array.isArray(symptomsDataList) ? symptomsDataList.length : 0);
       setSymptoms(Array.isArray(symptomsDataList) ? symptomsDataList : []);
 
       // Si se cargó el especialista, guardarlo
       if (specialistData) {
         const specialistInfo = specialistData.data || specialistData;
-        console.log('👨‍⚕️ [CONSULTATION] Especialista cargado:', specialistInfo);
         setSpecialist(specialistInfo);
         
         // Establecer precios iniciales del especialista
         if (specialistInfo.pricing) {
-          console.log('💰 [CONSULTATION] Precios del especialista:', {
-            chat: specialistInfo.pricing.chatConsultation,
-            video: specialistInfo.pricing.videoConsultation,
-          });
         }
       }
     } catch (error) {
@@ -230,8 +220,6 @@ const ConsultationRequestScreen = () => {
     try {
       setSubmitting(true);
 
-      console.log('📋 [CONSULTATION] Hijo seleccionado:', JSON.stringify(selectedChild, null, 2));
-      console.log('📋 [CONSULTATION] Child ID a enviar:', selectedChild.id);
 
       const consultationData = {
         description: description.trim(),
@@ -243,12 +231,10 @@ const ConsultationRequestScreen = () => {
         couponCode: couponCode || undefined,
       };
 
-      console.log('📋 [CONSULTATION] Datos de consulta:', JSON.stringify(consultationData, null, 2));
 
       const response = await consultationsService.createConsultation(selectedChild.id, consultationData);
       const consultation = response.data || response;
 
-      console.log('✅ [CONSULTATION] Consulta creada:', consultation);
 
       const consultationId = consultation.consultationId || consultation.id;
       const finalPrice = consultation.pricing?.finalPrice ?? (consultationType === 'chat' ? chatPricing?.finalPrice : videoPricing?.finalPrice) ?? 0;

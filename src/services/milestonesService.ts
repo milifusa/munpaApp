@@ -83,28 +83,21 @@ class MilestonesService {
   async getCategories(): Promise<MilestoneCategory[]> {
     try {
       const url = `${API_BASE_URL}/milestones/categories`;
-      console.log('📥 [MILESTONES SERVICE] Obteniendo categorías...');
-      console.log('🌐 [MILESTONES SERVICE] URL:', url);
       
       const headers = await this.getHeaders();
-      console.log('📋 [MILESTONES SERVICE] Headers:', JSON.stringify(headers, null, 2));
       
       const response = await fetch(url, { headers });
       
-      console.log('📡 [MILESTONES SERVICE] Status categorías:', response.status);
       
       const data = await response.json();
       
-      console.log('📦 [MILESTONES SERVICE] Respuesta categorías:', JSON.stringify(data, null, 2));
       
       if (data.success && data.data && Array.isArray(data.data)) {
-        console.log('✅ [MILESTONES SERVICE] Categorías exitosas:', data.data.length);
         return data.data;
       }
       
       // Si data es directamente un array
       if (Array.isArray(data)) {
-        console.log('✅ [MILESTONES SERVICE] Categorías directas (array):', data.length);
         return data;
       }
       
@@ -135,28 +128,14 @@ class MilestonesService {
 
       const url = `${API_BASE_URL}/children/${childId}/milestones${params.toString() ? '?' + params.toString() : ''}`;
       
-      console.log('📥 [MILESTONES SERVICE] Obteniendo hitos del niño...');
-      console.log('🌐 [MILESTONES SERVICE] URL:', url);
-      console.log('🎯 [MILESTONES SERVICE] Child ID:', childId);
-      console.log('⚙️ [MILESTONES SERVICE] Options:', JSON.stringify(options, null, 2));
       
       const headers = await this.getHeaders();
-      console.log('📋 [MILESTONES SERVICE] Headers:', JSON.stringify(headers, null, 2));
       
       const response = await fetch(url, { headers });
       
-      console.log('📡 [MILESTONES SERVICE] Status hitos:', response.status);
       
       const data = await response.json();
       
-      console.log('📦 [MILESTONES SERVICE] Respuesta hitos completa:', JSON.stringify({
-        success: data.success,
-        hasData: !!data.data,
-        hasMilestones: !!data.data?.milestones,
-        milestonesLength: data.data?.milestones?.length || 0,
-        dataKeys: Object.keys(data),
-        total: data.total,
-      }, null, 2));
       
       if (data.success) {
         // El API puede devolver los hitos de diferentes maneras:
@@ -168,18 +147,14 @@ class MilestonesService {
         
         if (data.data?.milestones && Array.isArray(data.data.milestones)) {
           milestones = data.data.milestones;
-          console.log('✅ [MILESTONES SERVICE] Hitos en data.data.milestones:', milestones.length);
         } else if (Array.isArray(data.data)) {
           milestones = data.data;
-          console.log('✅ [MILESTONES SERVICE] Hitos en data.data (array directo):', milestones.length);
         } else if (data.milestones && Array.isArray(data.milestones)) {
           milestones = data.milestones;
-          console.log('✅ [MILESTONES SERVICE] Hitos en data.milestones:', milestones.length);
         } else {
           console.warn('⚠️ [MILESTONES SERVICE] No se encontraron hitos en ningún formato conocido');
         }
         
-        console.log('✅ [MILESTONES SERVICE] Hitos exitosos, total:', milestones.length);
         
         return {
           childAge: data.data?.childAge || data.childAge || { months: 0, displayAge: '0 meses' },
@@ -212,23 +187,16 @@ class MilestonesService {
     overall: { total: number; completed: number; completionRate: number };
   }> {
     try {
-      console.log('📥 [MILESTONES SERVICE] Obteniendo hitos por categoría para:', childId);
       
       const response = await fetch(`${API_BASE_URL}/children/${childId}/milestones/by-category`, {
         headers: await this.getHeaders(),
       });
       
-      console.log('📡 [MILESTONES SERVICE] Status:', response.status);
       
       const data = await response.json();
       
-      console.log('📦 [MILESTONES SERVICE] Respuesta completa:', JSON.stringify(data, null, 2));
       
       if (data.success && data.data) {
-        console.log('✅ [MILESTONES SERVICE] Datos exitosos:', {
-          categoriesCount: data.data.categories?.length || 0,
-          overall: data.data.overall,
-        });
         return data.data;
       }
       
@@ -254,14 +222,8 @@ class MilestonesService {
       const url = `${API_BASE_URL}/children/${childId}/milestones/${milestoneId}/complete`;
       const body = { notes: notes || '' };
       
-      console.log('📥 [MILESTONES SERVICE] Marcando hito como completado...');
-      console.log('🌐 [MILESTONES SERVICE] URL:', url);
-      console.log('🎯 [MILESTONES SERVICE] Child ID:', childId);
-      console.log('📝 [MILESTONES SERVICE] Milestone ID:', milestoneId);
-      console.log('📋 [MILESTONES SERVICE] Body:', JSON.stringify(body, null, 2));
       
       const headers = await this.getHeaders();
-      console.log('📋 [MILESTONES SERVICE] Headers:', JSON.stringify(headers, null, 2));
       
       const response = await fetch(url, {
         method: 'POST',
@@ -269,11 +231,9 @@ class MilestonesService {
         body: JSON.stringify(body),
       });
       
-      console.log('📡 [MILESTONES SERVICE] Status completar:', response.status);
       
       const data = await response.json();
       
-      console.log('📦 [MILESTONES SERVICE] Respuesta:', JSON.stringify(data, null, 2));
       
       return data.success;
     } catch (error) {
@@ -287,24 +247,17 @@ class MilestonesService {
     try {
       const url = `${API_BASE_URL}/children/${childId}/milestones/${milestoneId}/complete`;
       
-      console.log('📥 [MILESTONES SERVICE] Desmarcando hito...');
-      console.log('🌐 [MILESTONES SERVICE] URL:', url);
-      console.log('🎯 [MILESTONES SERVICE] Child ID:', childId);
-      console.log('📝 [MILESTONES SERVICE] Milestone ID:', milestoneId);
       
       const headers = await this.getHeaders();
-      console.log('📋 [MILESTONES SERVICE] Headers:', JSON.stringify(headers, null, 2));
       
       const response = await fetch(url, {
         method: 'DELETE',
         headers,
       });
       
-      console.log('📡 [MILESTONES SERVICE] Status desmarcar:', response.status);
       
       const data = await response.json();
       
-      console.log('📦 [MILESTONES SERVICE] Respuesta:', JSON.stringify(data, null, 2));
       
       return data.success;
     } catch (error) {

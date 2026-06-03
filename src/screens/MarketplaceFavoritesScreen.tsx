@@ -31,10 +31,7 @@ const MarketplaceFavoritesScreen = () => {
   const loadFavorites = async () => {
     try {
       setLoading(true);
-      console.log('❤️ [FAVORITES] Cargando favoritos...');
       const fetchedFavorites = await marketplaceService.getFavorites();
-      console.log('✅ [FAVORITES] Favoritos cargados:', fetchedFavorites?.length || 0);
-      console.log('📦 [FAVORITES] Primer favorito:', fetchedFavorites?.[0]);
       setFavorites(Array.isArray(fetchedFavorites) ? fetchedFavorites : []);
     } catch (error) {
       console.error('❌ [FAVORITES] Error cargando favoritos:', error);

@@ -14,7 +14,6 @@ export const trackingService = {
     
     // Solo en iOS
     if (Platform.OS !== 'ios') {
-      console.log('⚠️ [TRACKING] ATT solo aplica en iOS, saltando...');
       return 'unavailable';
     }
 
@@ -34,7 +33,6 @@ export const trackingService = {
       }
 
       // Para cualquier otro caso (restricted, unavailable)
-      console.log('⚠️ [TRACKING] Estado especial:', currentStatus);
       return currentStatus;
     } catch (error) {
       console.error('❌ [TRACKING] Error solicitando permiso:', error);
@@ -106,7 +104,6 @@ export const trackEvent = async (event: TrackingEvent): Promise<void> => {
   const isAuthorized = await trackingService.isTrackingAuthorized();
 
   if (!isAuthorized) {
-    console.log('🚫 [TRACKING] Evento no enviado - tracking no autorizado:', event.eventName);
     return;
   }
   

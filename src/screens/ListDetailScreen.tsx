@@ -62,7 +62,6 @@ const ListDetailScreen = () => {
       navigation.goBack();
     } else {
       // Si no puede hacer goBack, navegar a RecommendationsMain
-      console.log('⚠️ [LIST DETAIL] No se puede hacer goBack, navegando a RecommendationsMain');
       navigation.navigate('RecommendationsMain');
     }
   };
@@ -90,29 +89,13 @@ const ListDetailScreen = () => {
   // Cargar detalles de la lista
   const loadListDetails = async () => {
     try {
-      console.log('📋 [LIST DETAIL] Cargando detalles de lista:', listId);
       const response = await listsService.getListDetails(listId);
-      console.log('📋 [LIST DETAIL] Respuesta completa del backend:', JSON.stringify(response, null, 2));
-      console.log('📋 [LIST DETAIL] Datos de la lista:', JSON.stringify(response.data, null, 2));
       
       // Debug de items y sus campos de comentarios/calificaciones
       if (response.data.items) {
         response.data.items.forEach((item: any, index: number) => {
-          console.log(`📋 [LIST DETAIL] Item ${index + 1} (${item.text}):`, {
-            commentsCount: item.commentsCount,
-            commentCount: item.commentCount,
-            averageRating: item.averageRating,
-            totalRatings: item.totalRatings,
-            ratingsCount: item.ratingsCount,
-            userRating: item.userRating
-          });
         });
       }
-      console.log('📋 [LIST DETAIL] ¿Es propietario?:', response.data.isOwner);
-      console.log('📋 [LIST DETAIL] ¿Es pública?:', response.data.isPublic);
-      console.log('📋 [LIST DETAIL] Usuario actual autenticado?:', isAuthenticated);
-      console.log('📋 [LIST DETAIL] Creator ID:', response.data.creatorId);
-      console.log('📋 [LIST DETAIL] Usuario actual ID:', user?.id || 'NO DISPONIBLE');
       
       // Calcular estadísticas localmente para asegurar consistencia
       const items = response.data.items || [];
@@ -130,9 +113,7 @@ const ListDetailScreen = () => {
           : completedItems
       };
       
-      console.log('📋 [LIST DETAIL] ¿Es propietario calculado?:', listData.isOwner);
       setList(listData);
-      console.log('✅ [LIST DETAIL] Lista cargada:', response.data.title);
     } catch (error: any) {
       console.error('❌ [LIST DETAIL] Error cargando lista:', error);
       Alert.alert(
@@ -172,7 +153,6 @@ const ListDetailScreen = () => {
   // Recargar datos cuando se enfoque la pantalla (para actualizar comentarios)
   useFocusEffect(
     useCallback(() => {
-      console.log('🔄 [LIST DETAIL] Pantalla enfocada, recargando datos...');
       loadData();
     }, [listId])
   );
@@ -191,16 +171,13 @@ const ListDetailScreen = () => {
     try {
       setTogglingItems(prev => new Set(prev).add(itemId));
       
-      console.log('🔄 [LIST DETAIL] Alternando item:', itemId);
       const result = await listsService.toggleItem(listId, itemId);
-      console.log('🔄 [LIST DETAIL] Resultado del toggle:', result.data);
       
       // Determinar el nuevo estado del item
       const newCompletedState = result.data.isCompleted !== undefined 
         ? result.data.isCompleted 
         : result.data.completed;
       
-      console.log('🔄 [LIST DETAIL] Nuevo estado completado:', newCompletedState);
       
       // Actualizar el estado local
       setList(prev => {
@@ -218,12 +195,6 @@ const ListDetailScreen = () => {
         // Recalcular estadísticas localmente
         const completedCount = updatedItems.filter(item => item.isCompleted || item.completed).length;
         
-        console.log('🔄 [LIST DETAIL] Estadísticas actualizadas:', {
-          totalItems: updatedItems.length,
-          completedItems: completedCount,
-          wasCompleted,
-          nowCompleted: newCompletedState
-        });
         
         return {
           ...prev,
@@ -253,17 +224,14 @@ const ListDetailScreen = () => {
 
     setIsAddingItem(true);
     try {
-      console.log('📋 [LIST DETAIL] Agregando item:', newItemData);
       
       let imageUrl = null;
       
       // Si hay una imagen seleccionada, subirla primero
       if (newItemData.imageUrl) {
         try {
-          console.log('🖼️ [LIST DETAIL] Subiendo imagen del item...');
           const uploadResult = await imageUploadService.uploadCommunityImage(newItemData.imageUrl);
           imageUrl = uploadResult;
-          console.log('✅ [LIST DETAIL] Imagen del item subida exitosamente:', imageUrl);
         } catch (uploadError) {
           console.error('❌ [LIST DETAIL] Error subiendo imagen del item:', uploadError);
           Alert.alert('Advertencia', 'No se pudo subir la imagen, pero el item se creará sin imagen');
@@ -306,7 +274,6 @@ const ListDetailScreen = () => {
       setNewItemText('');
       setShowAddItemModal(false);
       
-      console.log('✅ [LIST DETAIL] Item agregado exitosamente');
       
     } catch (error: any) {
       console.error('❌ [LIST DETAIL] Error agregando item:', error);
@@ -336,7 +303,6 @@ const ListDetailScreen = () => {
       });
 
       if (!result.canceled && result.assets[0]) {
-        console.log('🖼️ [LIST DETAIL] Imagen de item seleccionada:', result.assets[0].uri);
         setNewItemData(prev => ({ ...prev, imageUrl: result.assets[0].uri }));
       }
     } catch (error) {
@@ -360,7 +326,6 @@ const ListDetailScreen = () => {
       });
 
       if (!result.canceled && result.assets[0]) {
-        console.log('📸 [LIST DETAIL] Foto de item tomada:', result.assets[0].uri);
         setNewItemData(prev => ({ ...prev, imageUrl: result.assets[0].uri }));
       }
     } catch (error) {
@@ -380,11 +345,6 @@ const ListDetailScreen = () => {
     const item = list.items.find(i => i.id === itemId);
     if (!item) return;
     
-    console.log('💬 [LIST DETAIL] Navegando a comentarios del item:', itemId);
-    console.log('💬 [LIST DETAIL] Contador actual de comentarios:', {
-      commentsCount: item.commentsCount,
-      commentCount: item.commentCount
-    });
     
     // Navegar a la pantalla de comentarios
     (navigation as any).navigate('ItemComments', {
@@ -427,7 +387,6 @@ const ListDetailScreen = () => {
 
   const submitRating = async (itemId: string, rating: number) => {
     try {
-      console.log('⭐ [LIST DETAIL] Enviando calificación:', itemId, rating);
       const result = await listsService.rateItem(listId, itemId, rating);
       
       // Actualizar el estado local
@@ -449,7 +408,6 @@ const ListDetailScreen = () => {
         };
       });
       
-      console.log('✅ [LIST DETAIL] Calificación enviada exitosamente');
       
     } catch (error) {
       console.error('❌ [LIST DETAIL] Error enviando calificación:', error);
@@ -686,12 +644,6 @@ const ListDetailScreen = () => {
             </View>
             {(() => {
               const canAddItems = list.isOwner || (list.isPublic && isAuthenticated);
-              console.log('🔐 [LIST DETAIL] Permisos agregar items:', {
-                isOwner: list.isOwner,
-                isPublic: list.isPublic,
-                isAuthenticated,
-                canAddItems
-              });
               
               return canAddItems && (
                 <TouchableOpacity
@@ -710,12 +662,6 @@ const ListDetailScreen = () => {
               <Text style={styles.emptyItemsText}>No hay items en esta lista</Text>
               {(() => {
                 const canAddFirstItem = list.isOwner || (list.isPublic && isAuthenticated);
-                console.log('🔐 [LIST DETAIL] Permisos primer item:', {
-                  isOwner: list.isOwner,
-                  isPublic: list.isPublic,
-                  isAuthenticated,
-                  canAddFirstItem
-                });
                 
                 return canAddFirstItem && (
                   <TouchableOpacity

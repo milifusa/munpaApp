@@ -29,7 +29,7 @@ const EventDetailScreen: React.FC = () => {
   const { user } = useAuth();
   const { event: initialEvent, postId } = route.params || {};
 
-  const [event, setEvent] = useState<Post | null>(initialEvent || null);
+  const [event, setEvent] = useState<Post>(initialEvent || ({} as Post));
   const [loading, setLoading] = useState(!initialEvent && !!postId); // Loading si no hay evento inicial pero sí postId
   const [attendees, setAttendees] = useState<Attendee[]>([]);
   const [isLoadingAttendees, setIsLoadingAttendees] = useState(false);
@@ -50,18 +50,15 @@ const EventDetailScreen: React.FC = () => {
   useEffect(() => {
     const loadEvent = async () => {
       if (postId && !initialEvent) {
-        console.log('📥 [EVENT DETAIL] Cargando evento con postId:', postId);
         try {
           setLoading(true);
           const { communitiesService } = await import('../services/api');
           const response = await communitiesService.getPost(postId);
-          console.log('✅ [EVENT DETAIL] Evento cargado:', response);
           
           // Extraer el evento de response.data si existe, si no, usar response directamente
           const eventData = response?.data || response;
           
           if (eventData && eventData.id) {
-            console.log('✅ [EVENT DETAIL] Estableciendo evento:', eventData);
             setEvent(eventData);
             
             // ✅ Analytics: Evento cargado
@@ -370,7 +367,7 @@ const EventDetailScreen: React.FC = () => {
     );
   }
 
-  if (!event || !event.eventData) {
+  if (!event.eventData) {
     return (
       <View style={styles.container}>
         <Text>Evento no encontrado</Text>

@@ -105,11 +105,9 @@ const MilestonesScreen: React.FC = () => {
           
           // ✅ Calcular edad del niño y establecer el mes inicial
           const childAgeInMonths = calculateChildAge(childToSelect);
-          console.log('👶 [MILESTONES] Edad del niño:', childAgeInMonths, 'meses');
           
           // Establecer el mes más cercano disponible
           const closestAgeRange = findClosestAgeRange(childAgeInMonths);
-          console.log('🎯 [MILESTONES] Estableciendo rango de edad inicial:', closestAgeRange);
           setSelectedAgeRange(closestAgeRange.toString());
           
           // ✅ Hacer scroll al botón seleccionado después de un pequeño delay
@@ -136,7 +134,6 @@ const MilestonesScreen: React.FC = () => {
     const buttonWidth = 122;
     const scrollPosition = Math.max(0, (index * buttonWidth) - 50); // -50 para centrar mejor
     
-    console.log('📜 [MILESTONES] Haciendo scroll a posición:', scrollPosition, 'para índice:', index);
     
     ageScrollViewRef.current.scrollTo({
       x: scrollPosition,
@@ -145,21 +142,13 @@ const MilestonesScreen: React.FC = () => {
   };
 
   const calculateChildAge = (child: Child): number => {
-    console.log('📅 [MILESTONES] Calculando edad del niño:', {
-      name: child.name,
-      birthDate: child.birthDate,
-      ageInMonths: child.ageInMonths,
-      currentAgeInMonths: child.currentAgeInMonths,
-    });
     
     // Intentar obtener la edad de diferentes fuentes
     if (child.currentAgeInMonths !== undefined && child.currentAgeInMonths !== null) {
-      console.log('✅ [MILESTONES] Usando currentAgeInMonths:', child.currentAgeInMonths);
       return Math.max(1, child.currentAgeInMonths); // Mínimo 1 mes
     }
     
     if (child.ageInMonths !== undefined && child.ageInMonths !== null) {
-      console.log('✅ [MILESTONES] Usando ageInMonths:', child.ageInMonths);
       return Math.max(1, child.ageInMonths); // Mínimo 1 mes
     }
     
@@ -172,21 +161,11 @@ const MilestonesScreen: React.FC = () => {
       const birthDate = new Date(child.birthDate);
       const today = new Date();
       
-      console.log('📅 [MILESTONES] Fechas:', {
-        birthDate: birthDate.toISOString(),
-        today: today.toISOString(),
-      });
       
       const years = today.getFullYear() - birthDate.getFullYear();
       const months = today.getMonth() - birthDate.getMonth();
       const totalMonths = years * 12 + months;
       
-      console.log('📊 [MILESTONES] Cálculo:', {
-        years,
-        months,
-        totalMonths,
-        final: Math.max(1, totalMonths),
-      });
       
       return Math.max(1, totalMonths); // Mínimo 1 mes
     } catch (error) {
@@ -196,21 +175,17 @@ const MilestonesScreen: React.FC = () => {
   };
 
   const findClosestAgeRange = (ageInMonths: number): number => {
-    console.log('🔍 [MILESTONES] Buscando rango más cercano para edad:', ageInMonths);
     
     // Encontrar el rango de edad más cercano disponible
     const availableRanges = ageRanges.map(r => r.value);
-    console.log('📋 [MILESTONES] Rangos disponibles:', availableRanges);
     
     // Si la edad es menor o igual que el primer rango, usar el primer rango
     if (ageInMonths <= availableRanges[0]) {
-      console.log('✅ [MILESTONES] Edad menor al primer rango, usando:', availableRanges[0]);
       return availableRanges[0];
     }
     
     // Si la edad es mayor o igual que el último rango, usar el último rango
     if (ageInMonths >= availableRanges[availableRanges.length - 1]) {
-      console.log('✅ [MILESTONES] Edad mayor al último rango, usando:', availableRanges[availableRanges.length - 1]);
       return availableRanges[availableRanges.length - 1];
     }
     
@@ -218,31 +193,25 @@ const MilestonesScreen: React.FC = () => {
     let bestMatch = availableRanges[0];
     
     for (const range of availableRanges) {
-      console.log(`  Comparando: edad ${ageInMonths} vs rango ${range}`);
       
       // Si el rango es menor o igual a la edad, y es mayor que el mejor match actual
       if (range <= ageInMonths && range > bestMatch) {
         bestMatch = range;
-        console.log(`    ✓ Nuevo mejor match (anterior): ${bestMatch}`);
       }
       
       // Si encontramos un rango exacto, usarlo
       if (range === ageInMonths) {
-        console.log(`    ✓✓ Match exacto: ${range}`);
         bestMatch = range;
         break;
       }
     }
     
-    console.log('✅ [MILESTONES] Rango seleccionado (mes anterior/igual):', bestMatch);
     return bestMatch;
   };
 
   const loadCategories = async () => {
     try {
-      console.log('📚 [MILESTONES] Cargando categorías...');
       const categoriesData = await milestonesService.getCategories();
-      console.log('✅ [MILESTONES] Categorías cargadas:', categoriesData.length);
       
       // ✅ Colores del tema de Munpa
       const categoryColors: { [key: string]: string } = {
@@ -263,7 +232,6 @@ const MilestonesScreen: React.FC = () => {
           color: customColor, // ✅ Usar color personalizado del tema Munpa
         });
         
-        console.log(`  - ${cat.name} (${cat.icon}) - ${customColor}`);
       });
       setCategoriesMap(map);
     } catch (error) {
@@ -276,32 +244,17 @@ const MilestonesScreen: React.FC = () => {
 
     try {
       setLoadingMilestones(true);
-      console.log('🎯 [MILESTONES] Cargando TODOS los hitos para:', selectedChild.id);
-      console.log('🔑 [MILESTONES] categoriesMap size:', categoriesMap.size);
       
       // Obtener TODOS los hitos del niño (includeAll=true para obtener los 480 hitos)
       const data = await milestonesService.getMilestonesByChild(selectedChild.id, {
         includeAll: true, // ✅ Parámetro correcto para obtener todos los hitos
       });
       
-      console.log('📊 [MILESTONES] Datos recibidos completos:', {
-        hasData: !!data,
-        hasMilestones: !!data?.milestones,
-        milestonesLength: data?.milestones?.length || 0,
-        childAge: data?.childAge,
-      });
       
       if (data && data.milestones) {
-        console.log('✅ [MILESTONES] Total hitos obtenidos:', data.milestones.length);
         
         // Mostrar algunos ejemplos de hitos
         if (data.milestones.length > 0) {
-          console.log('📝 [MILESTONES] Primer hito ejemplo:', {
-            title: data.milestones[0].title,
-            ageMin: data.milestones[0].ageMonthsMin,
-            ageMax: data.milestones[0].ageMonthsMax,
-            categoryId: data.milestones[0].categoryId,
-          });
         }
         
         // ✅ Guardar TODOS los hitos en cache
@@ -309,7 +262,6 @@ const MilestonesScreen: React.FC = () => {
         setChildAge(data.childAge?.displayAge || 'Cargando...');
         
         // ✅ Filtrar y agrupar según el mes seleccionado
-        console.log('🔄 [MILESTONES] Filtrando para mes inicial:', selectedAgeRange);
         filterAndGroupMilestones(data.milestones, parseInt(selectedAgeRange));
       } else {
         console.warn('⚠️ [MILESTONES] No hay datos de hitos');
@@ -328,19 +280,16 @@ const MilestonesScreen: React.FC = () => {
   };
 
   const filterAndGroupMilestones = (milestones: Milestone[], ageMonths: number) => {
-    console.log('🔍 [MILESTONES] Filtrando hitos para mes:', ageMonths);
     
     // Filtrar hitos por el rango de edad seleccionado
     // Un hito se incluye si el mes seleccionado está dentro de su rango (ageMonthsMin - ageMonthsMax)
     const filteredMilestones = milestones.filter(milestone => {
       const isInRange = milestone.ageMonthsMin <= ageMonths && milestone.ageMonthsMax >= ageMonths;
       if (isInRange) {
-        console.log(`  ✅ "${milestone.title}" (${milestone.ageMonthsMin}-${milestone.ageMonthsMax} meses)`);
       }
       return isInRange;
     });
     
-    console.log('🎯 [MILESTONES] Hitos filtrados:', filteredMilestones.length, 'de', milestones.length, 'totales');
     
     if (filteredMilestones.length === 0) {
       console.warn('⚠️ [MILESTONES] No hay hitos para el mes', ageMonths);
@@ -383,9 +332,7 @@ const MilestonesScreen: React.FC = () => {
       completionRate: cat.total > 0 ? Math.round((cat.completed / cat.total) * 100) : 0,
     }));
     
-    console.log('🎨 [MILESTONES] Categorías con hitos:', enrichedCategories.length);
     enrichedCategories.forEach(cat => {
-      console.log(`  - ${cat.icon} ${cat.categoryName}: ${cat.total} hitos (${cat.completionRate}% completo)`);
     });
     
     // Calcular progreso general
@@ -415,7 +362,6 @@ const MilestonesScreen: React.FC = () => {
   useEffect(() => {
     // ✅ Filtrar hitos localmente cuando cambie el mes seleccionado
     if (allMilestones.length > 0) {
-      console.log('🔄 [MILESTONES] Filtrando para mes:', selectedAgeRange);
       filterAndGroupMilestones(allMilestones, parseInt(selectedAgeRange));
       
       // ✅ Analytics: Cambio de rango de edad

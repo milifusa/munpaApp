@@ -144,7 +144,6 @@ const SleepTrackerScreen = ({ navigation, route }: any) => {
     React.useCallback(() => {
       if (!sleepFeatureEnabled) return;
       if (childId) {
-        console.log('🔄 [SLEEP] Recargando datos al volver a la pantalla');
         loadData();
       }
     }, [childId])
@@ -187,7 +186,6 @@ const SleepTrackerScreen = ({ navigation, route }: any) => {
       // Obtener información de hora de despertar
       try {
         const wakeTimeResponse = await sleepService.getWakeTime(childId);
-        console.log('⏰ [SLEEP TRACKER] Info de hora de despertar:', wakeTimeResponse);
         if (wakeTimeResponse.success) {
           setWakeTimeInfo({
             wakeTime: wakeTimeResponse.wakeTime,
@@ -197,36 +195,19 @@ const SleepTrackerScreen = ({ navigation, route }: any) => {
           });
         }
       } catch (error) {
-        console.log('⚠️ [SLEEP] Error obteniendo info de hora de despertar:', error);
         setWakeTimeInfo(null);
       }
       
       // Obtener predicción con IA
       try {
         const predResponse = await sleepService.getSleepPrediction(childId);
-        console.log('🔍 [SLEEP TRACKER] Respuesta de predicción recibida:', {
-          success: predResponse.success,
-          hasPrediction: !!predResponse.prediction,
-          predictionKeys: predResponse.prediction ? Object.keys(predResponse.prediction) : [],
-          wakeTimeInPrediction: predResponse.prediction?.wakeTime,
-          dailyScheduleExists: !!predResponse.prediction?.dailySchedule,
-          allNapsCount: predResponse.prediction?.dailySchedule?.allNaps?.length || 0
-        });
         
         if (predResponse.success) {
           // La respuesta puede tener prediction o ser directa
           const pred = predResponse.prediction || predResponse;
-          console.log('✅ [SLEEP TRACKER] Guardando predicción en estado:', {
-            hasWakeTime: !!pred.wakeTime,
-            wakeTime: pred.wakeTime,
-            hasNextNap: !!pred.nextNap,
-            hasDailySchedule: !!pred.dailySchedule,
-            allNapsCount: pred.dailySchedule?.allNaps?.length || 0
-          });
           setPrediction(pred);
         }
       } catch (error) {
-        console.log('⚠️ [SLEEP] No hay suficientes datos para predicción:', error);
       }
       
       // Obtener análisis completo (incluye estadísticas)
@@ -236,7 +217,6 @@ const SleepTrackerScreen = ({ navigation, route }: any) => {
           setStats(analysisResponse.analysis.patterns);
         }
       } catch (error) {
-        console.log('No hay suficientes datos para análisis');
       }
     } catch (error) {
       console.error('Error cargando datos:', error);
@@ -248,13 +228,6 @@ const SleepTrackerScreen = ({ navigation, route }: any) => {
 
   // Mostrar modal para seleccionar hora de inicio
   const showStartSleepModal = (type: 'nap' | 'nightsleep') => {
-    console.log('🎯 [MODAL] Abriendo modal para:', type);
-    console.log('🎯 [MODAL] Estado actual de prediction:', {
-      predictionExists: !!prediction,
-      hasWakeTime: !!prediction?.wakeTime,
-      wakeTime: prediction?.wakeTime,
-      predictionKeys: prediction ? Object.keys(prediction) : [],
-    });
     
     setSelectedSleepType(type);
     setSelectedStartTime(new Date());
@@ -276,13 +249,6 @@ const SleepTrackerScreen = ({ navigation, route }: any) => {
       }
 
       // Validar que haya hora de despertar registrada HOY - solo para siestas
-      console.log('🔍 [VALIDATION] Validando hora de despertar para siesta:', {
-        hasWakeTimeInfo: !!wakeTimeInfo,
-        hasRegisteredToday: wakeTimeInfo?.hasRegisteredToday,
-        source: wakeTimeInfo?.source,
-        wakeTime: wakeTimeInfo?.wakeTime,
-        selectedType: selectedSleepType
-      });
 
       if (selectedSleepType === 'nap' && !wakeTimeInfo?.hasRegisteredToday) {
         setShowStartModal(false);
@@ -297,10 +263,6 @@ const SleepTrackerScreen = ({ navigation, route }: any) => {
       setShowStartModal(false);
       setLoading(true);
 
-      console.log('📅 [SLEEP] Enviando hora al servidor (UTC):', {
-        horaLocal: selectedStartTime.toString(),
-        horaUTC: selectedStartTime.toISOString()
-      });
 
       const response = await sleepService.recordSleep({
         childId,
@@ -338,10 +300,6 @@ const SleepTrackerScreen = ({ navigation, route }: any) => {
         (endTime.getTime() - new Date(activeSleep.startTime).getTime()) / 1000 / 60
       );
       
-      console.log('📅 [SLEEP] Finalizando sueño (UTC):', {
-        horaLocal: endTime.toString(),
-        horaUTC: endTime.toISOString()
-      });
       
       await sleepService.updateSleepEvent(activeSleep.id, {
         endTime: endTime.toISOString(),
@@ -445,17 +403,14 @@ const SleepTrackerScreen = ({ navigation, route }: any) => {
             try {
               setLoading(true);
               
-              console.log('🔄 [SLEEP] Reanudando siesta:', sleepEvent.id);
               
               // SOLUCIÓN: Eliminar la siesta detenida y crear una nueva activa
               // Esto es más confiable que intentar modificar el endTime
               try {
                 // 1. Eliminar la siesta detenida
-                console.log('🗑️ [SLEEP] Eliminando siesta detenida...');
                 await sleepService.deleteSleepEvent(sleepEvent.id);
                 
                 // 2. Crear una nueva siesta activa con el mismo startTime
-                console.log('➕ [SLEEP] Creando nueva siesta activa...');
                 const newResponse = await sleepService.recordSleep({
                   childId: sleepEvent.childId,
                   type: sleepEvent.type,

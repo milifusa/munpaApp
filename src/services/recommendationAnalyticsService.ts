@@ -80,25 +80,12 @@ class RecommendationAnalyticsService {
         },
       };
 
-      console.log('📊 [ANALYTICS] Registrando evento:', {
-        recommendationId,
-        eventType,
-        userId,
-        source,
-      });
-      console.log('📊 [ANALYTICS] Payload completo:', JSON.stringify(payload, null, 2));
       const fullUrl = `${this.baseUrl}/${recommendationId}/analytics/events`;
-      console.log('📊 [ANALYTICS] URL relativa:', fullUrl);
-      console.log('📊 [ANALYTICS] URL completa:', `https://api.munpa.online${fullUrl}`);
 
       const response = await api.post(fullUrl, payload);
       const responseData = response.data;
       
-      console.log('📊 [ANALYTICS] Response status:', response.status);
-      console.log('📊 [ANALYTICS] Response headers:', JSON.stringify(response.headers, null, 2));
       
-      console.log('✅ [ANALYTICS] Evento registrado exitosamente');
-      console.log('✅ [ANALYTICS] Respuesta del servidor:', JSON.stringify(responseData, null, 2));
     } catch (error: any) {
       // No lanzar error para no interrumpir el flujo del usuario
       const status = error.response?.status;
@@ -204,12 +191,10 @@ class RecommendationAnalyticsService {
    */
   async getAnalytics(recommendationId: string): Promise<RecommendationAnalytics | null> {
     try {
-      console.log('📊 [ANALYTICS] Obteniendo estadísticas para:', recommendationId);
       
       const response = await api.get(`${this.baseUrl}/${recommendationId}/analytics`);
       
       if (response?.data?.success && response?.data?.data) {
-        console.log('✅ [ANALYTICS] Estadísticas obtenidas');
         return response.data.data;
       }
       

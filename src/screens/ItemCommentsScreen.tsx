@@ -47,24 +47,9 @@ const ItemCommentsScreen = () => {
     try {
       if (showLoader) setIsLoading(true);
       
-      console.log('💬 [ITEM COMMENTS] Cargando comentarios:', { listId, itemId });
       const result = await listsService.getItemComments(listId, itemId);
       
       const commentsData = Array.isArray(result.data) ? result.data : [];
-      console.log('✅ [ITEM COMMENTS] Comentarios cargados:', commentsData.length);
-      
-      // Debug de los nuevos campos
-      if (commentsData.length > 0) {
-        commentsData.forEach((comment, index) => {
-          console.log(`💬 [ITEM COMMENTS] Comentario ${index + 1}:`, {
-            userName: comment.userName,
-            userPhoto: comment.userPhoto,
-            authorName: comment.authorName, // campo anterior
-            authorPhoto: comment.authorPhoto, // campo anterior
-            content: comment.content?.substring(0, 30) + '...'
-          });
-        });
-      }
       
       setComments(commentsData);
     } catch (error) {
@@ -98,14 +83,12 @@ const ItemCommentsScreen = () => {
 
     try {
       setIsAddingComment(true);
-      console.log('💬 [ITEM COMMENTS] Agregando comentario:', newComment.trim());
       
       await listsService.addItemComment(listId, itemId, { content: newComment.trim() });
       
       setNewComment('');
       await loadComments(false); // Recargar comentarios
       
-      console.log('✅ [ITEM COMMENTS] Comentario agregado exitosamente');
     } catch (error) {
       console.error('❌ [ITEM COMMENTS] Error agregando comentario:', error);
       Alert.alert('Error', 'No se pudo agregar el comentario');

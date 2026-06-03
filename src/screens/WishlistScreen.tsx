@@ -68,7 +68,6 @@ const WishlistScreen = ({ navigation }: any) => {
   }, []);
 
   const loadWishlist = async () => {
-    console.log('💝 [WISHLIST] Cargando lista de deseos...');
     setIsLoading(true);
     setError(null);
 
@@ -76,10 +75,8 @@ const WishlistScreen = ({ navigation }: any) => {
       const response = await api.getWishlist();
       
       if (response.success && response.data) {
-        console.log('✅ [WISHLIST] Lista cargada:', response.data.length);
         setWishlist(response.data);
       } else {
-        console.log('⚠️ [WISHLIST] Respuesta sin datos');
         setError('No se pudo cargar tu lista de deseos');
       }
     } catch (error: any) {
@@ -107,7 +104,6 @@ const WishlistScreen = ({ navigation }: any) => {
           style: 'destructive',
           onPress: async () => {
             try {
-              console.log('💔 [WISHLIST] Quitando wishlistId:', wishlistId);
               await api.removeFromWishlist(wishlistId);
               
               // Actualizar lista local

@@ -41,12 +41,6 @@ const getImageTypeAndExtension = (uri: string): { mimeType: string; extension: s
   const randomSuffix = Math.random().toString(36).substring(2, 8);
   const fileName = `image_${timestamp}_${randomSuffix}.${extension}`;
   
-  console.log('🔍 [IMAGE UPLOAD] Detección de tipo:', {
-    uri: uri.substring(0, 50) + '...',
-    detectedExtension: extension,
-    detectedMimeType: mimeType,
-    fileName
-  });
   
   return { mimeType, extension, fileName };
 };
@@ -55,10 +49,6 @@ const getImageTypeAndExtension = (uri: string): { mimeType: string; extension: s
 export const imageUploadService = {
   // Subir imagen y obtener URL
   uploadImage: async (uri: string, type: string = 'community', providedMimeType?: string) => {
-    console.log('📤 [IMAGE UPLOAD] Subiendo imagen a /api/communities/upload-photo:', { uri, type, providedMimeType });
-    console.log('📤 [IMAGE UPLOAD] URI recibida:', uri);
-    console.log('📤 [IMAGE UPLOAD] Tipo recibido:', type);
-    console.log('📤 [IMAGE UPLOAD] Tipo MIME proporcionado:', providedMimeType);
     
     try {
       // Usar el tipo MIME proporcionado si está disponible, sino detectarlo desde la URI
@@ -72,17 +62,13 @@ export const imageUploadService = {
         const timestamp = Date.now();
         const randomSuffix = Math.random().toString(36).substring(2, 8);
         fileName = `image_${timestamp}_${randomSuffix}.${extension}`;
-        console.log('📤 [IMAGE UPLOAD] Usando tipo MIME proporcionado:', mimeType);
       } else {
         // Si no hay tipo MIME, intentar detectarlo desde la URI
         const detected = getImageTypeAndExtension(uri);
         mimeType = detected.mimeType;
         fileName = detected.fileName;
-        console.log('📤 [IMAGE UPLOAD] Tipo MIME detectado desde URI:', mimeType);
       }
       
-      console.log('📤 [IMAGE UPLOAD] Tipo MIME final:', mimeType);
-      console.log('📤 [IMAGE UPLOAD] Nombre de archivo:', fileName);
       
       // Crear FormData para enviar la imagen
       const formData = new FormData();
@@ -93,12 +79,9 @@ export const imageUploadService = {
       } as any);
       formData.append('type', type);
       
-      console.log('📤 [IMAGE UPLOAD] FormData creado:', formData);
 
       // Obtener token de autenticación
       const authToken = await AsyncStorage.getItem('authToken');
-      console.log('🔑 [IMAGE UPLOAD] Token obtenido:', authToken ? 'SÍ' : 'NO');
-      console.log('🔑 [IMAGE UPLOAD] Longitud del token:', authToken?.length || 0);
 
       // Configurar headers para multipart/form-data
       const config = {
@@ -108,27 +91,11 @@ export const imageUploadService = {
         }
       };
       
-      console.log('📤 [IMAGE UPLOAD] Configuración preparada:', {
-        hasToken: !!authToken,
-        contentType: config.headers['Content-Type'],
-        hasAuthorization: !!config.headers.Authorization
-      });
 
       // Subir imagen al servidor
-      console.log('📤 [IMAGE UPLOAD] Llamando a API con URL:', '/api/communities/upload-photo');
-      console.log('📤 [IMAGE UPLOAD] Llamando a API con FormData:', formData);
-      console.log('📤 [IMAGE UPLOAD] Llamando a API con config:', config);
       
       const response = await axiosInstance.post('/api/communities/upload-photo', formData, config);
       
-      console.log('✅ [IMAGE UPLOAD] Imagen subida exitosamente a /api/communities/upload-photo:', response.data);
-      console.log('🖼️ [IMAGE UPLOAD] Estructura de respuesta:', {
-        success: response.data.success,
-        message: response.data.message,
-        data: response.data.data,
-        photoUrl: response.data.data?.photoUrl,
-        fileName: response.data.data?.fileName
-      });
       
       const photoUrl = response.data.data.photoUrl;
       if (!photoUrl) {
@@ -144,12 +111,8 @@ export const imageUploadService = {
 
   // Subir imagen específicamente para comunidades
   uploadCommunityImage: async (uri: string, mimeType?: string) => {
-    console.log('🖼️ [IMAGE UPLOAD] uploadCommunityImage llamado con URI:', uri);
-    console.log('🖼️ [IMAGE UPLOAD] Tipo MIME proporcionado:', mimeType);
-    console.log('🖼️ [IMAGE UPLOAD] Tipo de URI:', typeof uri);
     try {
       const result = await imageUploadService.uploadImage(uri, 'community', mimeType);
-      console.log('✅ [IMAGE UPLOAD] uploadCommunityImage completado, resultado:', result);
       return result;
     } catch (error) {
       console.error('❌ [IMAGE UPLOAD] Error en uploadCommunityImage:', error);

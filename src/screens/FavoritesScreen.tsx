@@ -73,7 +73,6 @@ const FavoritesScreen = ({ navigation }: any) => {
   }, []);
 
   const loadFavorites = async () => {
-    console.log('🔄 [FAVORITES] Cargando favoritos');
     setIsLoading(true);
     setError(null);
 
@@ -81,7 +80,6 @@ const FavoritesScreen = ({ navigation }: any) => {
       const response = await api.getFavorites();
       
       if (response.success) {
-        console.log('✅ [FAVORITES] Favoritos cargados:', response.data.length);
         setFavorites(response.data);
       } else {
         setError('No se pudieron cargar los favoritos');
@@ -101,7 +99,6 @@ const FavoritesScreen = ({ navigation }: any) => {
   };
 
   const handleRecommendationPress = (recommendation: Recommendation) => {
-    console.log('📍 [FAVORITES] Recomendación seleccionada:', recommendation.id);
     navigation.navigate('RecommendationDetail', { 
       recommendationId: recommendation.id,
       recommendationName: recommendation.name 
@@ -140,14 +137,12 @@ const FavoritesScreen = ({ navigation }: any) => {
 
   const handleCall = async (phone: string, recommendationId: string) => {
     if (phone) {
-      console.log('📞 [FAVORITES] Iniciando llamada:', phone);
       
       // Trackear llamada
       try {
         await recommendationAnalyticsService.trackCall(recommendationId, phone, {
           source: 'favorites_screen',
         });
-        console.log('✅ [FAVORITES] Evento de llamada registrado');
       } catch (error) {
         console.error('❌ [FAVORITES] Error registrando llamada:', error);
       }
@@ -158,14 +153,12 @@ const FavoritesScreen = ({ navigation }: any) => {
 
   const handleWhatsApp = async (phone: string, recommendationId: string) => {
     if (phone) {
-      console.log('💬 [FAVORITES] Iniciando WhatsApp:', phone);
       
       // Trackear contacto por WhatsApp
       try {
         await recommendationAnalyticsService.trackWhatsApp(recommendationId, phone, {
           source: 'favorites_screen',
         });
-        console.log('✅ [FAVORITES] Evento de WhatsApp registrado');
       } catch (error) {
         console.error('❌ [FAVORITES] Error registrando WhatsApp:', error);
       }

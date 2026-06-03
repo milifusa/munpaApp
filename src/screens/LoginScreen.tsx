@@ -98,7 +98,6 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
           error.message?.includes('cancelado') ||
           error.code === '1000' || 
           error.code === 1000) {
-        console.log('👤 Usuario canceló el login con Apple');
         return;
       }
       

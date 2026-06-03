@@ -103,7 +103,6 @@ const TeethingTrackerScreen = ({ navigation, route }: any) => {
           childToSelect = data[0];
           await AsyncStorage.setItem('selectedChildId', childToSelect.id);
         }
-        console.log('🦷 [TEETHING] Child cargado:', childToSelect?.name, childToSelect?.id);
         setSelectedChild(childToSelect);
       }
     } catch (error) {
@@ -114,14 +113,12 @@ const TeethingTrackerScreen = ({ navigation, route }: any) => {
   };
 
   useEffect(() => {
-    console.log('🦷 [TEETHING] useEffect - selectedChild:', selectedChild?.id);
     if (selectedChild?.id) {
       loadTeethingData();
       analyticsService.logEvent('teething_tracker_viewed', {
         childId: selectedChild.id,
       });
     } else {
-      console.log('🦷 [TEETHING] No hay selectedChild, inicializando con datos vacíos');
       setTeeth(initializeTeethStructure());
       setAgeMonths(0);
       setLoading(false);
@@ -130,20 +127,15 @@ const TeethingTrackerScreen = ({ navigation, route }: any) => {
 
   const loadTeethingData = async () => {
     if (!selectedChild?.id) {
-      console.log('🦷 [TEETHING] loadTeethingData - No hay childId');
       setLoading(false);
       return;
     }
     
-    console.log('🦷 [TEETHING] Cargando datos para child:', selectedChild.id);
     
     try {
       setLoading(true);
       const summary = await teethingService.getSummary(selectedChild.id);
       
-      console.log('🦷 [TEETHING] Datos recibidos:', summary);
-      console.log('🦷 [TEETHING] Teeth completo:', JSON.stringify(summary.data.teeth, null, 2));
-      console.log('🦷 [TEETHING] Timeline completo:', JSON.stringify(summary.data.timeline, null, 2));
       
       // Extraer data del wrapper
       const teethingData = summary.data;
@@ -174,11 +166,9 @@ const TeethingTrackerScreen = ({ navigation, route }: any) => {
         )[0];
         
         if (backendTooth) {
-          console.log(`🦷 [TEETHING] Diente ${tooth.id} encontrado en backend:`, backendTooth);
         }
         
         if (latestEvent) {
-          console.log(`🦷 [TEETHING] Diente ${tooth.id} tiene evento en timeline:`, latestEvent);
         }
         
         // Priorizar datos del timeline sobre el backend
@@ -207,9 +197,7 @@ const TeethingTrackerScreen = ({ navigation, route }: any) => {
         };
       });
       
-      console.log('🦷 [TEETHING] Dientes con estado aplicado:', teethWithState.filter(t => t.hasErupted).length, 'erupcionados');
       setTeeth(teethWithState);
-      console.log('🦷 [TEETHING] Dientes inicializados:', teethWithState.length);
     } catch (error: any) {
       console.error('🦷 [TEETHING] Error cargando datos:', error);
       console.error('🦷 [TEETHING] Error response:', error.response);
@@ -217,12 +205,10 @@ const TeethingTrackerScreen = ({ navigation, route }: any) => {
       
       // Si el error es 404, inicializar con datos vacíos
       if (error.response?.status === 404) {
-        console.log('🦷 [TEETHING] 404 - Inicializando con datos vacíos');
         setTeeth(initializeTeethStructure());
         setTimeline([]);
         setAgeMonths(calculateAgeInMonths());
       } else {
-        console.log('🦷 [TEETHING] Error diferente a 404, mostrando alerta e inicializando');
         // Inicializar con datos vacíos de todas formas
         setTeeth(initializeTeethStructure());
         setTimeline([]);
@@ -549,9 +535,6 @@ const TeethingTrackerScreen = ({ navigation, route }: any) => {
   const eruptedCount = teeth.filter(t => t.hasErupted && !t.hasShed).length;
   const shedCount = teeth.filter(t => t.hasShed).length;
 
-  console.log('🦷 [TEETHING RENDER] teeth.length:', teeth.length);
-  console.log('🦷 [TEETHING RENDER] eruptedCount:', eruptedCount);
-  console.log('🦷 [TEETHING RENDER] selectedChild:', selectedChild?.name);
 
   if (loadingChild || loading) {
     return (

@@ -40,7 +40,6 @@ const VendorProductsScreen = () => {
   const loadProducts = async () => {
     try {
       setLoading(true);
-      console.log('📦 [VENDOR PRODUCTS] Cargando mis productos...');
 
       // Cargar TODOS los productos para mostrar conteos correctos en los tabs
       const response = await axiosInstance.get('/api/vendor/products', {
@@ -50,13 +49,11 @@ const VendorProductsScreen = () => {
         },
       });
 
-      console.log('✅ [VENDOR PRODUCTS] Productos obtenidos:', response.data);
       
       const productsData = response.data?.data || response.data?.products || [];
       const productsList = Array.isArray(productsData) ? productsData : [];
       
       setProducts(productsList);
-      console.log(`📊 [VENDOR PRODUCTS] ${productsList.length} productos cargados`);
     } catch (error) {
       console.error('❌ [VENDOR PRODUCTS] Error cargando productos:', error);
       setProducts([]);
@@ -157,7 +154,6 @@ const VendorProductsScreen = () => {
 
   const updateStatus = async (productId: string, status: string) => {
     try {
-      console.log('🔄 [VENDOR PRODUCTS] Actualizando estado:', productId, status);
       
       await axiosInstance.patch(`/api/vendor/products/${productId}/status`, {
         status,

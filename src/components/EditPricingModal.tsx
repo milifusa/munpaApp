@@ -52,7 +52,6 @@ const EditPricingModal: React.FC<EditPricingModalProps> = ({
 
     try {
       setSaving(true);
-      console.log('💰 [PRICING] Actualizando precios...');
 
       const requestData = {
         chatConsultation: chatPriceNum,
@@ -61,7 +60,6 @@ const EditPricingModal: React.FC<EditPricingModalProps> = ({
       };
 
       const response = await axiosInstance.put('/api/specialist/pricing', requestData);
-      console.log('✅ [PRICING] Precios actualizados:', response.data);
 
       analyticsService.logEvent('specialist_pricing_updated', {
         chat_price: chatPriceNum,

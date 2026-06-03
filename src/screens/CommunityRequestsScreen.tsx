@@ -51,7 +51,6 @@ const CommunityRequestsScreen: React.FC = () => {
   // Limpiar estado cuando el usuario se desconecta
   useEffect(() => {
     if (!isAuthenticated) {
-      console.log('🧹 [REQUESTS] Usuario desconectado, limpiando estado...');
       setRequests([]);
       setIsLoading(false);
     }
@@ -59,15 +58,12 @@ const CommunityRequestsScreen: React.FC = () => {
 
   // Debug: Log cuando cambia el estado de requests
   useEffect(() => {
-    console.log('🎨 [REQUESTS] Estado de requests cambiado:', requests);
-    console.log('🎨 [REQUESTS] Longitud de requests:', requests.length);
   }, [requests]);
 
   // Función para cargar las solicitudes
   const loadRequests = async () => {
     // Verificar que el usuario esté autenticado antes de cargar datos
     if (!isAuthenticated) {
-      console.log('🚫 [REQUESTS] Usuario no autenticado, no cargando solicitudes');
       setIsLoading(false);
       return;
     }
@@ -76,21 +72,14 @@ const CommunityRequestsScreen: React.FC = () => {
       setIsLoading(true);
       const result = await communitiesService.getJoinRequests(communityId);
       
-      console.log('📋 [REQUESTS] Respuesta completa del backend:', JSON.stringify(result, null, 2));
       
       if (result.success) {
         // El backend devuelve data directamente, no data.requests
         const requestsData = result.data || [];
-        console.log('👥 [REQUESTS] Datos de solicitudes extraídos:', requestsData);
-        console.log('📊 [REQUESTS] Tipo de datos:', typeof requestsData);
-        console.log('📊 [REQUESTS] Es array?', Array.isArray(requestsData));
-        console.log('📊 [REQUESTS] Longitud:', requestsData?.length);
         
         const finalRequests = Array.isArray(requestsData) ? requestsData : [];
-        console.log('✅ [REQUESTS] Solicitudes finales a mostrar:', finalRequests);
         setRequests(finalRequests);
       } else {
-        console.log('❌ [REQUESTS] Backend no devolvió success: true');
         setRequests([]);
       }
     } catch (error: any) {
@@ -125,7 +114,6 @@ const CommunityRequestsScreen: React.FC = () => {
           style: 'destructive',
           onPress: async () => {
             try {
-              console.log('✅ [REQUESTS] Aprobando solicitud:', request.id);
               setProcessingRequestId(request.id);
               
               // Llamar al endpoint para aprobar la solicitud
@@ -175,7 +163,6 @@ const CommunityRequestsScreen: React.FC = () => {
           style: 'destructive',
           onPress: async () => {
             try {
-              console.log('❌ [REQUESTS] Rechazando solicitud:', request.id);
               setProcessingRequestId(request.id);
               
               // Llamar al endpoint para rechazar la solicitud
@@ -215,23 +202,19 @@ const CommunityRequestsScreen: React.FC = () => {
 
   // Función para convertir timestamp de Firestore a fecha válida
   const parseFirestoreTimestamp = (timestamp: any): Date => {
-    console.log('🕐 [REQUESTS] Parseando timestamp:', timestamp);
     
     if (timestamp && typeof timestamp === 'object' && timestamp._seconds) {
       // Es un timestamp de Firestore
       const seconds = timestamp._seconds;
       const nanoseconds = timestamp._nanoseconds || 0;
       const date = new Date(seconds * 1000 + nanoseconds / 1000000);
-      console.log('✅ [REQUESTS] Timestamp convertido a fecha:', date);
       return date;
     } else if (typeof timestamp === 'string') {
       // Es un string de fecha normal
       const date = new Date(timestamp);
-      console.log('✅ [REQUESTS] String convertido a fecha:', date);
       return date;
     } else if (timestamp instanceof Date) {
       // Ya es una fecha
-      console.log('✅ [REQUESTS] Ya es una fecha válida:', timestamp);
       return timestamp;
     } else {
       // Fallback a fecha actual
@@ -317,7 +300,6 @@ const CommunityRequestsScreen: React.FC = () => {
         <TouchableOpacity 
           style={styles.backButton}
           onPress={() => {
-            console.log('🔙 [REQUESTS] Botón de regreso presionado');
             (navigation as any).navigate('Communities');
           }}
         >

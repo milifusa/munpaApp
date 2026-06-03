@@ -120,7 +120,6 @@ const VaccineTrackerScreen: React.FC = () => {
       
       // Verificar si necesita asignar país para calendario de vacunación
       if (response?.needsVaccinationCountry === true) {
-        console.log('⚠️ [VACCINES] Necesita asignar país de vacunación');
         setNeedsVaccinationCountry(true);
         setVaccines([]);
         // Recargar países antes de mostrar el modal
@@ -128,28 +127,17 @@ const VaccineTrackerScreen: React.FC = () => {
         setShowCountryModal(true);
       } else {
         const items = Array.isArray(response?.data) ? response.data : [];
-        console.log('💉 [VACCINES] Vacunas recibidas (cantidad):', items.length);
         
         // Log detallado de las fechas y conversión
         items.forEach((vaccine: any, index: number) => {
-          console.log(`\n💉 [VACCINES] Vacuna ${index + 1} (${vaccine.name}):`);
-          console.log('  📅 scheduledDate (crudo):', vaccine.scheduledDate);
-          console.log('  📅 scheduledDate (tipo):', typeof vaccine.scheduledDate);
           if (vaccine.scheduledDate) {
             const parsed = parseDate(vaccine.scheduledDate);
-            console.log('  📅 scheduledDate (parseada):', parsed?.toISOString());
-            console.log('  📅 scheduledDate (formateada):', formatDate(vaccine.scheduledDate));
           }
           
-          console.log('  ✅ appliedDate (crudo):', vaccine.appliedDate);
-          console.log('  ✅ appliedDate (tipo):', typeof vaccine.appliedDate);
           if (vaccine.appliedDate) {
             const parsed = parseDate(vaccine.appliedDate);
-            console.log('  ✅ appliedDate (parseada):', parsed?.toISOString());
-            console.log('  ✅ appliedDate (formateada):', formatDate(vaccine.appliedDate));
           }
           
-          console.log('  🏷️ status:', vaccine.status);
         });
         
         setVaccines(items);
@@ -157,11 +145,9 @@ const VaccineTrackerScreen: React.FC = () => {
         
         // Cargar el calendario de vacunación si está asignado
         if (child?.vaccinationCountryId) {
-          console.log('📅 [VACCINES] Cargando calendario automáticamente...');
           const scheduleItems = await loadVaccineSchedule();
           if (scheduleItems.length > 0) {
             setVaccineScheduleItems(scheduleItems);
-            console.log('✅ [VACCINES] Calendario cargado automáticamente:', scheduleItems.length, 'items');
           }
         }
       }
@@ -175,9 +161,7 @@ const VaccineTrackerScreen: React.FC = () => {
 
   const loadCountries = async () => {
     try {
-      console.log('🌍 [VACCINES] Iniciando carga de calendarios...');
       const response = await vaccineService.getSchedules();
-      console.log('🌍 [VACCINES] Respuesta completa de getSchedules:', JSON.stringify(response, null, 2));
       
       // Intentar diferentes estructuras de respuesta
       let schedules = [];
@@ -189,7 +173,6 @@ const VaccineTrackerScreen: React.FC = () => {
         schedules = response.schedules;
       }
       
-      console.log('🌍 [VACCINES] Calendarios extraídos:', JSON.stringify(schedules, null, 2));
       
       // Extraer países únicos de los calendarios
       const uniqueCountries = schedules.reduce((acc: any[], schedule: any) => {
@@ -206,7 +189,6 @@ const VaccineTrackerScreen: React.FC = () => {
       }, []);
       
       setCountries(uniqueCountries);
-      console.log('🌍 [VACCINES] Países únicos con calendarios:', JSON.stringify(uniqueCountries, null, 2));
       
       if (uniqueCountries.length === 0) {
         console.warn('⚠️ [VACCINES] No se encontraron países con calendarios');
@@ -246,14 +228,12 @@ const VaccineTrackerScreen: React.FC = () => {
 
   const loadVaccineSchedule = async () => {
     if (!selectedChild?.vaccinationCountryId) {
-      console.log('⚠️ [VACCINES] No hay país de vacunación asignado');
       return [];
     }
 
     try {
       setLoadingSchedule(true);
       const response = await vaccineService.getScheduleByCountry(selectedChild.vaccinationCountryId);
-      console.log('📋 [VACCINES] Calendario recibido:', JSON.stringify(response, null, 2));
       
       // Extraer items del calendario
       let items = [];
@@ -263,7 +243,6 @@ const VaccineTrackerScreen: React.FC = () => {
         items = response.items;
       }
       
-      console.log('📋 [VACCINES] Items del calendario:', JSON.stringify(items, null, 2));
       return items;
     } catch (error) {
       console.error('❌ [VACCINES] Error cargando calendario:', error);
@@ -358,7 +337,6 @@ const VaccineTrackerScreen: React.FC = () => {
     }
 
     try {
-      console.log('📋 [VACCINES] Asignando calendario del país:', countryId);
       await vaccineService.assignSchedule(selectedChild.id, countryId);
       
       analyticsService.logEvent('vaccine_schedule_assigned', {
@@ -438,16 +416,11 @@ const VaccineTrackerScreen: React.FC = () => {
         data.notes = notesInput.trim();
       }
 
-      console.log('💉 [VACCINES] Guardando vacuna:', JSON.stringify(data, null, 2));
-      console.log('💉 [VACCINES] scheduledDate ISO:', data.scheduledDate);
-      console.log('💉 [VACCINES] appliedDate ISO:', data.appliedDate);
-      console.log('💉 [VACCINES] Modo:', editingVaccine ? 'EDITAR' : 'CREAR');
       
       let result;
       if (editingVaccine) {
         // Actualizar vacuna existente
         result = await vaccineService.updateVaccine(selectedChild.id, editingVaccine.id, data);
-        console.log('💉 [VACCINES] Vacuna actualizada:', JSON.stringify(result, null, 2));
         
         analyticsService.logEvent('vaccine_updated', {
           child_id: selectedChild.id,
@@ -459,7 +432,6 @@ const VaccineTrackerScreen: React.FC = () => {
       } else {
         // Crear nueva vacuna
         result = await vaccineService.createVaccine(selectedChild.id, data);
-        console.log('💉 [VACCINES] Vacuna creada:', JSON.stringify(result, null, 2));
         
         analyticsService.logEvent('vaccine_added', {
           child_id: selectedChild.id,
@@ -653,11 +625,9 @@ const VaccineTrackerScreen: React.FC = () => {
   const getVaccinesForMonth = (month: number | null) => {
     // Si no hay mes seleccionado, mostrar todas las vacunas registradas
     if (month === null) {
-      console.log('📋 [FILTER] Mostrando todas las vacunas:', vaccines.length);
       return vaccines;
     }
     
-    console.log('📋 [FILTER] Filtrando por mes:', month);
     
     // Si no hay calendario asignado, filtrar por fecha calculada
     if (vaccineScheduleItems.length === 0) {
@@ -713,20 +683,16 @@ const VaccineTrackerScreen: React.FC = () => {
       if (selectedChild?.birthDate && registeredVaccines.length > 0) {
         const targetMonth = month;
         
-        console.log(`🔍 [MATCH] Buscando "${scheduleItem.name}" para mes ${targetMonth} (calendario)`);
-        console.log(`🔍 [MATCH] Vacunas registradas con este nombre:`, registeredVaccines.length);
         
         matchedVaccine = registeredVaccines.find((v) => {
           // Si ya fue usada para otra entrada del calendario, saltar
           if (usedVaccineIds.has(v.id)) {
-            console.log(`   ⏭️ [MATCH] Vacuna ${v.id} ya usada, saltando`);
             return false;
           }
           
           // Usar la fecha PROGRAMADA (scheduledDate) para determinar a qué mes pertenece
           const scheduledDate = v.scheduledDate;
           if (!scheduledDate) {
-            console.log(`   ❌ [MATCH] Vacuna ${v.id} sin scheduledDate`);
             return false;
           }
           
@@ -734,12 +700,10 @@ const VaccineTrackerScreen: React.FC = () => {
           const vaccineDate = parseDate(scheduledDate);
           
           if (!vaccineDate || isNaN(vaccineDate.getTime())) {
-            console.log(`   ❌ [MATCH] Fecha programada inválida para vacuna ${v.id}:`, scheduledDate);
             return false;
           }
           
           if (!birthDate || isNaN(birthDate.getTime())) {
-            console.log(`   ❌ [MATCH] Fecha de nacimiento inválida:`, selectedChild.birthDate);
             return false;
           }
           
@@ -749,14 +713,11 @@ const VaccineTrackerScreen: React.FC = () => {
           
           // Considerar que es la misma dosis si la fecha programada está dentro de ±1 mes
           const isMatch = Math.abs(monthsDiff - targetMonth) <= 1;
-          console.log(`   ${isMatch ? '✅' : '❌'} [MATCH] ${v.name} (${v.status}): mes calculado=${monthsDiff}, target=${targetMonth} - ${isMatch ? 'COINCIDE' : 'NO COINCIDE'}`);
           return isMatch;
         });
         
         if (matchedVaccine) {
-          console.log(`✅ [MATCH] Encontrada vacuna registrada: ${matchedVaccine.name} (${matchedVaccine.id})`);
         } else {
-          console.log(`⚠️ [MATCH] No se encontró vacuna registrada, creando pendiente`);
         }
       }
 
@@ -780,8 +741,6 @@ const VaccineTrackerScreen: React.FC = () => {
       }
     });
 
-    console.log(`📋 [FILTER] Resultado para mes ${month}:`, result.length, 'vacunas');
-    console.log('📋 [FILTER] Detalles:', result.map(v => `${v.name} (${v.status})`));
     return result;
   };
 
@@ -870,7 +829,6 @@ const VaccineTrackerScreen: React.FC = () => {
               return hasApplied;
             }).length;
             
-            console.log(`🔢 [BADGE] Mes ${month}: ${appliedCount}/${scheduleVaccinesForMonth.length} aplicadas`);
 
             return (
               <TouchableOpacity

@@ -39,7 +39,6 @@ const ProductDetailScreen = () => {
   const loadProduct = async () => {
     try {
       setLoading(true);
-      console.log('🔍 [PRODUCT DETAIL] Cargando producto:', productId);
       
       const fetchedProduct = await marketplaceService.getProductById(productId);
       
@@ -47,8 +46,6 @@ const ProductDetailScreen = () => {
         throw new Error('Producto no encontrado');
       }
       
-      console.log('✅ [PRODUCT DETAIL] Producto cargado:', fetchedProduct.id);
-      console.log('✅ [PRODUCT DETAIL] isFavorite:', fetchedProduct.isFavorite);
       
       setProduct(fetchedProduct);
       setIsFavorite(fetchedProduct?.isFavorite || false);
@@ -64,12 +61,10 @@ const ProductDetailScreen = () => {
   const handleToggleFavorite = async () => {
     try {
       if (isFavorite) {
-        console.log('💔 [PRODUCT DETAIL] Quitando de favoritos');
         await marketplaceService.removeFromFavorites(productId);
         setIsFavorite(false);
         Alert.alert('Éxito', 'Eliminado de favoritos');
       } else {
-        console.log('❤️ [PRODUCT DETAIL] Agregando a favoritos');
         await marketplaceService.addToFavorites(productId);
         setIsFavorite(true);
         Alert.alert('Éxito', 'Agregado a favoritos');
@@ -381,7 +376,7 @@ const ProductDetailScreen = () => {
           {product.type === 'trueque' && (
             <View style={styles.coordinationSection}>
               <View style={styles.coordinationHeader}>
-                <Ionicons name="handshake" size={20} color="#2196F3" />
+                <Ionicons name="swap-horizontal-outline" size={20} color="#2196F3" />
                 <Text style={styles.coordinationTitle}>¿Cómo coordinar el intercambio?</Text>
               </View>
               <View style={styles.coordinationSteps}>
@@ -919,4 +914,3 @@ const styles = StyleSheet.create({
 });
 
 export default ProductDetailScreen;
-

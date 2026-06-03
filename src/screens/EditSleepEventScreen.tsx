@@ -28,9 +28,13 @@ const EditSleepEventScreen: React.FC = () => {
   const [endTime, setEndTime] = useState(
     sleepEvent.endTime ? new Date(sleepEvent.endTime) : new Date()
   );
-  const [quality, setQuality] = useState(sleepEvent.quality || 'good');
+  const [quality, setQuality] = useState<'poor' | 'fair' | 'good' | 'excellent'>(
+    (sleepEvent.quality as 'poor' | 'fair' | 'good' | 'excellent') || 'good'
+  );
   const [wakeUps, setWakeUps] = useState(sleepEvent.wakeUps?.toString() || '0');
-  const [location, setLocation] = useState(sleepEvent.location || 'crib');
+  const [location, setLocation] = useState<'crib' | 'stroller' | 'car' | 'carrier'>(
+    (sleepEvent.location as 'crib' | 'stroller' | 'car' | 'carrier') || 'crib'
+  );
   const [notes, setNotes] = useState(sleepEvent.notes || '');
   const [pauses, setPauses] = useState<SleepPause[]>(sleepEvent.pauses || []);
 
@@ -244,14 +248,23 @@ const EditSleepEventScreen: React.FC = () => {
     return `${mins}m`;
   };
 
-  const qualityOptions = [
+  const qualityOptions: Array<{
+    value: 'poor' | 'fair' | 'good' | 'excellent';
+    label: string;
+    emoji: string;
+    color: string;
+  }> = [
     { value: 'poor', label: 'Pobre', emoji: '😢', color: '#FF6B6B' },
     { value: 'fair', label: 'Regular', emoji: '😐', color: '#FFA500' },
     { value: 'good', label: 'Buena', emoji: '😊', color: '#4ECDC4' },
     { value: 'excellent', label: 'Excelente', emoji: '😄', color: '#2ECC71' },
   ];
 
-  const locationOptions = [
+  const locationOptions: Array<{
+    value: 'crib' | 'stroller' | 'car' | 'carrier';
+    label: string;
+    icon: string;
+  }> = [
     { value: 'crib', label: 'Cuna', icon: 'bed' },
     { value: 'stroller', label: 'Cochecito', icon: 'walk' },
     { value: 'car', label: 'Auto', icon: 'car' },
@@ -1044,4 +1057,3 @@ const styles = StyleSheet.create({
 });
 
 export default EditSleepEventScreen;
-

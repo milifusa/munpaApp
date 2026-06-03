@@ -31,9 +31,7 @@ const MyProductsScreen = () => {
   const loadMyProducts = async () => {
     try {
       setLoading(true);
-      console.log('📦 [MY PRODUCTS] Cargando mis productos...');
       const fetchedProducts = await marketplaceService.getMyProducts();
-      console.log('✅ [MY PRODUCTS] Productos cargados:', fetchedProducts?.length || 0);
       setProducts(Array.isArray(fetchedProducts) ? fetchedProducts : []);
     } catch (error) {
       console.error('❌ [MY PRODUCTS] Error cargando mis productos:', error);

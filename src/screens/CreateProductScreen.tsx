@@ -83,7 +83,6 @@ const CreateProductScreen = () => {
   const getCurrentLocation = async () => {
     try {
       setLocationLoading(true);
-      console.log('📍 [CREATE PRODUCT] Obteniendo ubicación del usuario...');
       
       // Solicitar permisos
       const { status } = await Location.requestForegroundPermissionsAsync();
@@ -113,17 +112,11 @@ const CreateProductScreen = () => {
       }
 
       // Obtener ubicación actual con alta precisión
-      console.log('📍 [CREATE PRODUCT] Solicitando ubicación con alta precisión...');
       const currentLocation = await Location.getCurrentPositionAsync({
         accuracy: Location.Accuracy.High,
       });
 
       const { latitude, longitude, accuracy } = currentLocation.coords;
-      console.log('✅ [CREATE PRODUCT] Ubicación obtenida:', { 
-        latitude, 
-        longitude, 
-        accuracy: accuracy ? `${accuracy}m` : 'desconocida',
-      });
 
       // Procesar la ubicación directamente sin validación
       await processLocation(latitude, longitude);
@@ -263,7 +256,6 @@ const CreateProductScreen = () => {
       // Actualizar solo si son diferentes a las por defecto o si hay más datos
       if (fetchedCategories && fetchedCategories.length > 0) {
         setCategories(fetchedCategories);
-        console.log('✅ [CREATE PRODUCT] Categorías actualizadas en estado');
       }
     } catch (error) {
       console.error('❌ [CREATE PRODUCT] Error cargando categorías:', error);
@@ -276,7 +268,6 @@ const CreateProductScreen = () => {
       const response = await vendorService.getCategories();
       const vendorCats = response?.data || response || [];
       setVendorCategories(Array.isArray(vendorCats) ? vendorCats : []);
-      console.log('✅ [CREATE PRODUCT] Categorías del vendedor cargadas:', vendorCats.length);
     } catch (error) {
       console.error('❌ [CREATE PRODUCT] Error cargando categorías del vendedor:', error);
       setVendorCategories([]);
@@ -328,7 +319,6 @@ const CreateProductScreen = () => {
     }
 
     try {
-      console.log('📸 [CREATE PRODUCT] Solicitando permisos de galería...');
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       
       if (status !== 'granted') {
@@ -341,7 +331,6 @@ const CreateProductScreen = () => {
         return;
       }
 
-      console.log('✅ [CREATE PRODUCT] Permisos de galería concedidos');
       
       // Verificar que hay token de autenticación antes de intentar subir
       const token = await AsyncStorage.getItem('authToken');
@@ -355,30 +344,21 @@ const CreateProductScreen = () => {
         return;
       }
       
-      console.log('📸 [CREATE PRODUCT] Abriendo galería... Platform:', Platform.OS);
 
       // En Android, allowsMultipleSelection puede causar problemas, mejor una imagen a la vez
-      const pickerOptions = {
-        mediaTypes: ['images'],
+      const pickerOptions: ImagePicker.ImagePickerOptions = {
+        mediaTypes: ['images'] as any,
         allowsEditing: false,
         quality: 0.8,
         allowsMultipleSelection: Platform.OS === 'ios',
         selectionLimit: Platform.OS === 'ios' ? (5 - photos.length) : 1,
       };
       
-      console.log('📸 [CREATE PRODUCT] Opciones del picker:', pickerOptions);
       
       const result = await ImagePicker.launchImageLibraryAsync(pickerOptions);
 
-      console.log('📸 [CREATE PRODUCT] Resultado del picker:', {
-        canceled: result.canceled,
-        assetsCount: result.assets?.length || 0,
-        hasAssets: !!result.assets,
-        firstAssetUri: result.assets?.[0]?.uri,
-      });
 
       if (result.canceled) {
-        console.log('ℹ️ [CREATE PRODUCT] Usuario canceló la selección de imagen');
         return;
       }
 
@@ -390,7 +370,6 @@ const CreateProductScreen = () => {
 
       setUploadingImages(true);
       
-      console.log(`🔄 [CREATE PRODUCT] Subiendo ${result.assets.length} imagen(es)...`);
       
       // Subir imágenes una por una para mejor control de errores
       const uploadedUrls: string[] = [];
@@ -399,13 +378,6 @@ const CreateProductScreen = () => {
       for (let i = 0; i < result.assets.length; i++) {
         const asset = result.assets[i];
         try {
-          console.log(`📤 [CREATE PRODUCT] Subiendo imagen ${i + 1}/${result.assets.length}:`, {
-            uri: asset.uri,
-            width: asset.width,
-            height: asset.height,
-            fileSize: asset.fileSize,
-            type: asset.type,
-          });
           
           if (!asset.uri) {
             throw new Error('URI de la imagen no válida');
@@ -418,7 +390,6 @@ const CreateProductScreen = () => {
           }
           
           uploadedUrls.push(uploadedUrl);
-          console.log(`✅ [CREATE PRODUCT] Imagen ${i + 1} subida exitosamente:`, uploadedUrl);
         } catch (uploadError: any) {
           hasError = true;
           console.error(`❌ [CREATE PRODUCT] Error subiendo imagen ${i + 1}:`, {
@@ -456,7 +427,6 @@ const CreateProductScreen = () => {
 
       if (uploadedUrls.length > 0) {
         setPhotos([...photos, ...uploadedUrls]);
-        console.log(`✅ [CREATE PRODUCT] ${uploadedUrls.length} imagen(es) agregada(s) exitosamente`);
       } else if (!hasError) {
         Alert.alert('Error', 'No se pudieron subir las imágenes. Por favor, intenta de nuevo.');
       }
@@ -634,10 +604,6 @@ const CreateProductScreen = () => {
         productData.tradeFor = tradeFor.trim();
       }
 
-      console.log('📤 [CREATE PRODUCT] Enviando datos:', {
-        ...productData,
-        photos: productData.photos.length + ' fotos',
-      });
 
       if (isEditing) {
         await marketplaceService.updateProduct(productId, productData);
@@ -664,7 +630,6 @@ const CreateProductScreen = () => {
           city: productData.location?.city || null,
           country: productData.location?.country || null,
         });
-        console.log('✅ [CREATE PRODUCT] Producto creado:', result);
         Alert.alert('Éxito', 'Producto publicado correctamente');
       }
 
@@ -1864,4 +1829,3 @@ const styles = StyleSheet.create({
 });
 
 export default CreateProductScreen;
-

@@ -175,10 +175,8 @@ const consultationsService = {
   
   // Listar síntomas activos (App)
   getSymptoms: async (category?: string) => {
-    console.log('🩺 [CONSULTATIONS] Obteniendo síntomas...', { category });
     const params = category ? { category } : {};
     const response = await api.get('/api/symptoms', { params });
-    console.log('✅ [CONSULTATIONS] Síntomas obtenidos:', response.data);
     return response.data;
   },
 
@@ -186,21 +184,17 @@ const consultationsService = {
   
   // Listar especialistas disponibles (App)
   getSpecialists: async (specialty?: string, available?: boolean) => {
-    console.log('👨‍⚕️ [CONSULTATIONS] Obteniendo especialistas...', { specialty, available });
     const params: any = {};
     if (specialty) params.specialty = specialty;
     if (available !== undefined) params.available = available;
     
     const response = await api.get('/api/specialists', { params });
-    console.log('✅ [CONSULTATIONS] Especialistas obtenidos:', response.data);
     return response.data;
   },
 
   // Obtener especialista por ID (App)
   getSpecialist: async (specialistId: string) => {
-    console.log('👨‍⚕️ [CONSULTATIONS] Obteniendo especialista:', specialistId);
     const response = await api.get(`/api/specialists/${specialistId}`);
-    console.log('✅ [CONSULTATIONS] Especialista obtenido:', response.data);
     return response.data;
   },
 
@@ -208,25 +202,21 @@ const consultationsService = {
   
   // Verificar cupón (App)
   verifyCoupon: async (code: string, type?: 'chat' | 'video', specialistId?: string) => {
-    console.log('🎁 [CONSULTATIONS] Verificando cupón:', { code, type, specialistId });
     const params: any = {};
     if (type) params.type = type;
     if (specialistId) params.specialistId = specialistId;
     
     const response = await api.get(`/api/coupons/verify/${code}`, { params });
-    console.log('✅ [CONSULTATIONS] Cupón verificado:', response.data);
     return response.data;
   },
 
   // Calcular precio con descuento (App)
   calculatePrice: async (type: 'chat' | 'video', specialistId?: string, couponCode?: string) => {
-    console.log('💰 [CONSULTATIONS] Calculando precio...', { type, specialistId, couponCode });
     const response = await api.post('/api/consultations/calculate-price', {
       type,
       specialistId,
       couponCode,
     });
-    console.log('✅ [CONSULTATIONS] Precio calculado:', response.data);
     return response.data;
   },
 
@@ -242,24 +232,20 @@ const consultationsService = {
     preferredSpecialistId?: string;
     couponCode?: string;
   }) => {
-    console.log('📝 [CONSULTATIONS] Creando consulta para hijo:', childId, data);
     
     // Intentar primero con el endpoint estándar
     try {
       const response = await api.post(`/api/children/${childId}/consultations`, data);
-      console.log('✅ [CONSULTATIONS] Consulta creada:', response.data);
       return response.data;
     } catch (error: any) {
       console.error('⚠️ [CONSULTATIONS] Error con endpoint estándar, intentando alternativo...', error.response?.status);
       
       // Si falla con 404, intentar con childId en el body
       if (error.response?.status === 404) {
-        console.log('🔄 [CONSULTATIONS] Intentando endpoint alternativo con childId en body...');
         const response = await api.post('/api/consultations', {
           childId,
           ...data,
         });
-        console.log('✅ [CONSULTATIONS] Consulta creada con endpoint alternativo:', response.data);
         return response.data;
       }
       
@@ -280,36 +266,27 @@ const consultationsService = {
     const fullUrl = Object.keys(params).length > 0
       ? `${baseURL}${path}?${new URLSearchParams(params as Record<string, string>).toString()}`
       : `${baseURL}${path}`;
-    console.log('📋 [CONSULTATIONS] Obteniendo consultas...', filters);
-    console.log('📋 [CONSULTATIONS] URL:', fullUrl);
     const response = await api.get(path, { params: filters });
-    console.log('✅ [CONSULTATIONS] Consultas obtenidas:', response.data);
     return response.data;
   },
 
   // Obtener detalles de consulta (App)
   getConsultation: async (consultationId: string) => {
-    console.log('📋 [CONSULTATIONS] Obteniendo consulta:', consultationId);
     const response = await api.get(`/api/consultations/${consultationId}`);
-    console.log('✅ [CONSULTATIONS] Consulta obtenida:', response.data);
     return response.data;
   },
 
   // Cancelar consulta (App)
   cancelConsultation: async (consultationId: string, reason?: string) => {
-    console.log('❌ [CONSULTATIONS] Cancelando consulta:', consultationId);
     const response = await api.delete(`/api/consultations/${consultationId}`, {
       data: { reason },
     });
-    console.log('✅ [CONSULTATIONS] Consulta cancelada:', response.data);
     return response.data;
   },
 
   // Crear PaymentIntent para Stripe (consultas)
   createPaymentIntent: async (consultationId: string) => {
-    console.log('💳 [CONSULTATIONS] Creando PaymentIntent:', consultationId);
     const response = await api.post(`/api/consultations/${consultationId}/payment/create-intent`);
-    console.log('✅ [CONSULTATIONS] PaymentIntent creado:', response.data);
     return response.data;
   },
 
@@ -318,9 +295,7 @@ const consultationsService = {
     paymentMethod: 'stripe' | 'payphone' | 'transfer';
     paymentToken?: string;
   }) => {
-    console.log('💳 [CONSULTATIONS] Procesando pago para consulta:', consultationId);
     const response = await api.post(`/api/consultations/${consultationId}/payment`, paymentData);
-    console.log('✅ [CONSULTATIONS] Pago procesado:', response.data);
     return response.data;
   },
 
@@ -328,30 +303,25 @@ const consultationsService = {
   
   // Enviar mensaje (App)
   sendMessage: async (consultationId: string, message: string, attachments?: string[]) => {
-    console.log('💬 [CONSULTATIONS] Enviando mensaje...', { consultationId, message: message.substring(0, 50) });
     const response = await api.post(`/api/consultations/${consultationId}/messages`, {
       message,
       attachments,
     });
-    console.log('✅ [CONSULTATIONS] Mensaje enviado:', response.data);
     return response.data;
   },
 
   // Obtener mensajes (App)
   getMessages: async (consultationId: string, limit?: number, before?: string) => {
-    console.log('💬 [CONSULTATIONS] Obteniendo mensajes...', { consultationId, limit, before });
     const params: any = {};
     if (limit) params.limit = limit;
     if (before) params.before = before;
     
     const response = await api.get(`/api/consultations/${consultationId}/messages`, { params });
-    console.log('✅ [CONSULTATIONS] Mensajes obtenidos:', response.data);
     return response.data;
   },
 
   // Marcar mensaje como leído (App)
   markMessageAsRead: async (consultationId: string, messageId: string) => {
-    console.log('✅ [CONSULTATIONS] Marcando mensaje como leído:', messageId);
     const response = await api.patch(`/api/consultations/${consultationId}/messages/${messageId}/read`);
     return response.data;
   },
@@ -361,9 +331,7 @@ const consultationsService = {
 
   // Unirse a videollamada (Padre y médico - mismo endpoint)
   joinVideo: async (consultationId: string) => {
-    console.log('📹 [CONSULTATIONS] Uniendo a videollamada:', consultationId);
     const response = await api.post(`/api/consultations/${consultationId}/video/join`);
-    console.log('✅ [CONSULTATIONS] Unido a videollamada:', response.data);
     return response.data;
   },
 
@@ -374,9 +342,7 @@ const consultationsService = {
 
   // Finalizar videollamada (Padre y médico - mismo endpoint)
   endVideo: async (consultationId: string, duration: number) => {
-    console.log('🔚 [CONSULTATIONS] Finalizando videollamada:', consultationId, 'Duración:', duration);
     const response = await api.post(`/api/consultations/${consultationId}/video/end`, { duration });
-    console.log('✅ [CONSULTATIONS] Videollamada finalizada:', response.data);
     return response.data;
   },
 
@@ -387,9 +353,7 @@ const consultationsService = {
     score: number;
     comment?: string;
   }) => {
-    console.log('⭐ [CONSULTATIONS] Calificando consulta:', consultationId, rating);
     const response = await api.post(`/api/consultations/${consultationId}/rating`, rating);
-    console.log('✅ [CONSULTATIONS] Consulta calificada:', response.data);
     return response.data;
   },
 };
