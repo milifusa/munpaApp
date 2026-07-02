@@ -9,13 +9,13 @@ import {
   Image,
   RefreshControl,
   ActivityIndicator,
+  TextInput,
   Linking,
   Alert,
   Platform,
   StatusBar,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import api from '../services/api';
 import { useLocation } from '../hooks/useLocation';
@@ -99,6 +99,7 @@ const CategoryRecommendationsScreen = ({ route, navigation }: any) => {
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [sortBy, setSortBy] = useState<'distance' | 'rating' | 'name'>('distance');
+  const [searchQuery, setSearchQuery] = useState('');
   const [hasRecalculatedWithLocation, setHasRecalculatedWithLocation] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
@@ -257,6 +258,52 @@ const CategoryRecommendationsScreen = ({ route, navigation }: any) => {
       loadRecommendations(nextPage, false);
     }
   };
+
+  const shouldShowDistance = (distance?: number) =>
+    typeof distance === 'number' && distance >= 0 && distance <= 200;
+
+  const getLocationLabel = (recommendation: Recommendation) => {
+    const city = recommendation.cityName || recommendation.city;
+    const country = recommendation.countryName || recommendation.country;
+
+    if (city && country) return `${city} · ${country}`;
+    if (city) return city;
+    if (country) return country;
+    return 'Ubicación por confirmar';
+  };
+
+  const getRecommendationLabel = (recommendation: Recommendation): string | null => {
+    const total = recommendation.stats?.totalReviews || 0;
+    const avg = recommendation.stats?.averageRating || 0;
+    const recommendationsCount = calculateRecommendations(total, avg);
+
+    if (recommendationsCount > 0) {
+      return `${recommendationsCount} ${recommendationsCount === 1 ? 'mamá lo recomienda' : 'mamás lo recomiendan'}`;
+    }
+
+    return total > 0 ? `${total} reseñas` : null;
+  };
+
+  const filteredRecommendations = recommendations.filter((recommendation) => {
+    const query = searchQuery.trim().toLowerCase();
+    if (!query) return true;
+
+    const searchable = [
+      recommendation.name,
+      recommendation.description,
+      recommendation.address,
+      recommendation.cityName,
+      recommendation.city,
+      recommendation.countryName,
+      recommendation.country,
+    ].filter(Boolean).join(' ').toLowerCase();
+
+    return searchable.includes(query);
+  });
+
+  const topRecommendations = filteredRecommendations
+    .filter((recommendation) => (recommendation.stats?.totalReviews || 0) > 0)
+    .slice(0, 2);
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -522,174 +569,261 @@ const CategoryRecommendationsScreen = ({ route, navigation }: any) => {
     ) : null;
   };
 
-  const renderRecommendationCard = ({ item: recommendation }: { item: Recommendation }) => (
-    <TouchableOpacity 
+  const renderRecommendationCard = ({ item: recommendation }: { item: Recommendation }) => {
+    const recommendationLabel = getRecommendationLabel(recommendation);
+
+    return (
+    <TouchableOpacity
       style={styles.card}
       onPress={() => handleRecommendationPress(recommendation)}
+      activeOpacity={0.84}
     >
-      {/* Imagen */}
-      {recommendation.imageUrl ? (
-        <Image 
-          source={{ uri: recommendation.imageUrl }} 
-          style={styles.cardImage}
-        />
-      ) : (
-        <View style={styles.cardImagePlaceholder}>
-          <Image 
-            source={require('../../assets/icon.png')} 
-            style={styles.defaultIcon}
-            resizeMode="contain"
+      <View style={styles.cardTopRow}>
+        {recommendation.imageUrl ? (
+          <Image
+            source={{ uri: recommendation.imageUrl }}
+            style={styles.providerAvatar}
           />
-        </View>
-      )}
-
-      {/* Botón de favorito */}
-      <TouchableOpacity 
-        style={styles.favoriteButton}
-        onPress={(e) => {
-          e.stopPropagation();
-          handleToggleFavorite(recommendation.id);
-        }}
-      >
-        <Ionicons 
-          name={recommendation.isFavorite ? "heart" : "heart-outline"} 
-          size={24} 
-          color={recommendation.isFavorite ? "#FF6B6B" : "#666"} 
-        />
-      </TouchableOpacity>
-
-      {/* Botón de wishlist */}
-      <TouchableOpacity 
-        style={styles.wishlistButton}
-        onPress={(e) => {
-          e.stopPropagation();
-          handleAddToWishlist(recommendation.id, recommendation.name);
-        }}
-      >
-        <Ionicons 
-          name={recommendation.isInWishlist ? "bookmark" : "bookmark-outline"} 
-          size={24} 
-          color={recommendation.isInWishlist ? "#FFB74D" : "#666"} 
-        />
-      </TouchableOpacity>
-
-      {/* Contenido */}
-      <View style={styles.cardContent}>
-        <Text style={styles.cardTitle} numberOfLines={2}>
-          {recommendation.name}
-        </Text>
-
-        {/* Badges de calidad */}
-        {renderBadges(recommendation)}
-        
-        {/* Rating y Reviews */}
-        <View style={styles.ratingContainer}>
-          <Ionicons name="people" size={16} color="#59C6C0" />
-          <Text style={styles.ratingText}>
-            {(() => {
-              const total = recommendation.stats?.totalReviews || 0;
-              const avg = recommendation.stats?.averageRating || 0;
-              const recommendations = calculateRecommendations(total, avg);
-              return recommendations > 0
-                ? `${recommendations} ${recommendations === 1 ? 'mamá lo recomienda' : 'mamás lo recomiendan'}`
-                : 'Sin recomendaciones';
-            })()}
-          </Text>
-        </View>
-
-        {/* Distancia y tiempo estimado */}
-        {recommendation.distance !== undefined && (
-          <View style={styles.distanceContainer}>
-            <View style={styles.distanceBadge}>
-              <Ionicons name="location" size={14} color="#59C6C0" />
-              <Text style={styles.distanceText}>
-                {recommendation.distance < 1 
-                  ? `${Math.round(recommendation.distance * 1000)}m` 
-                  : `${recommendation.distance}km`}
-              </Text>
-            </View>
-            {recommendation.estimatedTime && (
-              <View style={styles.timeBadge}>
-                <Ionicons name="time" size={14} color="#666" />
-                <Text style={styles.timeText}>{recommendation.estimatedTime}</Text>
-              </View>
-            )}
+        ) : (
+          <View style={styles.providerAvatarPlaceholder}>
+            <Image
+              source={require('../../assets/icon.png')}
+              style={styles.defaultIcon}
+              resizeMode="contain"
+            />
           </View>
         )}
-        
-        {recommendation.description && (
-          <Text style={styles.cardDescription} numberOfLines={3}>
-            {recommendation.description}
-          </Text>
+
+        <View style={styles.providerMainInfo}>
+          <View style={styles.cardTitleRow}>
+            <Text style={styles.cardTitle} numberOfLines={2}>
+              {recommendation.name}
+            </Text>
+            <View style={styles.cardIconActions}>
+              <TouchableOpacity
+                style={styles.cardIconButton}
+                onPress={(e) => {
+                  e.stopPropagation();
+                  handleAddToWishlist(recommendation.id, recommendation.name);
+                }}
+              >
+                <Ionicons
+                  name={recommendation.isInWishlist ? "bookmark" : "bookmark-outline"}
+                  size={19}
+                  color={recommendation.isInWishlist ? "#FFB74D" : "#6B7280"}
+                />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.cardIconButton}
+                onPress={(e) => {
+                  e.stopPropagation();
+                  handleToggleFavorite(recommendation.id);
+                }}
+              >
+                <Ionicons
+                  name={recommendation.isFavorite ? "heart" : "heart-outline"}
+                  size={19}
+                  color={recommendation.isFavorite ? "#FF6B6B" : "#6B7280"}
+                />
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {recommendation.description && (
+            <Text style={styles.providerSpecialty} numberOfLines={1}>
+              {recommendation.description}
+            </Text>
+          )}
+
+          <View style={styles.trustRow}>
+            {recommendation.verified && (
+              <View style={styles.verifiedCompactBadge}>
+                <Ionicons name="checkmark-circle" size={13} color="#4CAF50" />
+                <Text style={styles.verifiedCompactText}>Verificado</Text>
+              </View>
+            )}
+            {recommendation.stats?.averageRating ? (
+              <View style={styles.ratingPill}>
+                <Ionicons name="star" size={12} color="#FFB74D" />
+                <Text style={styles.ratingPillText}>
+                  {recommendation.stats.averageRating.toFixed(1)}
+                </Text>
+              </View>
+            ) : null}
+          </View>
+        </View>
+      </View>
+
+      <View style={styles.cardContent}>
+        {recommendationLabel && (
+          <View style={styles.metaRow}>
+            <Ionicons name="people-outline" size={15} color="#59C6C0" />
+            <Text style={styles.metaText} numberOfLines={1}>
+              {recommendationLabel}
+            </Text>
+          </View>
         )}
 
-        {/* Dirección */}
+        <View style={styles.metaRow}>
+          <Ionicons name="location-outline" size={15} color="#59C6C0" />
+          <Text style={styles.metaText} numberOfLines={1}>
+            {getLocationLabel(recommendation)}
+          </Text>
+        </View>
+
         {recommendation.address && (
-          <View style={styles.infoRow}>
-            <Ionicons name="location" size={16} color="#59C6C0" />
-            <Text style={styles.infoText} numberOfLines={2}>
+          <View style={styles.metaRow}>
+            <Ionicons name="navigate-outline" size={15} color="#59C6C0" />
+            <Text style={styles.metaText} numberOfLines={2}>
               {recommendation.address}
             </Text>
           </View>
         )}
 
-        {(recommendation.cityName || recommendation.city || recommendation.countryName || recommendation.country) && (
-          <View style={styles.infoRow}>
-            <Ionicons name="map-outline" size={16} color="#59C6C0" />
-            <Text style={styles.infoText} numberOfLines={1}>
-              {(recommendation.cityName || recommendation.city || 'Ciudad')} · {recommendation.countryName || recommendation.country || 'País'}
-            </Text>
+        {shouldShowDistance(recommendation.distance) && (
+          <View style={styles.distanceContainer}>
+            <View style={styles.distanceBadge}>
+              <Ionicons name="location" size={13} color="#59C6C0" />
+              <Text style={styles.distanceText}>
+                {recommendation.distance! < 1
+                  ? `${Math.round(recommendation.distance! * 1000)}m`
+                  : `${recommendation.distance!.toFixed(1)}km`}
+              </Text>
+            </View>
+            {recommendation.estimatedTime && (
+              <View style={styles.timeBadge}>
+                <Ionicons name="time" size={13} color="#6B7280" />
+                <Text style={styles.timeText}>{recommendation.estimatedTime}</Text>
+              </View>
+            )}
           </View>
         )}
 
-        {/* Teléfono */}
-        {recommendation.phone && (
-          <View style={styles.infoRow}>
-            <Ionicons name="call" size={16} color="#59C6C0" />
-            <Text style={styles.infoText}>{recommendation.phone}</Text>
-          </View>
-        )}
-
-        {/* Botones de acción rápida */}
-        <View style={styles.quickActions}>
+        <View style={styles.cardActions}>
           {recommendation.phone && (
-            <TouchableOpacity 
-              style={styles.quickActionButton}
-              onPress={() => handleCall(recommendation.phone!, recommendation.id)}
+            <TouchableOpacity
+              style={styles.actionButton}
+              onPress={(e) => {
+                e.stopPropagation();
+                handleCall(recommendation.phone!, recommendation.id);
+              }}
             >
-              <Ionicons name="call" size={18} color="white" />
+              <Ionicons name="call" size={16} color="#178A84" />
+              <Text style={styles.actionButtonText}>Llamar</Text>
             </TouchableOpacity>
           )}
 
           {recommendation.whatsapp && (
-            <TouchableOpacity 
-              style={[styles.quickActionButton, { backgroundColor: '#25D366' }]}
-              onPress={() => handleWhatsApp(recommendation.whatsapp!, recommendation.id)}
+            <TouchableOpacity
+              style={styles.actionButton}
+              onPress={(e) => {
+                e.stopPropagation();
+                handleWhatsApp(recommendation.whatsapp!, recommendation.id);
+              }}
             >
-              <Ionicons name="logo-whatsapp" size={18} color="white" />
+              <Ionicons name="logo-whatsapp" size={16} color="#178A84" />
+              <Text style={styles.actionButtonText}>WhatsApp</Text>
             </TouchableOpacity>
           )}
 
           {recommendation.latitude && recommendation.longitude && (
-            <TouchableOpacity 
-              style={[styles.quickActionButton, { backgroundColor: '#4285F4' }]}
-              onPress={() => handleOpenMap(recommendation.latitude!, recommendation.longitude!, recommendation.name, recommendation.id)}
+            <TouchableOpacity
+              style={styles.actionButton}
+              onPress={(e) => {
+                e.stopPropagation();
+                handleOpenMap(recommendation.latitude!, recommendation.longitude!, recommendation.name, recommendation.id);
+              }}
             >
-              <Ionicons name="navigate" size={18} color="white" />
-            </TouchableOpacity>
-          )}
-
-          {recommendation.website && (
-            <TouchableOpacity 
-              style={[styles.quickActionButton, { backgroundColor: '#96d2d3' }]}
-              onPress={() => handleOpenLink(recommendation.website!, recommendation.id)}
-            >
-              <Ionicons name="globe" size={18} color="white" />
+              <Ionicons name="navigate" size={16} color="#178A84" />
+              <Text style={styles.actionButtonText}>Mapa</Text>
             </TouchableOpacity>
           )}
         </View>
       </View>
     </TouchableOpacity>
+    );
+  };
+
+  const renderListHeader = () => (
+    <View style={styles.listHeader}>
+      <View style={styles.searchContainer}>
+        <Ionicons name="search" size={19} color="#9CA3AF" />
+        <TextInput
+          style={styles.searchInput}
+          placeholder={`Buscar en ${categoryName}`}
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          placeholderTextColor="#9CA3AF"
+          autoCorrect={false}
+          autoCapitalize="none"
+        />
+        {searchQuery.length > 0 && (
+          <TouchableOpacity onPress={() => setSearchQuery('')}>
+            <Ionicons name="close-circle" size={19} color="#9CA3AF" />
+          </TouchableOpacity>
+        )}
+      </View>
+
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.sortChips}
+      >
+        {[
+          { id: 'distance', label: 'Cerca', icon: 'location-outline' },
+          { id: 'rating', label: 'Mejor valorados', icon: 'star-outline' },
+          { id: 'name', label: 'A-Z', icon: 'text-outline' },
+        ].map((option) => {
+          const isActive = sortBy === option.id;
+
+          return (
+            <TouchableOpacity
+              key={option.id}
+              style={[styles.sortChip, isActive && styles.sortChipActive]}
+              onPress={() => setSortBy(option.id as typeof sortBy)}
+              activeOpacity={0.84}
+            >
+              <Ionicons
+                name={option.icon as any}
+                size={14}
+                color={isActive ? '#FFFFFF' : '#526170'}
+              />
+              <Text style={[styles.sortChipText, isActive && styles.sortChipTextActive]}>
+                {option.label}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </ScrollView>
+
+      {!searchQuery.trim() && topRecommendations.length > 0 && (
+        <View style={styles.topSection}>
+          <Text style={styles.topSectionTitle}>Más recomendados</Text>
+          <View style={styles.topCards}>
+            {topRecommendations.map((recommendation) => (
+              <TouchableOpacity
+                key={recommendation.id}
+                style={styles.topCard}
+                onPress={() => handleRecommendationPress(recommendation)}
+                activeOpacity={0.84}
+              >
+                <View style={styles.topCardIcon}>
+                  <Ionicons name="star" size={14} color="#FFB74D" />
+                </View>
+                <View style={styles.topCardText}>
+                  <Text style={styles.topCardTitle} numberOfLines={1}>
+                    {recommendation.name}
+                  </Text>
+                  <Text style={styles.topCardSubtitle} numberOfLines={1}>
+                    {getRecommendationLabel(recommendation)}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+      )}
+    </View>
   );
 
   return (
@@ -697,81 +831,28 @@ const CategoryRecommendationsScreen = ({ route, navigation }: any) => {
       <StatusBar barStyle="light-content" backgroundColor="#96d2d3" />
       <View style={styles.content}>
         {/* Header */}
-        <LinearGradient
-          colors={['#59C6C0', '#4DB8B3']}
-          style={styles.header}
-        >
-        <TouchableOpacity 
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-        >
-          <Ionicons name="arrow-back" size={24} color="white" />
-        </TouchableOpacity>
-        <View style={styles.headerTitleContainer}>
-          <Text style={styles.headerTitle}>{categoryName}</Text>
-          <Text style={styles.headerSubtitle}>
-            {!isLoading && `${recommendations.length} recomendaciones`}
-          </Text>
-        </View>
-        <TouchableOpacity
-          style={styles.headerAddButton}
-          onPress={() => {
-            navigation.navigate('AddRecommendation', { categoryId });
-          }}
-        >
-          <Ionicons name="add" size={24} color="white" />
-        </TouchableOpacity>
-      </LinearGradient>
-
-      {/* Filtros de ordenamiento */}
-      {!isLoading && recommendations.length > 0 && (
-        <View style={styles.filtersContainer}>
-          <Text style={styles.filterLabel}>Ordenar por:</Text>
-          <View style={styles.filterButtons}>
-            <TouchableOpacity
-              style={[styles.filterButton, sortBy === 'distance' && styles.filterButtonActive]}
-              onPress={() => setSortBy('distance')}
-            >
-              <Ionicons 
-                name="location" 
-                size={16} 
-                color={sortBy === 'distance' ? '#FFF' : '#59C6C0'} 
-              />
-              <Text style={[styles.filterButtonText, sortBy === 'distance' && styles.filterButtonTextActive]}>
-                Cerca de ti
-              </Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity
-              style={[styles.filterButton, sortBy === 'rating' && styles.filterButtonActive]}
-              onPress={() => setSortBy('rating')}
-            >
-              <Ionicons 
-                name="star" 
-                size={16} 
-                color={sortBy === 'rating' ? '#FFF' : '#59C6C0'} 
-              />
-              <Text style={[styles.filterButtonText, sortBy === 'rating' && styles.filterButtonTextActive]}>
-                Mejor valorados
-              </Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity
-              style={[styles.filterButton, sortBy === 'name' && styles.filterButtonActive]}
-              onPress={() => setSortBy('name')}
-            >
-              <Ionicons 
-                name="text" 
-                size={16} 
-                color={sortBy === 'name' ? '#FFF' : '#59C6C0'} 
-              />
-              <Text style={[styles.filterButtonText, sortBy === 'name' && styles.filterButtonTextActive]}>
-                Nombre A-Z
-              </Text>
-            </TouchableOpacity>
+        <View style={styles.header}>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => navigation.goBack()}
+          >
+            <Ionicons name="arrow-back" size={24} color="white" />
+          </TouchableOpacity>
+          <View style={styles.headerTitleContainer}>
+            <Text style={styles.headerTitle}>{categoryName}</Text>
+            <Text style={styles.headerSubtitle}>
+              {!isLoading && `${filteredRecommendations.length} recomendaciones`}
+            </Text>
           </View>
+          <TouchableOpacity
+            style={styles.headerAddButton}
+            onPress={() => {
+              navigation.navigate('AddRecommendation', { categoryId });
+            }}
+          >
+            <Ionicons name="add" size={22} color="white" />
+          </TouchableOpacity>
         </View>
-      )}
 
       {isLoading && recommendations.length === 0 ? (
         <View style={styles.loadingContainer}>
@@ -789,12 +870,16 @@ const CategoryRecommendationsScreen = ({ route, navigation }: any) => {
         </View>
       ) : (
         <FlatList
-          data={recommendations}
+          data={filteredRecommendations}
           renderItem={renderRecommendationCard}
           keyExtractor={(item) => item.id}
           style={styles.scrollView}
           contentContainerStyle={styles.cardsContainer}
+          ListHeaderComponent={recommendations.length > 0 ? renderListHeader() : null}
           showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="none"
+          removeClippedSubviews={false}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
           }
@@ -804,10 +889,12 @@ const CategoryRecommendationsScreen = ({ route, navigation }: any) => {
             <View style={styles.emptyContainer}>
               <Ionicons name="search-outline" size={64} color="#CCC" />
               <Text style={styles.emptyText}>
-                No hay recomendaciones disponibles
+                {searchQuery.trim() ? 'No encontramos resultados' : 'No hay recomendaciones disponibles'}
               </Text>
               <Text style={styles.emptySubtext}>
-                Aún no hay lugares registrados en esta categoría
+                {searchQuery.trim()
+                  ? 'Prueba con otro nombre, especialidad o ciudad'
+                  : 'Aún no hay lugares registrados en esta categoría'}
               </Text>
             </View>
           }
@@ -833,57 +920,165 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    backgroundColor: '#F7FAFC',
+    backgroundColor: '#F5F7FA',
   },
   scrollView: {
     flex: 1,
+  },
+  listHeader: {
+    marginBottom: 12,
+  },
+  searchContainer: {
+    minHeight: 48,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 9,
+    paddingHorizontal: 13,
+    borderRadius: 18,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E9EEF2',
+    marginBottom: 10,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 14,
+    color: '#2D3748',
+    fontFamily: 'Montserrat',
+  },
+  sortChips: {
+    gap: 8,
+    paddingRight: 8,
+    marginBottom: 12,
+  },
+  sortChip: {
+    minHeight: 34,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 11,
+    borderRadius: 17,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E9EEF2',
+  },
+  sortChipActive: {
+    backgroundColor: '#59C6C0',
+    borderColor: '#59C6C0',
+  },
+  sortChipText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#526170',
+    fontFamily: 'Montserrat',
+  },
+  sortChipTextActive: {
+    color: '#FFFFFF',
+  },
+  topSection: {
+    marginTop: 2,
+  },
+  topSectionTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#2D3748',
+    marginBottom: 8,
+    fontFamily: 'Montserrat',
+  },
+  topCards: {
+    gap: 8,
+  },
+  topCard: {
+    minHeight: 54,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 9,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: 14,
+    backgroundColor: '#FFFCF5',
+    borderWidth: 1,
+    borderColor: '#FFE7B8',
+  },
+  topCardIcon: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFF7E6',
+  },
+  topCardText: {
+    flex: 1,
+    minWidth: 0,
+  },
+  topCardTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#2D3748',
+    fontFamily: 'Montserrat',
+  },
+  topCardSubtitle: {
+    fontSize: 11,
+    color: '#6B7280',
+    marginTop: 2,
+    fontFamily: 'Montserrat',
   },
 
   // Header
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingTop: 10,
-    paddingBottom: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 255, 255, 0.3)',
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 12,
+    backgroundColor: '#59C6C0',
   },
   backButton: {
-    marginRight: 15,
-    padding: 5,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 8,
   },
   headerTitleContainer: {
     flex: 1,
   },
   headerAddButton: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   headerTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
+    fontSize: 21,
+    fontWeight: '800',
     color: 'white',
+    fontFamily: 'Montserrat',
   },
   headerSubtitle: {
-    fontSize: 14,
+    fontSize: 13,
     color: 'rgba(255, 255, 255, 0.9)',
     marginTop: 2,
+    fontFamily: 'Montserrat',
   },
 
   // Cards
   cardsContainer: {
-    padding: 20,
-    paddingBottom: 30,
+    paddingHorizontal: 16,
+    paddingTop: 14,
+    paddingBottom: 130,
   },
   card: {
-    backgroundColor: '#F7FAFC',
+    backgroundColor: '#FFFFFF',
     borderRadius: 16,
-    marginBottom: 20, // Espacio entre tarjetas
+    marginBottom: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#E9EEF2',
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
@@ -892,73 +1087,111 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
-    overflow: 'hidden',
   },
-  cardImage: {
-    width: '100%',
-    height: 180,
-    backgroundColor: '#F0F0F0',
+  cardTopRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 11,
   },
-  cardImagePlaceholder: {
-    width: '100%',
-    height: 180,
-    backgroundColor: '#F0F0F0',
+  providerAvatar: {
+    width: 68,
+    height: 68,
+    borderRadius: 20,
+    backgroundColor: '#F0FDFC',
+  },
+  providerAvatarPlaceholder: {
+    width: 68,
+    height: 68,
+    borderRadius: 20,
+    backgroundColor: '#F0FDFC',
     justifyContent: 'center',
     alignItems: 'center',
   },
   defaultIcon: {
-    width: 80,
-    height: 80,
+    width: 42,
+    height: 42,
     opacity: 0.6,
   },
-  favoriteButton: {
-    position: 'absolute',
-    top: 10,
-    right: 10,
-    backgroundColor: 'white',
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.2,
-    shadowRadius: 3,
-    elevation: 4,
-    zIndex: 1,
+  providerMainInfo: {
+    flex: 1,
+    minWidth: 0,
   },
-  wishlistButton: {
-    position: 'absolute',
-    top: 10,
-    right: 60, // Espacio para el botón de favorito
-    backgroundColor: 'white',
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: 'center',
+  cardTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+  },
+  cardIconActions: {
+    flexDirection: 'row',
+    gap: 6,
+  },
+  cardIconButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.2,
-    shadowRadius: 3,
-    elevation: 4,
-    zIndex: 1,
+    justifyContent: 'center',
+    backgroundColor: '#F5F7FA',
+    borderWidth: 1,
+    borderColor: '#E9EEF2',
   },
   cardContent: {
-    padding: 15,
+    marginTop: 10,
+    gap: 5,
   },
   cardTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 8,
+    flex: 1,
+    fontSize: 17,
+    lineHeight: 21,
+    fontWeight: '800',
+    color: '#2D3748',
+    fontFamily: 'Montserrat',
+  },
+  providerSpecialty: {
+    fontSize: 13,
+    lineHeight: 17,
+    color: '#526170',
+    marginTop: 3,
+    fontFamily: 'Montserrat',
+  },
+  trustRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 7,
+    marginTop: 8,
+  },
+  verifiedCompactBadge: {
+    minHeight: 24,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    borderRadius: 12,
+    backgroundColor: '#F0FBF1',
+    borderWidth: 1,
+    borderColor: '#BFE8C3',
+  },
+  verifiedCompactText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#4CAF50',
+    fontFamily: 'Montserrat',
+  },
+  ratingPill: {
+    minHeight: 24,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    borderRadius: 12,
+    backgroundColor: '#FFF7E6',
+  },
+  ratingPillText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#8A5A00',
+    fontFamily: 'Montserrat',
   },
   ratingContainer: {
     flexDirection: 'row',
@@ -992,21 +1225,46 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
   },
-  quickActions: {
+  metaRow: {
     flexDirection: 'row',
-    gap: 10,
-    marginTop: 12,
+    alignItems: 'flex-start',
+    gap: 7,
+    minHeight: 20,
+  },
+  metaText: {
+    flex: 1,
+    fontSize: 12,
+    lineHeight: 17,
+    color: '#526170',
+    fontWeight: '600',
+    fontFamily: 'Montserrat',
+  },
+  cardActions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 10,
     paddingTop: 12,
     borderTopWidth: 1,
-    borderTopColor: '#F0F0F0',
+    borderTopColor: '#E9EEF2',
   },
-  quickActionButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#96d2d3',
-    justifyContent: 'center',
+  actionButton: {
+    minHeight: 34,
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
+    paddingHorizontal: 10,
+    borderRadius: 17,
+    backgroundColor: '#F1FBFA',
+    borderWidth: 1,
+    borderColor: '#D8F1EF',
+  },
+  actionButtonText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#178A84',
+    fontFamily: 'Montserrat',
   },
 
   // Estados
@@ -1127,9 +1385,8 @@ const styles = StyleSheet.create({
   distanceContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 8,
-    marginBottom: 4,
-    gap: 10,
+    marginTop: 5,
+    gap: 8,
   },
   distanceBadge: {
     flexDirection: 'row',
@@ -1199,4 +1456,3 @@ const styles = StyleSheet.create({
 });
 
 export default CategoryRecommendationsScreen;
-

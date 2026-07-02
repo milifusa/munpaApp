@@ -14,6 +14,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '../contexts/AuthContext';
 import MunpaLogo from '../components/MunpaLogo';
 import { profileService } from '../services/api';
+import analyticsService from '../services/analyticsService';
 import {
   colors,
   typography,
@@ -27,7 +28,7 @@ interface SignupScreenProps {
 }
 
 const SignupScreen: React.FC<SignupScreenProps> = ({ navigation }) => {
-  const { user, signup } = useAuth();
+  const { signup, setUser } = useAuth();
   const [isProfileCompletionMode, setIsProfileCompletionMode] = useState(false);
   const [displayName, setDisplayName] = useState('');
   const [email, setEmail] = useState('');
@@ -45,13 +46,21 @@ const SignupScreen: React.FC<SignupScreenProps> = ({ navigation }) => {
     const checkProfileCompletionMode = async () => {
       const needsCompletion = await AsyncStorage.getItem('needsProfileCompletion');
       const userData = await AsyncStorage.getItem('userData');
+      let screenMode: 'signup' | 'profile_completion' = 'signup';
       
       if (needsCompletion === 'true' && userData) {
+        screenMode = 'profile_completion';
         setIsProfileCompletionMode(true);
         const parsedUser = JSON.parse(userData);
         setDisplayName(parsedUser.name || parsedUser.displayName || '');
         setEmail(parsedUser.email || '');
       }
+
+      analyticsService.logScreenView(screenMode === 'profile_completion' ? 'ProfileCompletion' : 'Signup');
+      analyticsService.logEvent('signup_screen_viewed', {
+        mode: screenMode,
+        method: 'email',
+      });
     };
     checkProfileCompletionMode();
   }, []);
@@ -74,10 +83,32 @@ const SignupScreen: React.FC<SignupScreenProps> = ({ navigation }) => {
     return { strength: 3, color: '#B4C14B', text: 'Fuerte' };
   };
 
+  const getSignupAnalyticsParams = () => ({
+    mode: isProfileCompletionMode ? 'profile_completion' : 'signup',
+    method: 'email',
+    has_display_name: !!displayName.trim(),
+    has_email: !!email.trim(),
+    has_gender: !!gender,
+    children_count: childrenCount,
+    is_pregnant: pregnancyStatus === 'pregnant',
+    is_multiple_pregnancy: pregnancyStatus === 'pregnant' && isMultiplePregnancy,
+    has_gestation_weeks: !!gestationWeeks,
+  });
+
+  const logSignupValidationError = (field: string, reason: string) => {
+    analyticsService.logEvent('signup_validation_error', {
+      ...getSignupAnalyticsParams(),
+      field,
+      reason,
+    });
+  };
+
   const handleSignup = async () => {
+    analyticsService.logEvent('signup_submit_pressed', getSignupAnalyticsParams());
     
     // Validación del nombre (siempre requerido)
     if (!displayName.trim()) {
+      logSignupValidationError('display_name', 'missing');
       Alert.alert('Error', 'Por favor ingresa tu nombre completo');
       return;
     }
@@ -85,21 +116,25 @@ const SignupScreen: React.FC<SignupScreenProps> = ({ navigation }) => {
     // Validaciones de email y contraseña solo si NO estamos en modo completar perfil
     if (!isProfileCompletionMode) {
       if (!email.trim()) {
+        logSignupValidationError('email', 'missing');
         Alert.alert('Error', 'Por favor ingresa tu correo electrónico');
         return;
       }
 
       if (!password.trim()) {
+        logSignupValidationError('password', 'missing');
         Alert.alert('Error', 'Por favor ingresa una contraseña');
         return;
       }
 
       if (!validateEmail(email)) {
+        logSignupValidationError('email', 'invalid_format');
         Alert.alert('Error', 'Por favor ingresa un email válido');
         return;
       }
 
       if (!validatePassword(password)) {
+        logSignupValidationError('password', 'weak_password');
         Alert.alert(
           'Error',
           'La contraseña debe tener al menos 6 caracteres, una mayúscula, una minúscula y un número'
@@ -109,12 +144,17 @@ const SignupScreen: React.FC<SignupScreenProps> = ({ navigation }) => {
     }
 
     if (!gender) {
+      logSignupValidationError('gender', 'missing');
       Alert.alert('Error', 'Por favor selecciona si eres papá o mamá');
       return;
     }
 
     // Si no tiene hijos, debe especificar estado de embarazo/espera
     if (childrenCount === 0 && pregnancyStatus === 'none') {
+      analyticsService.logEvent('signup_family_status_blocked', {
+        ...getSignupAnalyticsParams(),
+        reason: 'no_children_or_pregnancy',
+      });
       const genderText = gender === 'F' ? 'embarazada' : 'esperando bebé(s)';
       Alert.alert(
         'App para familias',
@@ -134,6 +174,10 @@ const SignupScreen: React.FC<SignupScreenProps> = ({ navigation }) => {
 
     // Si no tiene hijos y no está esperando bebé(s), mostrar mensaje informativo
     if (childrenCount === 0 && pregnancyStatus === 'none') {
+      analyticsService.logEvent('signup_family_status_blocked', {
+        ...getSignupAnalyticsParams(),
+        reason: 'no_children_or_pregnancy',
+      });
       const genderText = gender === 'F' ? 'embarazada' : 'esperando bebé(s)';
       Alert.alert(
         'App para familias',
@@ -154,11 +198,13 @@ const SignupScreen: React.FC<SignupScreenProps> = ({ navigation }) => {
     if (pregnancyStatus === 'pregnant') {
       const weeks = parseInt(gestationWeeks, 10);
       if (!weeks || weeks < 1 || weeks > 42) {
+        logSignupValidationError('gestation_weeks', 'out_of_range');
         Alert.alert('Error', 'Las semanas de gestación deben estar entre 1 y 42');
         return;
       }
     }
 
+    analyticsService.logEvent('signup_started', getSignupAnalyticsParams());
     setIsLoading(true);
     try {
       if (isProfileCompletionMode) {
@@ -174,6 +220,7 @@ const SignupScreen: React.FC<SignupScreenProps> = ({ navigation }) => {
         
         // Limpiar flag de completar perfil
         await AsyncStorage.removeItem('needsProfileCompletion');
+        analyticsService.logEvent('profile_completion_completed', getSignupAnalyticsParams());
       } else {
         // Modo registro normal
         const totalChildrenForSignup = childrenCount + (pregnancyStatus === 'pregnant' ? (isMultiplePregnancy ? 2 : 1) : 0);
@@ -190,16 +237,21 @@ const SignupScreen: React.FC<SignupScreenProps> = ({ navigation }) => {
         if (pregnancyStatus === 'pregnant') {
           totalChildren += isMultiplePregnancy ? 2 : 1; // 2 para múltiples, 1 para único
         }
+
+        analyticsService.logEvent('signup_children_data_started', {
+          ...getSignupAnalyticsParams(),
+          total_children: totalChildren,
+        });
         
         navigation.navigate('ChildrenData', {
           childrenCount: totalChildren,
           gender,
           pregnancyStatus,
           isMultiplePregnancy,
+          source: 'signup',
         });
       } else {
         // Si no hay hijos, establecer el usuario como autenticado y ir al Home
-        const { setUser } = useAuth();
         const userData = await AsyncStorage.getItem('userData');
         if (userData) {
           setUser(JSON.parse(userData));
@@ -208,6 +260,12 @@ const SignupScreen: React.FC<SignupScreenProps> = ({ navigation }) => {
     } catch (error: any) {
       console.error('❌ Error en registro:', error);
       const errorMessage = error.response?.data?.message || 'Error al crear la cuenta';
+      const errorCode = error.response?.data?.code || error.code || 'unknown';
+      analyticsService.logEvent('signup_failed', {
+        ...getSignupAnalyticsParams(),
+        error_code: String(errorCode),
+        error_status: error.response?.status || 0,
+      });
       Alert.alert('Error de registro', errorMessage);
     } finally {
       setIsLoading(false);

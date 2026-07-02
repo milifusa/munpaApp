@@ -3,6 +3,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   StyleSheet,
+  Text,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -62,12 +63,7 @@ const LikeButton: React.FC<LikeButtonProps> = ({
         />
       )}
       {showCount && (
-        <Ionicons
-          name="heart"
-          size={getIconSize() - 2}
-          color="#FF6B6B"
-          style={styles.countIcon}
-        />
+        <Text style={styles.countText}>{likeCount}</Text>
       )}
     </TouchableOpacity>
   );
@@ -75,14 +71,23 @@ const LikeButton: React.FC<LikeButtonProps> = ({
 
 const styles = StyleSheet.create({
   smallButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
     padding: 6,
     marginLeft: 3,
   },
   mediumButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
     padding: 8,
     marginLeft: 5,
   },
   largeButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
     padding: 12,
     marginLeft: 8,
   },
@@ -93,12 +98,11 @@ const styles = StyleSheet.create({
   loadingButton: {
     opacity: 0.7,
   },
-  countIcon: {
-    position: 'absolute',
-    top: -2,
-    right: -2,
-    backgroundColor: 'white',
-    borderRadius: 8,
+  countText: {
+    minWidth: 10,
+    fontSize: 14,
+    color: '#6B7280',
+    fontWeight: '500',
   },
 });
 

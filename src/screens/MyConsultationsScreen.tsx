@@ -93,7 +93,10 @@ const MyConsultationsScreen = () => {
   const renderConsultation = ({ item }: { item: Consultation }) => (
     <TouchableOpacity
       style={styles.consultationCard}
-      onPress={() => navigation.navigate('ConsultationDetail', { consultationId: item.id })}
+      onPress={() => {
+        console.log('abriendo consulta id:', item.id);
+        navigation.navigate('ConsultationDetail', { consultationId: item.id });
+      }}
       activeOpacity={0.7}
     >
       <View style={styles.consultationHeader}>

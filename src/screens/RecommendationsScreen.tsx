@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -11,7 +11,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import api from '../services/api';
 import BannerCarousel from '../components/BannerCarousel';
 
@@ -69,7 +69,6 @@ const RecommendationsScreen = ({ navigation }: any) => {
   const insets = useSafeAreaInsets();
   const [searchQuery, setSearchQuery] = useState('');
   const [refreshing, setRefreshing] = useState(false);
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
   const [isLoadingCategories, setIsLoadingCategories] = useState(true);
   const [categoriesError, setCategoriesError] = useState<string | null>(null);
@@ -79,6 +78,7 @@ const RecommendationsScreen = ({ navigation }: any) => {
   const [searchResults, setSearchResults] = useState<RecentRecommendation[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
+  const searchRequestIdRef = useRef(0);
 
   // Cargar categorías y recomendaciones recientes al montar el componente
   useEffect(() => {
@@ -88,6 +88,7 @@ const RecommendationsScreen = ({ navigation }: any) => {
 
   useEffect(() => {
     if (searchQuery.trim() === '') {
+      searchRequestIdRef.current += 1;
       setSearchResults([]);
       setSearchError(null);
       setIsSearching(false);
@@ -95,10 +96,15 @@ const RecommendationsScreen = ({ navigation }: any) => {
     }
 
     const timeoutId = setTimeout(async () => {
+      const requestId = searchRequestIdRef.current + 1;
+      searchRequestIdRef.current = requestId;
+
       try {
         setIsSearching(true);
         setSearchError(null);
         const response = await api.searchRecommendations(searchQuery.trim());
+        if (searchRequestIdRef.current !== requestId) return;
+
         const items =
           response?.data ||
           response?.recommendations ||
@@ -106,11 +112,14 @@ const RecommendationsScreen = ({ navigation }: any) => {
           [];
         setSearchResults(Array.isArray(items) ? items : []);
       } catch (error: any) {
+        if (searchRequestIdRef.current !== requestId) return;
         console.error('❌ [RECOMMENDATIONS] Error búsqueda:', error);
         setSearchResults([]);
         setSearchError('No se pudieron cargar los resultados');
       } finally {
-        setIsSearching(false);
+        if (searchRequestIdRef.current === requestId) {
+          setIsSearching(false);
+        }
       }
     }, 400);
 
@@ -164,59 +173,153 @@ const RecommendationsScreen = ({ navigation }: any) => {
   };
 
   const handleCategoryPress = (category: Category) => {
-    setSelectedCategory(category.id);
-    
-    // Navegar a la pantalla de recomendaciones de la categoría
     navigation.navigate('CategoryRecommendations', {
       categoryId: category.id,
       categoryName: category.name,
     });
   };
 
-  const renderQuickActions = () => (
-    <View >
-      <View style={styles.quickActions}>
-      <TouchableOpacity 
-          style={styles.quickAction}
-          onPress={() => navigation.navigate('ListsMain')}
+  const visibleRecommendations = [...recentRecommendations].sort((a, b) =>
+    (b.averageRating || 0) - (a.averageRating || 0) ||
+    (b.totalReviews || 0) - (a.totalReviews || 0)
+  );
+
+  const getCategoryRecommendations = (categoryId: string) =>
+    recentRecommendations.filter((recommendation) => recommendation.category?.id === categoryId);
+
+  const getCategoryValueLabel = (category: Category) => {
+    const recommendationsCount = getCategoryRecommendations(category.id).length;
+
+    if (recommendationsCount > 0) {
+      return 'Con opciones recientes';
+    }
+
+    if (category.description) {
+      return category.description.length > 34
+        ? `${category.description.slice(0, 34).trim()}...`
+        : category.description;
+    }
+
+    return 'Ver recomendaciones';
+  };
+
+  const getLocationLabel = (recommendation: RecentRecommendation) => {
+    const city = recommendation.cityName || recommendation.city;
+    const country = recommendation.countryName || recommendation.country;
+
+    if (city && country) return `${city} · ${country}`;
+    if (city) return city;
+    if (country) return country;
+    return 'Ubicación por confirmar';
+  };
+
+  const getRecommendationCountLabel = (recommendation: RecentRecommendation): string | null => {
+    const recommendations = calculateRecommendations(
+      recommendation.totalReviews || 0,
+      recommendation.averageRating || 0
+    );
+
+    if (recommendations > 0) {
+      return `${recommendations} ${recommendations === 1 ? 'mamá lo recomienda' : 'mamás lo recomiendan'}`;
+    }
+
+    return recommendation.totalReviews > 0 ? `${recommendation.totalReviews} reseñas` : null;
+  };
+
+  const renderRecommendationCard = (
+    recommendation: RecentRecommendation,
+    variant: 'featured' | 'compact' = 'compact'
+  ) => {
+    const recommendationCountLabel = getRecommendationCountLabel(recommendation);
+
+    return (
+    <TouchableOpacity
+      key={recommendation.id}
+      style={[
+        styles.recommendationCard,
+        variant === 'featured' && styles.recommendationCardFeatured,
+      ]}
+      onPress={() => handleRecommendationPress(recommendation)}
+      activeOpacity={0.84}
+    >
+      {recommendation.imageUrl ? (
+        <Image
+          source={{ uri: recommendation.imageUrl }}
+          style={[
+            styles.recommendationImage,
+            variant === 'featured' && styles.recommendationImageFeatured,
+          ]}
+        />
+      ) : (
+        <View
+          style={[
+            styles.recommendationImagePlaceholder,
+            variant === 'featured' && styles.recommendationImageFeatured,
+          ]}
         >
-          <View style={[styles.quickActionIcon, { backgroundColor: '#96d2d3', }]}>
-            <Ionicons name="list" size={20} color="white" />
+          <Ionicons name="sparkles-outline" size={22} color="#59C6C0" />
+        </View>
+      )}
+
+      <View style={styles.recommendationInfo}>
+        <View style={styles.recommendationTopLine}>
+          <Text style={styles.recommendationCategory} numberOfLines={1}>
+            {recommendation.category?.name || 'Recomendación'}
+          </Text>
+          {recommendation.averageRating > 0 && (
+            <View style={styles.ratingPill}>
+              <Ionicons name="star" size={11} color="#FFB74D" />
+              <Text style={styles.ratingPillText}>{recommendation.averageRating.toFixed(1)}</Text>
+            </View>
+          )}
+        </View>
+        <Text style={styles.recommendationTitle} numberOfLines={2}>
+          {recommendation.name}
+        </Text>
+        {recommendationCountLabel && (
+          <View style={styles.recommendationMetaRow}>
+            <Ionicons name="people-outline" size={13} color="#59C6C0" />
+            <Text style={styles.recommendationMetaText} numberOfLines={1}>
+              {recommendationCountLabel}
+            </Text>
           </View>
-          <Text style={styles.quickActionText}>Listas</Text>
-        </TouchableOpacity>
-        <TouchableOpacity 
-          style={styles.quickAction}
-          onPress={() => navigation.navigate('Favorites')}
-        >
-          <View style={[styles.quickActionIcon, { backgroundColor: '#FF6B6B' }]}>
-            <Ionicons name="heart" size={20} color="white" />
-          </View>
-          <Text style={styles.quickActionText}>Mis Favoritos</Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity 
-          style={styles.quickAction}
-          onPress={() => navigation.navigate('Wishlist')}
-        >
-          <View style={[styles.quickActionIcon, { backgroundColor: '#FFB74D' }]}>
-            <Ionicons name="bookmark" size={20} color="white" />
-          </View>
-          <Text style={styles.quickActionText}>Lista de Deseos</Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity 
-          style={styles.quickAction}
-          onPress={() => navigation.navigate('FavoritesMap')}
-        >
-          <View style={[styles.quickActionIcon, { backgroundColor: '#4285F4' }]}>
-            <Ionicons name="map" size={20} color="white" />
-          </View>
-          <Text style={styles.quickActionText}>Ver Mapa</Text>
-        </TouchableOpacity>
-        
+        )}
+        <View style={styles.recommendationMetaRow}>
+          <Ionicons name="location-outline" size={13} color="#6B7280" />
+          <Text style={styles.recommendationLocation} numberOfLines={1}>
+            {getLocationLabel(recommendation)}
+          </Text>
+        </View>
       </View>
-    </View>
+
+      <Ionicons name="chevron-forward" size={16} color="#B8C2CC" />
+    </TouchableOpacity>
+    );
+  };
+
+  const renderQuickActions = () => (
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={styles.quickActions}
+    >
+      {[
+        { label: 'Listas', icon: 'list-outline', route: 'ListsMain' },
+        { label: 'Favoritos', icon: 'heart-outline', route: 'Favorites' },
+        { label: 'Deseos', icon: 'bookmark-outline', route: 'Wishlist' },
+        { label: 'Mapa', icon: 'map-outline', route: 'FavoritesMap' },
+      ].map((action) => (
+        <TouchableOpacity
+          key={action.route}
+          style={styles.quickAction}
+          onPress={() => navigation.navigate(action.route)}
+          activeOpacity={0.84}
+        >
+          <Ionicons name={action.icon as any} size={17} color="#59C6C0" />
+          <Text style={styles.quickActionText}>{action.label}</Text>
+        </TouchableOpacity>
+      ))}
+    </ScrollView>
   );
 
   const handleRecommendationPress = (recommendation: RecentRecommendation) => {
@@ -225,12 +328,122 @@ const RecommendationsScreen = ({ navigation }: any) => {
     });
   };
 
-  const renderRecentRecommendations = () => {
-    // Si está cargando, mostrar indicador
+  const renderSearchResults = () => (
+    <View style={styles.sectionBlock}>
+      <Text style={styles.sectionTitle}>Resultados de búsqueda</Text>
+      {isSearching && (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#59C6C0" />
+        </View>
+      )}
+      {!isSearching && searchResults.length === 0 && (
+        <View style={styles.emptyContainer}>
+          <Ionicons name="search-outline" size={42} color="#B8C2CC" />
+          <Text style={styles.emptyText}>{searchError || 'No se encontraron resultados'}</Text>
+          <Text style={styles.emptySubtext}>Prueba con una categoría, ciudad o tipo de servicio.</Text>
+        </View>
+      )}
+      {!isSearching && searchResults.length > 0 && (
+        <View style={styles.recommendationList}>
+          {searchResults.map((recommendation) => renderRecommendationCard(recommendation))}
+        </View>
+      )}
+    </View>
+  );
+
+  const renderCategoriesSection = () => (
+    <View style={styles.sectionBlock}>
+      <View style={styles.sectionHeaderRow}>
+        <View>
+          <Text style={styles.sectionTitle}>¿Qué necesitas hoy?</Text>
+          <Text style={styles.sectionSubtitle}>
+            Elige una categoría para ver todas sus recomendaciones.
+          </Text>
+        </View>
+      </View>
+
+      {isLoadingCategories && (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#59C6C0" />
+          <Text style={styles.loadingText}>Cargando categorías...</Text>
+        </View>
+      )}
+
+      {!isLoadingCategories && categoriesError && (
+        <View style={styles.errorContainer}>
+          <Ionicons name="alert-circle" size={42} color="#FF6B6B" />
+          <Text style={styles.errorText}>{categoriesError}</Text>
+          <TouchableOpacity style={styles.retryButton} onPress={loadCategories}>
+            <Ionicons name="refresh" size={18} color="white" />
+            <Text style={styles.retryButtonText}>Reintentar</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {!isLoadingCategories && !categoriesError && categories.length > 0 && (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.categoriesGrid}
+        >
+          {categories.map((category) => {
+            const isEmoji = category.icon ? /[\u{1F300}-\u{1F9FF}]/u.test(category.icon) : false;
+            const hasIonicon = Boolean(
+              category.icon &&
+              !isEmoji &&
+              Object.prototype.hasOwnProperty.call(Ionicons.glyphMap, category.icon)
+            );
+
+            return (
+              <TouchableOpacity
+                key={category.id}
+                style={styles.categoryCard}
+                onPress={() => handleCategoryPress(category)}
+                activeOpacity={0.84}
+              >
+                {category.imageUrl ? (
+                  <Image source={{ uri: category.imageUrl }} style={styles.categoryImage} />
+                ) : (
+                  <View style={styles.categoryIcon}>
+                    {isEmoji ? (
+                      <Text style={styles.categoryEmoji}>{category.icon}</Text>
+                    ) : hasIonicon ? (
+                      <Ionicons
+                        name={category.icon as any}
+                        size={20}
+                        color="#59C6C0"
+                      />
+                    ) : (
+                      <Image
+                        source={require('../../assets/icon.png')}
+                        style={styles.categoryLogo}
+                        resizeMode="contain"
+                      />
+                    )}
+                  </View>
+                )}
+                <View style={styles.categoryTextBlock}>
+                  <Text style={styles.categoryTitle} numberOfLines={1}>
+                    {category.name}
+                  </Text>
+                  <Text style={styles.categoryValue} numberOfLines={1}>
+                    {getCategoryValueLabel(category)}
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={14} color="#B8C2CC" />
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+      )}
+    </View>
+  );
+
+  const renderRecommendedSection = () => {
     if (isLoadingRecent) {
       return (
-        <View style={styles.recentContainer}>
-          <Text style={styles.sectionTitle}>Últimas Recomendaciones</Text>
+        <View style={styles.sectionBlock}>
+          <Text style={styles.sectionTitle}>Recomendadas para ti</Text>
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color="#59C6C0" />
             <Text style={styles.loadingText}>Cargando recomendaciones...</Text>
@@ -239,16 +452,15 @@ const RecommendationsScreen = ({ navigation }: any) => {
       );
     }
 
-    // Si hay error, mostrar mensaje de error
     if (recentError) {
       return (
-        <View style={styles.recentContainer}>
-          <Text style={styles.sectionTitle}>Últimas Recomendaciones</Text>
+        <View style={styles.sectionBlock}>
+          <Text style={styles.sectionTitle}>Recomendadas para ti</Text>
           <View style={styles.errorContainer}>
-            <Ionicons name="alert-circle" size={48} color="#FF6B6B" />
+            <Ionicons name="alert-circle" size={42} color="#FF6B6B" />
             <Text style={styles.errorText}>{recentError}</Text>
             <TouchableOpacity style={styles.retryButton} onPress={loadRecentRecommendations}>
-              <Ionicons name="refresh" size={20} color="white" />
+              <Ionicons name="refresh" size={18} color="white" />
               <Text style={styles.retryButtonText}>Reintentar</Text>
             </TouchableOpacity>
           </View>
@@ -256,80 +468,58 @@ const RecommendationsScreen = ({ navigation }: any) => {
       );
     }
 
-    // Si no hay recomendaciones, mostrar mensaje vacío
     if (recentRecommendations.length === 0) {
       return (
-        <View style={styles.recentContainer}>
-          <Text style={styles.sectionTitle}>Últimas Recomendaciones</Text>
+        <View style={styles.sectionBlock}>
+          <Text style={styles.sectionTitle}>Recomendadas para ti</Text>
           <View style={styles.emptyContainer}>
-            <Ionicons name="file-tray-outline" size={64} color="#CCC" />
+            <Ionicons name="sparkles-outline" size={42} color="#B8C2CC" />
             <Text style={styles.emptyText}>No hay recomendaciones recientes</Text>
-            <Text style={styles.emptySubtext}>
-              Sé el primero en agregar una recomendación
-            </Text>
+            <Text style={styles.emptySubtext}>Sé el primero en compartir un lugar útil.</Text>
           </View>
         </View>
       );
     }
 
-    // Renderizar recomendaciones
     return (
-      <View style={styles.recentContainer}>
-        <Text style={styles.sectionTitle}>Últimas Recomendaciones</Text>
-        <View style={styles.recentItems}>
-          {recentRecommendations.slice(0, 10).map((recommendation) => (
-            <TouchableOpacity 
-              key={recommendation.id} 
-              style={styles.recentItem}
-              onPress={() => handleRecommendationPress(recommendation)}
-            >
-              {/* Imagen o icono */}
-              {recommendation.imageUrl ? (
-                <Image 
-                  source={{ uri: recommendation.imageUrl }} 
-                  style={styles.recentItemImage}
-                />
-              ) : (
-                <View style={styles.recentItemIcon}>
-                  <Image 
-                    source={require('../../assets/icon.png')} 
-                    style={styles.defaultIcon}
-                    resizeMode="contain"
-                  />
-                </View>
-              )}
-              
-              {/* Información */}
-              <View style={styles.recentItemInfo}>
-                <Text style={styles.recentItemTitle} numberOfLines={1}>
-                  {recommendation.name}
-                </Text>
-                <Text style={styles.recentItemCategory} numberOfLines={1}>
-                  {recommendation.category?.name || 'Sin categoría'}
-                </Text>
-                {(recommendation.cityName || recommendation.city || recommendation.countryName || recommendation.country) && (
-                  <Text style={styles.recentItemLocation} numberOfLines={1}>
-                    {(recommendation.cityName || recommendation.city || 'Ciudad')} · {recommendation.countryName || recommendation.country || 'País'}
-                  </Text>
-                )}
-                <View style={styles.recentItemRating}>
-                  {/* Mostrar número de mamás que lo recomiendan */}
-                  <Ionicons name="people" size={14} color="#59C6C0" />
-                  <Text style={styles.ratingText}>
-                    {(() => {
-                      const recommendations = calculateRecommendations(recommendation.totalReviews, recommendation.averageRating);
-                      return recommendations > 0
-                        ? `${recommendations} ${recommendations === 1 ? 'mamá lo recomienda' : 'mamás lo recomiendan'}`
-                        : 'Sin recomendaciones';
-                    })()}
-                  </Text>
-                </View>
-              </View>
-              
-              {/* Flecha */}
-              <Ionicons name="chevron-forward" size={16} color="#CCC" />
-            </TouchableOpacity>
-          ))}
+      <View style={styles.sectionBlock}>
+        <View style={styles.sectionHeaderRow}>
+          <View>
+            <Text style={styles.sectionTitle}>Recomendadas para ti</Text>
+            <Text style={styles.sectionSubtitle}>Una vista rápida; usa categorías para listas completas.</Text>
+          </View>
+        </View>
+        <View style={styles.recommendationList}>
+          {visibleRecommendations.slice(0, 4).map((recommendation, index) =>
+            renderRecommendationCard(recommendation, index === 0 ? 'featured' : 'compact')
+          )}
+        </View>
+      </View>
+    );
+  };
+
+  const renderLatestSection = () => {
+    if (isLoadingRecent || recentError || recentRecommendations.length <= 4) return null;
+
+    return (
+      <View style={styles.sectionBlock}>
+        <View style={styles.sectionHeaderRow}>
+          <View>
+            <Text style={styles.sectionTitle}>Últimas agregadas</Text>
+            <Text style={styles.sectionSubtitle}>Nuevas ideas para guardar o visitar después.</Text>
+          </View>
+          <TouchableOpacity
+            style={styles.sectionAction}
+            onPress={() => navigation.navigate('AddRecommendation')}
+          >
+            <Ionicons name="add" size={16} color="#178A84" />
+            <Text style={styles.sectionActionText}>Agregar</Text>
+          </TouchableOpacity>
+        </View>
+        <View style={styles.recommendationList}>
+          {recentRecommendations.slice(4, 8).map((recommendation) =>
+            renderRecommendationCard(recommendation)
+          )}
         </View>
       </View>
     );
@@ -339,26 +529,50 @@ const RecommendationsScreen = ({ navigation }: any) => {
     <View style={styles.container}>
       <ScrollView 
         style={styles.scrollView} 
-        contentContainerStyle={{ paddingBottom: insets.bottom }}
+        contentContainerStyle={{ paddingBottom: insets.bottom + 110 }}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="none"
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
         }
       >
-        {/* Carrusel de Banners de Recomendaciones */}
-        <BannerCarousel section="recomendaciones" fallbackToHome={false} />
-
-        {/* Contenido principal */}
         <View style={styles.contentContainer}>
-          {/* Barra de búsqueda */}
+          <View style={styles.header}>
+            <View style={styles.headerCopy}>
+              <Text style={styles.headerTitle}>Recomendaciones</Text>
+              <Text style={styles.headerSubtitle}>
+                Lugares, especialistas y servicios recomendados por otras mamás.
+              </Text>
+            </View>
+            <View style={styles.headerActions}>
+              <TouchableOpacity
+                style={styles.headerIconButton}
+                onPress={() => navigation.navigate('Favorites')}
+                activeOpacity={0.84}
+              >
+                <Ionicons name="heart-outline" size={19} color="#59C6C0" />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.headerIconButton}
+                onPress={() => navigation.navigate('FavoritesMap')}
+                activeOpacity={0.84}
+              >
+                <Ionicons name="map-outline" size={19} color="#59C6C0" />
+              </TouchableOpacity>
+            </View>
+          </View>
+
           <View style={styles.searchContainer}>
             <Ionicons name="search" size={20} color="#999" style={styles.searchIcon} />
             <TextInput
               style={styles.searchInput}
-              placeholder="Buscar lugares, médicos, niñeras..."
+              placeholder="Buscar pediatra, guardería, terapia..."
               value={searchQuery}
               onChangeText={setSearchQuery}
               placeholderTextColor="#999"
+              autoCorrect={false}
+              autoCapitalize="none"
             />
             {searchQuery.length > 0 && (
               <TouchableOpacity onPress={() => setSearchQuery('')}>
@@ -366,168 +580,32 @@ const RecommendationsScreen = ({ navigation }: any) => {
               </TouchableOpacity>
             )}
           </View>
-          
+
           {searchQuery.trim().length > 0 ? (
-            <View style={styles.recentContainer}>
-              <Text style={styles.sectionTitle}>Resultados de búsqueda</Text>
-              {isSearching && (
-                <View style={styles.loadingContainer}>
-                  <ActivityIndicator size="large" color="#59C6C0" />
-                </View>
-              )}
-              {!isSearching && searchResults.length === 0 && (
-                <Text style={styles.searchEmptyText}>
-                  {searchError || 'No se encontraron resultados'}
-                </Text>
-              )}
-              {!isSearching && searchResults.length > 0 && (
-                <View style={styles.recentItems}>
-                  {searchResults.map((recommendation) => (
-                    <TouchableOpacity 
-                      key={recommendation.id} 
-                      style={styles.recentItem}
-                      onPress={() => handleRecommendationPress(recommendation)}
-                    >
-                      {recommendation.imageUrl ? (
-                        <Image 
-                          source={{ uri: recommendation.imageUrl }} 
-                          style={styles.recentItemImage}
-                        />
-                      ) : (
-                        <View style={styles.recentItemIcon}>
-                          <Image 
-                            source={require('../../assets/icon.png')} 
-                            style={styles.defaultIcon}
-                            resizeMode="contain"
-                          />
-                        </View>
-                      )}
-                      <View style={styles.recentItemInfo}>
-                        <Text style={styles.recentItemTitle} numberOfLines={1}>
-                          {recommendation.name}
-                        </Text>
-                        <Text style={styles.recentItemCategory} numberOfLines={1}>
-                          {recommendation.category?.name || 'Sin categoría'}
-                        </Text>
-                        {(recommendation.cityName || recommendation.city || recommendation.countryName || recommendation.country) && (
-                          <Text style={styles.recentItemLocation} numberOfLines={1}>
-                            {(recommendation.cityName || recommendation.city || 'Ciudad')} · {recommendation.countryName || recommendation.country || 'País'}
-                          </Text>
-                        )}
-                      </View>
-                      <Ionicons name="chevron-forward" size={16} color="#CCC" />
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              )}
-            </View>
+            renderSearchResults()
           ) : (
             <>
-              {/* Acciones rápidas */}
               {renderQuickActions()}
-              
-              {/* Botón grande para agregar recomendación */}
-              <TouchableOpacity
-                style={styles.addRecommendationButton}
-                onPress={() => navigation.navigate('AddRecommendation')}
-              >
-                <View style={styles.addRecommendationContent}>
-                  <View style={styles.addRecommendationIcon}>
-                    <Ionicons name="add-circle" size={28} color="white" />
-                  </View>
-                  <View style={styles.addRecommendationText}>
-                    <Text style={styles.addRecommendationTitle}>Agregar Recomendación</Text>
-                    <Text style={styles.addRecommendationSubtitle}>
-                      Comparte un lugar que te guste con la comunidad
-                    </Text>
-                  </View>
-                  <Ionicons name="chevron-forward" size={24} color="#59C6C0" />
-                </View>
-              </TouchableOpacity>
+              {renderCategoriesSection()}
+              {renderRecommendedSection()}
+              <View style={styles.bannerSlot}>
+                <BannerCarousel section="recomendaciones" fallbackToHome={false} />
+              </View>
+              {renderLatestSection()}
             </>
           )}
         </View>
-
-        {/* Categorías principales */}
-        <View style={styles.categoriesContainer}>
-          <Text style={styles.sectionTitle}>¿Qué estás buscando?</Text>
-          
-          {/* Estado de carga */}
-          {isLoadingCategories && (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color="#59C6C0" />
-              <Text style={styles.loadingText}>Cargando categorías...</Text>
-            </View>
-          )}
-
-          {/* Estado de error */}
-          {!isLoadingCategories && categoriesError && (
-            <View style={styles.errorContainer}>
-              <Ionicons name="alert-circle" size={48} color="#FF6B6B" />
-              <Text style={styles.errorText}>{categoriesError}</Text>
-              <TouchableOpacity style={styles.retryButton} onPress={loadCategories}>
-                <Ionicons name="refresh" size={20} color="white" />
-                <Text style={styles.retryButtonText}>Reintentar</Text>
-              </TouchableOpacity>
-            </View>
-          )}
-
-          {/* Categorías de la API */}
-          {!isLoadingCategories && !categoriesError && categories.length > 0 && (
-            <View style={styles.categoriesGrid}>
-              {categories.map((category) => (
-                <TouchableOpacity
-                  key={category.id}
-                  style={[
-                    styles.categoryCard,
-                    selectedCategory === category.id && styles.selectedCategory
-                  ]}
-                  onPress={() => handleCategoryPress(category)}
-                >
-                  {/* Imagen o icono de la categoría */}
-                  {category.imageUrl ? (
-                    <Image 
-                      source={{ uri: category.imageUrl }} 
-                      style={styles.categoryImage}
-                    />
-                  ) : (
-                    <View style={styles.categoryIcon}>
-                      <Image 
-                        source={require('../../assets/icon.png')} 
-                        style={styles.defaultCategoryIcon}
-                        resizeMode="contain"
-                      />
-                    </View>
-                  )}
-                  
-                  {/* Información de la categoría */}
-                  <View style={styles.categoryInfo}>
-                    <Text style={styles.categoryTitle} numberOfLines={2}>
-                      {category.name}
-                    </Text>
-                    <Text style={styles.categorySubtitle} numberOfLines={2}>
-                      {category.description}
-                    </Text>
-                  </View>
-                  
-                  {/* Flecha */}
-                  <View style={styles.categoryArrow}>
-                    <Ionicons name="arrow-forward" size={16} color="#666" />
-                  </View>
-                </TouchableOpacity>
-              ))}
-            </View>
-          )}
-        </View>
-
-        
-
-        {/* Recomendaciones recientes */}
-        {searchQuery.trim().length === 0 && renderRecentRecommendations()}
-
-        {/* Espacio final */}
-        <View style={styles.finalSpacing} />
       </ScrollView>
+
+      {searchQuery.trim().length === 0 && (
+        <TouchableOpacity
+          style={[styles.fabButton, { bottom: insets.bottom + 82 }]}
+          onPress={() => navigation.navigate('AddRecommendation')}
+          activeOpacity={0.84}
+        >
+          <Ionicons name="add" size={30} color="#FFFFFF" />
+        </TouchableOpacity>
+      )}
     </View>
   );
 };
@@ -535,7 +613,7 @@ const RecommendationsScreen = ({ navigation }: any) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F7FAFC',
+    backgroundColor: '#FFFFFF',
   },
   scrollView: {
     flex: 1,
@@ -543,9 +621,47 @@ const styles = StyleSheet.create({
   
   // Contenedor de contenido
   contentContainer: {
-    paddingHorizontal: 20,
-    paddingTop: 20,
+    paddingHorizontal: 16,
+    paddingTop: 14,
     paddingBottom: 10,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: 14,
+    marginBottom: 16,
+  },
+  headerCopy: {
+    flex: 1,
+  },
+  headerTitle: {
+    fontSize: 27,
+    fontWeight: '800',
+    color: '#2D3748',
+    fontFamily: 'Montserrat',
+  },
+  headerSubtitle: {
+    fontSize: 13,
+    lineHeight: 18,
+    color: '#6B7280',
+    marginTop: 5,
+    fontFamily: 'Montserrat',
+  },
+  headerActions: {
+    flexDirection: 'row',
+    gap: 8,
+    paddingTop: 2,
+  },
+  headerIconButton: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F1FBFA',
+    borderWidth: 1,
+    borderColor: '#D8F1EF',
   },
   title: {
     fontSize: 32,
@@ -563,267 +679,264 @@ const styles = StyleSheet.create({
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F7FAFC',
-    borderRadius: 15,
+    backgroundColor: '#F5F7FA',
+    borderRadius: 18,
     paddingHorizontal: 15,
     paddingVertical: 12,
     borderWidth: 1,
-    borderColor: '#E9ECEF',
+    borderColor: '#E9EEF2',
+    marginBottom: 12,
   },
   searchIcon: {
     marginRight: 10,
   },
   searchInput: {
     flex: 1,
-    fontSize: 16,
+    fontSize: 14,
     color: '#333',
+    fontFamily: 'Montserrat',
   },
   
   // Secciones
+  sectionBlock: {
+    marginTop: 18,
+  },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: 12,
+    marginBottom: 12,
+  },
   sectionTitle: {
     fontSize: 20,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 15,
+    fontWeight: '800',
+    color: '#2D3748',
+    fontFamily: 'Montserrat',
+  },
+  sectionSubtitle: {
+    fontSize: 12,
+    lineHeight: 17,
+    color: '#6B7280',
+    marginTop: 3,
+    fontFamily: 'Montserrat',
+  },
+  sectionAction: {
+    minHeight: 32,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 9,
+    borderRadius: 16,
+    backgroundColor: '#F1FBFA',
+    borderWidth: 1,
+    borderColor: '#D8F1EF',
+  },
+  sectionActionText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#178A84',
+    fontFamily: 'Montserrat',
   },
   
   // Categorías
-  categoriesContainer: {
-    padding: 20,
-  },
   categoriesGrid: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    gap: 15,
+    gap: 9,
+    paddingRight: 8,
   },
   categoryCard: {
-    width: '47%',
-    backgroundColor: '#F7FAFC',
-    borderRadius: 20,
-    padding: 20,
+    width: 174,
+    minHeight: 58,
+    flexDirection: 'row',
     alignItems: 'center',
-    minHeight: 160,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 6,
-    elevation: 4,
-    borderWidth: 2,
-    borderColor: 'transparent',
-  },
-  selectedCategory: {
-    borderColor: '#59C6C0',
-    backgroundColor: '#F0FDFC',
+    gap: 9,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 9,
+    borderWidth: 1,
+    borderColor: '#E9EEF2',
   },
   categoryIcon: {
-    width: 80,
-    height: 80,
-    borderRadius: 12,
+    width: 38,
+    height: 38,
+    borderRadius: 15,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 15,
     backgroundColor: '#F0FDFC',
   },
-  defaultCategoryIcon: {
-    width: 60,
-    height: 60,
-    opacity: 0.6,
+  categoryEmoji: {
+    fontSize: 20,
+  },
+  categoryLogo: {
+    width: 22,
+    height: 22,
+    opacity: 0.78,
   },
   categoryImage: {
-    width: 80,
-    height: 80,
-    borderRadius: 12,
-    marginBottom: 15,
+    width: 38,
+    height: 38,
+    borderRadius: 15,
   },
-  categoryInfo: {
+  categoryTextBlock: {
     flex: 1,
-    paddingHorizontal: 12,
-    marginBottom: 15,
+    minWidth: 0,
   },
   categoryTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#333',
-    textAlign: 'center',
-    marginBottom: 8,
-  },
-  categorySubtitle: {
-    fontSize: 12,
-    color: '#666',
-    textAlign: 'center',
+    fontSize: 13,
     lineHeight: 16,
-    marginBottom: 10,
+    fontWeight: '800',
+    color: '#2D3748',
+    fontFamily: 'Montserrat',
   },
-  categoryArrow: {
-    position: 'absolute',
-    top: 15,
-    right: 15,
+  categoryValue: {
+    fontSize: 10,
+    lineHeight: 13,
+    color: '#6B7280',
+    marginTop: 2,
+    fontWeight: '700',
+    fontFamily: 'Montserrat',
   },
-  
-
   quickActions: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
-    backgroundColor: 'transparent',
-    paddingVertical: 20,
+    gap: 8,
+    paddingVertical: 2,
+    paddingRight: 8,
   },
   quickAction: {
+    minHeight: 36,
+    flexDirection: 'row',
     alignItems: 'center',
-    flex: 1,
-  },
-  quickActionIcon: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 8,
+    gap: 6,
+    paddingHorizontal: 12,
+    borderRadius: 18,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#D8F1EF',
   },
   quickActionText: {
     fontSize: 12,
-    color: '#333',
+    color: '#178A84',
     textAlign: 'center',
-    fontWeight: '500',
+    fontWeight: '800',
+    fontFamily: 'Montserrat',
   },
-  
-  // Botón grande para agregar recomendación
-  addRecommendationButton: {
-    backgroundColor: 'white',
-    borderRadius: 16,
-    padding: 16,
-    marginTop: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
+  recommendationList: {
+    gap: 10,
   },
-  addRecommendationContent: {
+  recommendationCard: {
+    minHeight: 96,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 10,
+    padding: 10,
+    borderRadius: 16,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E9EEF2',
   },
-  addRecommendationIcon: {
+  recommendationCardFeatured: {
+    minHeight: 118,
+    borderColor: '#CDEFEB',
+    backgroundColor: '#FBFFFE',
+  },
+  recommendationImage: {
     width: 56,
     height: 56,
-    borderRadius: 28,
-    backgroundColor: '#59C6C0',
-    justifyContent: 'center',
-    alignItems: 'center',
+    borderRadius: 14,
+    backgroundColor: '#F0FDFC',
   },
-  addRecommendationText: {
+  recommendationImageFeatured: {
+    width: 74,
+    height: 74,
+    borderRadius: 18,
+  },
+  recommendationImagePlaceholder: {
+    width: 56,
+    height: 56,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F0FDFC',
+  },
+  recommendationInfo: {
     flex: 1,
   },
-  addRecommendationTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#2C3E50',
-    marginBottom: 4,
-  },
-  addRecommendationSubtitle: {
-    fontSize: 13,
-    color: '#718096',
-    lineHeight: 18,
-  },
-  
-  // Recomendaciones recientes
-  recentContainer: {
-    paddingHorizontal: 20,
-    marginBottom: 30,
-  },
-  recentItems: {
-    backgroundColor: '#F7FAFC',
-    borderRadius: 20,
-    padding: 15,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 3,
-  },
-  recentItem: {
+  recommendationTopLine: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 15,
-    paddingHorizontal: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
+    justifyContent: 'space-between',
+    gap: 8,
+    marginBottom: 3,
   },
-  recentItemIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#F0FDFC',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 15,
-  },
-  defaultIcon: {
-    width: 40,
-    height: 40,
-    opacity: 0.6,
-  },
-  recentItemImage: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    marginRight: 15,
-    backgroundColor: '#F0FDFC',
-  },
-  recentItemInfo: {
+  recommendationCategory: {
     flex: 1,
-  },
-  recentItemTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 4,
-  },
-  recentItemCategory: {
-    fontSize: 12,
+    fontSize: 11,
+    fontWeight: '800',
     color: '#59C6C0',
-    marginBottom: 4,
-    fontWeight: '500',
+    fontFamily: 'Montserrat',
   },
-  recentItemLocation: {
-    fontSize: 12,
-    color: '#6B7280',
-    marginBottom: 4,
-  },
-  searchEmptyText: {
-    fontSize: 13,
-    color: '#6B7280',
-    textAlign: 'center',
-    marginTop: 12,
-  },
-  recentItemRating: {
+  ratingPill: {
+    minHeight: 22,
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 3,
+    paddingHorizontal: 7,
+    borderRadius: 11,
+    backgroundColor: '#FFF7E6',
   },
-  ratingText: {
-    fontSize: 12,
-    color: '#333',
-    marginLeft: 4,
-    fontWeight: '600',
+  ratingPillText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#8A5A00',
+    fontFamily: 'Montserrat',
   },
-  reviewsText: {
-    fontSize: 12,
-    color: '#999',
-    marginLeft: 4,
+  recommendationTitle: {
+    fontSize: 15,
+    lineHeight: 19,
+    fontWeight: '800',
+    color: '#2D3748',
+    fontFamily: 'Montserrat',
+    marginBottom: 6,
   },
-  
-  // Espaciado
-  finalSpacing: {
-    height: 30,
+  recommendationMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    minHeight: 18,
   },
-
+  recommendationMetaText: {
+    flex: 1,
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#526170',
+    fontFamily: 'Montserrat',
+  },
+  recommendationLocation: {
+    flex: 1,
+    fontSize: 11,
+    color: '#6B7280',
+    fontFamily: 'Montserrat',
+  },
+  bannerSlot: {
+    marginTop: 18,
+    marginBottom: 2,
+  },
+  fabButton: {
+    position: 'absolute',
+    right: 22,
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#59C6C0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.18,
+    shadowRadius: 10,
+    elevation: 6,
+  },
   // Estados de carga, error y vacío
   loadingContainer: {
     alignItems: 'center',

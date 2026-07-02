@@ -11,6 +11,7 @@ import {
   Platform,
   StatusBar,
   Modal,
+  Share,
   ActivityIndicator,
   DeviceEventEmitter,
   TextInput,
@@ -53,7 +54,6 @@ import { useFonts } from "../hooks/useFonts";
 import { useLocation } from "../hooks/useLocation";
 import BannerCarousel from "../components/BannerCarousel";
 import RecipeCard from "../components/RecipeCard";
-import { LinearGradient } from "expo-linear-gradient";
 
 const WHITE_NOISE_LOCAL = require("../../assets/whitenoise.mp3");
 const WHITE_NOISE_URLS = [
@@ -61,8 +61,12 @@ const WHITE_NOISE_URLS = [
   "https://cdn.pixabay.com/audio/2022/02/23/audio_5d01c5d8b1.mp3",
 ];
 const WHITE_NOISE_LOAD_TIMEOUT_MS = 20000;
-const POPULAR_POST_CARD_WIDTH = Dimensions.get('window').width * 0.8;
-const PREGNANCY_SIZE_IMAGE_HEIGHT = Math.min(Dimensions.get('window').width - 40, 390);
+const SCREEN_WIDTH = Dimensions.get('window').width;
+const POPULAR_POST_CARD_WIDTH = SCREEN_WIDTH * 0.8;
+const PREGNANCY_SIZE_IMAGE_HEIGHT = Math.min(SCREEN_WIDTH - 40, 390);
+const PREGNANCY_WEEK_CHIP_SIZE = 42;
+const PREGNANCY_WEEK_CHIP_GAP = 8;
+const PREGNANCY_WEEK_CHIP_STEP = PREGNANCY_WEEK_CHIP_SIZE + PREGNANCY_WEEK_CHIP_GAP;
 
 // Función helper para formatear duración en minutos
 const formatDuration = (totalMinutes: number, showSeconds: boolean = false): string => {
@@ -237,6 +241,19 @@ interface PregnancyContractionRecord {
   durationSeconds: number;
 }
 
+type PregnancyComparisonMode = 'fruits' | 'animals' | 'sweets' | 'human';
+
+const PREGNANCY_COMPARISON_OPTIONS: {
+  id: PregnancyComparisonMode;
+  label: string;
+  icon: string;
+}[] = [
+  { id: 'human', label: 'Bebé', icon: '👶' },
+  { id: 'fruits', label: 'Frutas', icon: '🍓' },
+  { id: 'animals', label: 'Animales', icon: '🐾' },
+  { id: 'sweets', label: 'Dulces', icon: '🍬' },
+];
+
 const PREGNANCY_SIZE_BY_WEEK: PregnancySizeComparison[] = [
   { week: 1, name: 'Sin comparativo', emoji: '✨', detail: 'Aún no hay embrión medible.', noComparison: true },
   { week: 2, name: 'Sin comparativo', emoji: '✨', detail: 'Semana de ovulación o fecundación aproximada.', noComparison: true },
@@ -283,47 +300,53 @@ const PREGNANCY_SIZE_BY_WEEK: PregnancySizeComparison[] = [
 ];
 
 const PREGNANCY_WEEKS = Array.from({ length: 42 }, (_, index) => index + 1);
-const PREGNANCY_SIZE_IMAGES: Record<number, any> = {
-  3: require("../../assets/pregnancy-sizes/week-03.png"),
-  4: require("../../assets/pregnancy-sizes/week-04.png"),
-  5: require("../../assets/pregnancy-sizes/week-05.png"),
-  6: require("../../assets/pregnancy-sizes/week-06.png"),
-  7: require("../../assets/pregnancy-sizes/week-07.png"),
-  8: require("../../assets/pregnancy-sizes/week-08.png"),
-  9: require("../../assets/pregnancy-sizes/week-09.png"),
-  10: require("../../assets/pregnancy-sizes/week-10.png"),
-  11: require("../../assets/pregnancy-sizes/week-11.png"),
-  12: require("../../assets/pregnancy-sizes/week-12.png"),
-  13: require("../../assets/pregnancy-sizes/week-13.png"),
-  14: require("../../assets/pregnancy-sizes/week-14.png"),
-  15: require("../../assets/pregnancy-sizes/week-15.png"),
-  16: require("../../assets/pregnancy-sizes/week-16.png"),
-  17: require("../../assets/pregnancy-sizes/week-17.png"),
-  18: require("../../assets/pregnancy-sizes/week-18.png"),
-  19: require("../../assets/pregnancy-sizes/week-19.png"),
-  20: require("../../assets/pregnancy-sizes/week-20.png"),
-  21: require("../../assets/pregnancy-sizes/week-21.png"),
-  22: require("../../assets/pregnancy-sizes/week-22.png"),
-  23: require("../../assets/pregnancy-sizes/week-23.png"),
-  24: require("../../assets/pregnancy-sizes/week-24.png"),
-  25: require("../../assets/pregnancy-sizes/week-25.png"),
-  26: require("../../assets/pregnancy-sizes/week-26.png"),
-  27: require("../../assets/pregnancy-sizes/week-27.png"),
-  28: require("../../assets/pregnancy-sizes/week-28.png"),
-  29: require("../../assets/pregnancy-sizes/week-29.png"),
-  30: require("../../assets/pregnancy-sizes/week-30.png"),
-  31: require("../../assets/pregnancy-sizes/week-31.png"),
-  32: require("../../assets/pregnancy-sizes/week-32.png"),
-  33: require("../../assets/pregnancy-sizes/week-33.png"),
-  34: require("../../assets/pregnancy-sizes/week-34.png"),
-  35: require("../../assets/pregnancy-sizes/week-35.png"),
-  36: require("../../assets/pregnancy-sizes/week-36.png"),
-  37: require("../../assets/pregnancy-sizes/week-37.png"),
-  38: require("../../assets/pregnancy-sizes/week-38.png"),
-  39: require("../../assets/pregnancy-sizes/week-39.png"),
-  40: require("../../assets/pregnancy-sizes/week-40.png"),
-  41: require("../../assets/pregnancy-sizes/week-41.png"),
-  42: require("../../assets/pregnancy-sizes/week-42.png"),
+const EARLY_PREGNANCY_IMAGELESS_WEEKS = new Set([1, 2, 3]);
+const SHARED_PREGNANCY_IMAGE_WEEKS = new Set([40, 41, 42]);
+type PregnancyImageFolder = 'frutas' | 'animales' | 'dulces' | 'bebe';
+
+type PregnancyImageContext = {
+  (path: string): any;
+  keys: () => string[];
+};
+
+const PREGNANCY_IMAGE_FOLDER_BY_MODE: Record<PregnancyComparisonMode, PregnancyImageFolder> = {
+  fruits: 'frutas',
+  animals: 'animales',
+  sweets: 'dulces',
+  human: 'bebe',
+};
+
+const pregnancySizeImagesContext = (require as any).context(
+  "../../assets/pregnancy-sizes",
+  true,
+  /week-\d{2}\.png$/
+) as PregnancyImageContext;
+
+const buildPregnancySizeImages = (folder: PregnancyImageFolder): Record<number, any> =>
+  pregnancySizeImagesContext.keys().reduce<Record<number, any>>((images, imagePath) => {
+    const match = imagePath.match(new RegExp(`^\\./${folder}/week-(\\d{2})\\.png$`));
+    if (match) {
+      images[Number(match[1])] = pregnancySizeImagesContext(imagePath);
+    }
+    return images;
+  }, {});
+
+const PREGNANCY_SIZE_IMAGES_BY_MODE = Object.entries(PREGNANCY_IMAGE_FOLDER_BY_MODE).reduce(
+  (imagesByMode, [mode, folder]) => ({
+    ...imagesByMode,
+    [mode]: buildPregnancySizeImages(folder),
+  }),
+  {} as Record<PregnancyComparisonMode, Record<number, any>>
+);
+
+const getPregnancySizeImage = (
+  mode: PregnancyComparisonMode,
+  week: number | null
+) => {
+  if (!week) return null;
+  if (EARLY_PREGNANCY_IMAGELESS_WEEKS.has(week)) return null;
+  const imageMode = SHARED_PREGNANCY_IMAGE_WEEKS.has(week) ? 'fruits' : mode;
+  return PREGNANCY_SIZE_IMAGES_BY_MODE[imageMode][week] || null;
 };
 
 const PREGNANCY_APPROX_MEASUREMENTS: Record<number, PregnancyApproxMeasurement> = {
@@ -383,6 +406,84 @@ const getPregnancySizeComparison = (weeks?: number | null): PregnancySizeCompari
     PREGNANCY_SIZE_BY_WEEK.find((item) => item.week === normalizedWeek) ||
     PREGNANCY_SIZE_BY_WEEK[PREGNANCY_SIZE_BY_WEEK.length - 1]
   );
+};
+
+const getPregnancyComparisonByMode = (
+  weeks: number | null,
+  mode: PregnancyComparisonMode
+): PregnancySizeComparison | null => {
+  const normalizedWeek = normalizePregnancyWeek(weeks);
+  if (!normalizedWeek) return null;
+
+  const fruitComparison = getPregnancySizeComparison(normalizedWeek);
+  if (mode === 'fruits') return fruitComparison;
+
+  if (normalizedWeek <= 2) {
+    return {
+      week: normalizedWeek,
+      name: 'Sin comparativo',
+      emoji: mode === 'human' ? '✨' : PREGNANCY_COMPARISON_OPTIONS.find((item) => item.id === mode)?.icon || '✨',
+      detail: normalizedWeek === 1
+        ? 'Aún no hay embrión medible.'
+        : 'Semana de ovulación o fecundación aproximada.',
+      noComparison: true,
+    };
+  }
+
+  const byMode: Record<Exclude<PregnancyComparisonMode, 'fruits'>, PregnancySizeComparison[]> = {
+    animals: [
+      { week: 3, name: 'una pulga diminuta', emoji: '🐜', detail: 'Aún es microscópico, como un puntito vivo en desarrollo.' },
+      { week: 5, name: 'una hormiguita', emoji: '🐜', detail: 'Pequeñísimo, pero con cambios muy rápidos.' },
+      { week: 7, name: 'una mariquita pequeña', emoji: '🐞', detail: 'Empiezan a definirse estructuras importantes.' },
+      { week: 9, name: 'un caracol bebé', emoji: '🐌', detail: 'Cada semana suma forma y movimiento.' },
+      { week: 11, name: 'un colibrí pequeñito', emoji: '🐦', detail: 'Sus extremidades siguen tomando proporción.' },
+      { week: 13, name: 'un ratoncito bebé', emoji: '🐭', detail: 'Inicia una etapa de crecimiento más visible.' },
+      { week: 16, name: 'un hámster bebé', emoji: '🐹', detail: 'Puede comenzar una etapa de movimientos sutiles.' },
+      { week: 20, name: 'un conejito pequeño', emoji: '🐰', detail: 'Mitad del camino para muchas familias.' },
+      { week: 24, name: 'un gatito recién nacido', emoji: '🐱', detail: 'Crece con más presencia y responde a estímulos.' },
+      { week: 28, name: 'un cachorro pequeño', emoji: '🐶', detail: 'El tercer trimestre trae mucha ganancia de peso.' },
+      { week: 32, name: 'un conejo mediano', emoji: '🐇', detail: 'Toma más espacio y sus rutinas se sienten más.' },
+      { week: 36, name: 'un cachorro grande', emoji: '🐕', detail: 'Ya se acerca la recta final.' },
+      { week: 40, name: 'un bebé listo para nacer', emoji: '👶', detail: 'Tu bebé está listo para el gran encuentro.' },
+    ],
+    sweets: [
+      { week: 3, name: 'una chispa de azúcar', emoji: '✨', detail: 'Aún es microscópico, como un granito dulce.' },
+      { week: 5, name: 'un sprinkle', emoji: '🍬', detail: 'Muy pequeñito, pero creciendo todos los días.' },
+      { week: 7, name: 'un confite pequeño', emoji: '🍬', detail: 'Su corazón y órganos principales siguen formándose.' },
+      { week: 9, name: 'una gomita mini', emoji: '🍭', detail: 'Sus movimientos empiezan aunque todavía no los sientas.' },
+      { week: 11, name: 'un malvavisco pequeño', emoji: '☁️', detail: 'Manitos y piecitos siguen tomando forma.' },
+      { week: 13, name: 'una trufa pequeña', emoji: '🍫', detail: 'Crece con energía al iniciar el segundo trimestre.' },
+      { week: 16, name: 'una dona mini', emoji: '🍩', detail: 'Puede iniciar una etapa de movimientos sutiles.' },
+      { week: 20, name: 'un cupcake', emoji: '🧁', detail: 'Mitad del camino para muchas familias.' },
+      { week: 24, name: 'una barra de chocolate', emoji: '🍫', detail: 'Crece con más fuerza y presencia.' },
+      { week: 28, name: 'un pastelito', emoji: '🍰', detail: 'Su cerebro sigue creciendo intensamente.' },
+      { week: 32, name: 'un pastel pequeño', emoji: '🎂', detail: 'Va tomando más espacio dentro de ti.' },
+      { week: 36, name: 'un pastel familiar', emoji: '🎂', detail: 'Ya se acerca la recta final.' },
+      { week: 40, name: 'una sorpresa lista', emoji: '🎁', detail: 'Tu bebé está listo para el gran encuentro.' },
+    ],
+    human: [
+      { week: 3, name: 'células en desarrollo', emoji: '✨', detail: 'Aún no tiene forma de bebé; está iniciando una etapa celular clave.' },
+      { week: 5, name: 'un embrión muy pequeño', emoji: '🤍', detail: 'Empiezan estructuras básicas y cambios muy rápidos.' },
+      { week: 7, name: 'un embrión con latido', emoji: '💗', detail: 'El corazón y órganos principales se están formando.' },
+      { week: 9, name: 'un bebé en miniatura', emoji: '👶', detail: 'Sus movimientos empiezan, aunque aún no los sientas.' },
+      { week: 11, name: 'un bebé con manitos formándose', emoji: '🖐️', detail: 'Manos, pies y rasgos continúan definiéndose.' },
+      { week: 13, name: 'un bebé iniciando el segundo trimestre', emoji: '👶', detail: 'Termina una etapa clave de formación.' },
+      { week: 16, name: 'un bebé más activo', emoji: '🤰', detail: 'Puede empezar una etapa de movimientos sutiles.' },
+      { week: 20, name: 'un bebé a mitad del camino', emoji: '👶', detail: 'Muchas familias ya pueden conocer más detalles en ultrasonido.' },
+      { week: 24, name: 'un bebé más proporcionado', emoji: '🤍', detail: 'Sus pulmones, piel y sentidos siguen madurando.' },
+      { week: 28, name: 'un bebé entrando al tercer trimestre', emoji: '👶', detail: 'Su cerebro y cuerpo crecen con intensidad.' },
+      { week: 32, name: 'un bebé con rutinas', emoji: '💫', detail: 'Sus periodos de sueño y actividad pueden sentirse más claros.' },
+      { week: 36, name: 'un bebé casi listo', emoji: '🤰', detail: 'El cuerpo se prepara para la recta final.' },
+      { week: 40, name: 'un bebé listo para nacer', emoji: '👶', detail: 'Tu bebé está listo para el gran encuentro.' },
+    ],
+  };
+
+  const options = byMode[mode];
+  const matched = [...options].reverse().find((item) => normalizedWeek >= item.week) || options[0];
+  return {
+    ...matched,
+    week: normalizedWeek,
+  };
 };
 
 const getPregnancyWeekDetail = (
@@ -701,7 +802,9 @@ const HomeScreen: React.FC = () => {
   const [activeConsultations, setActiveConsultations] = useState<any[]>([]);
   const [loadingConsultations, setLoadingConsultations] = useState(false);
   const [selectedPregnancyWeek, setSelectedPregnancyWeek] = useState<number | null>(null);
+  const [pregnancyComparisonMode, setPregnancyComparisonMode] = useState<PregnancyComparisonMode>('human');
   const [showPregnancyDetailModal, setShowPregnancyDetailModal] = useState(false);
+  const [showPregnancyImageModal, setShowPregnancyImageModal] = useState(false);
   const [pregnancyChecklistState, setPregnancyChecklistState] = useState<Record<string, boolean>>({});
   const [pregnancySymptoms, setPregnancySymptoms] = useState<string[]>([]);
   const [pregnancyDiaryNote, setPregnancyDiaryNote] = useState('');
@@ -756,8 +859,10 @@ const HomeScreen: React.FC = () => {
 
   // Refs para scroll
   const scrollViewRef = useRef<ScrollView>(null);
+  const pregnancyWeekScrollRef = useRef<ScrollView>(null);
   const activitiesSectionRef = useRef<View>(null);
   const todayActivitiesRef = useRef<View>(null);
+  const [pregnancyWeekScrollerWidth, setPregnancyWeekScrollerWidth] = useState(0);
   const [now, setNow] = useState(new Date());
   const [showWhiteNoiseModal, setShowWhiteNoiseModal] = useState(false);
   const [whiteNoiseSound, setWhiteNoiseSound] = useState<Audio.Sound | null>(null);
@@ -790,6 +895,7 @@ const HomeScreen: React.FC = () => {
     setSelectedActivityDetail(null);
     setShowActivityDetailModal(false);
     setShowPregnancyDetailModal(false);
+    setShowPregnancyImageModal(false);
     setShowPregnancyModuleModal(false);
     setLoadingTodayGuide(true);
     setLoadingTodayFaq(true);
@@ -808,6 +914,26 @@ const HomeScreen: React.FC = () => {
     return () => {
       subscription.remove();
     };
+  }, []);
+
+  useEffect(() => {
+    const loadPregnancyComparisonMode = async () => {
+      try {
+        const savedMode = await AsyncStorage.getItem('pregnancyComparisonMode');
+        if (
+          savedMode === 'fruits' ||
+          savedMode === 'animals' ||
+          savedMode === 'sweets' ||
+          savedMode === 'human'
+        ) {
+          setPregnancyComparisonMode(savedMode);
+        }
+      } catch (error) {
+        console.warn('⚠️ [PREGNANCY] Error cargando modo de comparativo:', error);
+      }
+    };
+
+    loadPregnancyComparisonMode();
   }, []);
 
   useEffect(() => {
@@ -1661,6 +1787,21 @@ const HomeScreen: React.FC = () => {
     });
   };
 
+  const openSpecialists = (source: string, intent?: string) => {
+    analyticsService.logEvent('specialists_promo_clicked', {
+      source,
+      intent: intent || 'browse',
+      child_id: selectedChild?.id,
+      is_pregnancy: isPregnancyProfile,
+      pregnancy_week: pregnancyWeekToShow,
+    });
+
+    (navigation as any).navigate('SpecialistsList', {
+      source,
+      intent,
+    });
+  };
+
   const applyWhiteNoiseDuration = (minutes: number | null) => {
     setWhiteNoiseDurationMinutes(minutes);
     if (whiteNoiseTimer) {
@@ -1903,6 +2044,15 @@ const HomeScreen: React.FC = () => {
     setImageErrors((prev) => new Set(prev).add(childId));
   };
 
+  const updatePregnancyComparisonMode = async (mode: PregnancyComparisonMode) => {
+    setPregnancyComparisonMode(mode);
+    try {
+      await AsyncStorage.setItem('pregnancyComparisonMode', mode);
+    } catch (error) {
+      console.warn('⚠️ [PREGNANCY] Error guardando modo de comparativo:', error);
+    }
+  };
+
   const savePregnancyWeekState = async (updates: {
     checklist?: Record<string, boolean>;
     symptoms?: string[];
@@ -2088,6 +2238,7 @@ const HomeScreen: React.FC = () => {
       await finishPregnancyStatusUpdate(nextChildren, bornChild);
       setShowPregnancyBirthDatePicker(false);
       setShowPregnancyDetailModal(false);
+      setShowPregnancyImageModal(false);
       setShowPregnancyModuleModal(false);
       Alert.alert('Listo', 'Actualizamos el perfil: ahora este bebé aparece como nacido.');
     } catch (error) {
@@ -2110,6 +2261,7 @@ const HomeScreen: React.FC = () => {
       await finishPregnancyStatusUpdate(remainingChildren, nextSelectedChild);
       setShowPregnancyBirthDatePicker(false);
       setShowPregnancyDetailModal(false);
+      setShowPregnancyImageModal(false);
       setShowPregnancyModuleModal(false);
       Alert.alert('Listo', 'Dimos de baja este embarazo de tus bebés activos.');
     } catch (error) {
@@ -2148,7 +2300,14 @@ const HomeScreen: React.FC = () => {
     });
   };
 
-  const userFirstName = user?.displayName?.split(' ')[0] || 'Mamá';
+  const userDisplayName = (
+    user?.name ||
+    user?.displayName ||
+    (user as any)?.fullName ||
+    (user as any)?.firstName ||
+    ''
+  ).trim();
+  const userFirstName = userDisplayName ? userDisplayName.split(/\s+/)[0] : 'Mamá';
   const childFirstName = selectedChild?.name?.split(' ')[0] || 'Tu bebé';
   const isPregnancyProfile = Boolean(selectedChild?.isUnborn);
   const selectedChildIndex = selectedChild
@@ -2158,11 +2317,39 @@ const HomeScreen: React.FC = () => {
     selectedChild?.gestationWeeks ??
     selectedChild?.registeredGestationWeeks ??
     null;
-  const pregnancyWeekToShow = selectedPregnancyWeek ?? normalizePregnancyWeek(pregnancyWeeks);
+  const currentPregnancyWeek = normalizePregnancyWeek(pregnancyWeeks);
+  const pregnancyWeekToShow = selectedPregnancyWeek ?? currentPregnancyWeek;
+
+  useEffect(() => {
+    if (!pregnancyWeekToShow || !pregnancyWeekScrollerWidth) return;
+
+    const selectedIndex = pregnancyWeekToShow - 1;
+    const centeredOffset = Math.max(
+      0,
+      selectedIndex * PREGNANCY_WEEK_CHIP_STEP -
+        pregnancyWeekScrollerWidth / 2 +
+        PREGNANCY_WEEK_CHIP_SIZE / 2
+    );
+
+    const frame = requestAnimationFrame(() => {
+      pregnancyWeekScrollRef.current?.scrollTo({
+        x: centeredOffset,
+        y: 0,
+        animated: true,
+      });
+    });
+
+    return () => cancelAnimationFrame(frame);
+  }, [pregnancyWeekScrollerWidth, pregnancyWeekToShow]);
+
   const pregnancySize = selectedChild?.isUnborn
-    ? getPregnancySizeComparison(pregnancyWeekToShow)
+    ? getPregnancyComparisonByMode(pregnancyWeekToShow, pregnancyComparisonMode)
     : null;
-  const pregnancySizeImage = pregnancyWeekToShow ? PREGNANCY_SIZE_IMAGES[pregnancyWeekToShow] : null;
+  const isEarlyPregnancyWeek = Boolean(
+    pregnancyWeekToShow && EARLY_PREGNANCY_IMAGELESS_WEEKS.has(pregnancyWeekToShow)
+  );
+  const pregnancySizeImage = getPregnancySizeImage(pregnancyComparisonMode, pregnancyWeekToShow);
+  const isHumanPregnancyComparison = pregnancyComparisonMode === 'human';
   const pregnancyWeekDetail = pregnancySize && pregnancyWeekToShow
     ? getPregnancyWeekDetail(pregnancyWeekToShow, pregnancySize)
     : null;
@@ -2178,6 +2365,63 @@ const HomeScreen: React.FC = () => {
   const pregnancyTrimesterPrep = pregnancyWeekToShow ? getTrimesterPreparation(pregnancyWeekToShow) : '';
   const pregnancySupportTips = pregnancyWeekToShow ? getPartnerSupportTips(pregnancyWeekToShow) : [];
   const pregnancyCountdown = getPregnancyCountdown(selectedChild?.dueDate, pregnancyWeekToShow);
+  const pregnancyComparisonLabel = PREGNANCY_COMPARISON_OPTIONS.find(
+    (option) => option.id === pregnancyComparisonMode
+  )?.label || 'Embarazo';
+  const pregnancyImageShareTitle = pregnancyWeekToShow
+    ? `Semana ${pregnancyWeekToShow} de embarazo`
+    : 'Embarazo';
+  const pregnancyImageShareFact = pregnancyWeekToShow
+    ? pregnancyWeekToShow < 14
+      ? 'esta etapa es clave para la formación de sus órganos y rasgos principales.'
+      : pregnancyWeekToShow < 28
+        ? 'sus sentidos y movimientos se vuelven cada vez más presentes.'
+        : 'está ganando peso, practicando movimientos y preparándose para conocernos.'
+    : 'cada semana trae cambios importantes.';
+  const pregnancyImageShareMeasurement = pregnancyApproxMeasurement
+    ? `Tamaño aproximado: ${pregnancyApproxMeasurement.length}; peso: ${pregnancyApproxMeasurement.weight}.`
+    : null;
+  const pregnancyImageShareMessage = [
+    'Quería compartirte cómo está mi bebé.',
+    pregnancyWeekToShow ? `Hoy vamos en la semana ${pregnancyWeekToShow} de embarazo.` : null,
+    pregnancyImageShareMeasurement,
+    pregnancyImageShareFact,
+    `Lo estoy viendo en Munpa con la vista de ${pregnancyComparisonLabel.toLowerCase()}.`,
+  ].filter(Boolean).join('\n');
+  const openPregnancyImageViewer = () => {
+    if (pregnancySizeImage) {
+      setShowPregnancyImageModal(true);
+      return;
+    }
+
+    setShowPregnancyDetailModal(true);
+  };
+  const openPregnancyImageViewerFromDetail = () => {
+    if (!pregnancySizeImage) return;
+
+    setShowPregnancyDetailModal(false);
+    setTimeout(() => {
+      setShowPregnancyImageModal(true);
+    }, 220);
+  };
+  const sharePregnancyImage = async () => {
+    if (!pregnancySizeImage) {
+      Alert.alert('Imagen pendiente', 'Todavía no hay imagen para compartir en esta semana.');
+      return;
+    }
+
+    try {
+      const resolvedImage = Image.resolveAssetSource(pregnancySizeImage);
+      await Share.share({
+        title: pregnancyImageShareTitle,
+        message: pregnancyImageShareMessage,
+        url: resolvedImage?.uri,
+      });
+    } catch (error) {
+      console.warn('⚠️ [PREGNANCY] Error compartiendo imagen:', error);
+      Alert.alert('No se pudo compartir', 'Intenta nuevamente en unos segundos.');
+    }
+  };
   const completedPregnancyChecklist = pregnancyChecklist.filter((item) => pregnancyChecklistState[item]).length;
   const activeContractionElapsedSeconds = activeContractionStartedAt
     ? Math.max(0, Math.round((contractionTick - activeContractionStartedAt) / 1000))
@@ -2193,12 +2437,88 @@ const HomeScreen: React.FC = () => {
     notes: pregnancyDiaryNote ? 'Nota guardada' : 'Escribir nota',
     family: `${pregnancySupportTips.length} ideas`,
   };
+  const childAgeLabel = (() => {
+    if (!selectedChild) return 'Tu espacio de apoyo diario';
+    if (isPregnancyProfile) {
+      return pregnancyWeekToShow
+        ? `Semana ${pregnancyWeekToShow} de embarazo`
+        : 'Embarazo activo';
+    }
+
+    const ageInMonths =
+      selectedChild.currentAgeInMonths ??
+      selectedChild.ageInMonths ??
+      null;
+
+    if (ageInMonths == null || Number.isNaN(Number(ageInMonths))) {
+      return 'Perfil activo';
+    }
+
+    if (ageInMonths < 1) return 'Recién nacido';
+    if (ageInMonths < 12) {
+      const months = Math.max(1, Math.round(ageInMonths));
+      return `${months} ${months === 1 ? 'mes' : 'meses'}`;
+    }
+
+    const years = Math.floor(ageInMonths / 12);
+    const months = Math.round(ageInMonths % 12);
+    if (months === 0) return `${years} ${years === 1 ? 'año' : 'años'}`;
+    return `${years} ${years === 1 ? 'año' : 'años'} ${months} m`;
+  })();
+  const fallbackDouliQuestions = [
+    `¿Qué actividad puedo hacer hoy con ${childFirstName}?`,
+    `¿Cómo sé si ${childFirstName} está comiendo bien?`,
+    `¿Qué señales debo observar esta semana?`,
+  ];
+  const visibleDouliQuestions = (
+    loadingTodayFaq
+      ? ['Cargando preguntas...']
+      : todayFaqQuestions.length > 0
+        ? todayFaqQuestions
+        : fallbackDouliQuestions
+  ).slice(0, 4);
+  const todayPlanTitle =
+    todayGuide?.title ||
+    (isPregnancyProfile
+      ? `Semana ${pregnancyWeekToShow || 1}: conexión y preparación`
+      : `Plan de juego para ${childFirstName}`);
+  const todayPlanFocus =
+    todayGuide?.subtitle ||
+    (isPregnancyProfile
+      ? 'Un momento breve para observar cómo te sientes y preparar lo esencial.'
+      : `${childFirstName} aprende mejor con experiencias simples, repetidas y tranquilas.`);
+  const todayPlanAction =
+    todayGuide?.tip ||
+    activitySuggestions?.suggestions?.generalTip ||
+    activitySuggestions?.suggestions?.warningIfTired ||
+    (isPregnancyProfile
+      ? 'Toma 5 minutos para respirar, hidratarte y anotar una pregunta para tu próxima consulta.'
+      : `Prueba 5 minutos de juego con una textura, sonido suave u objeto de contraste.`);
+  const todayPlanWhy =
+    todayGuide?.description ||
+    (isPregnancyProfile
+      ? 'Los pequeños registros diarios ayudan a notar cambios y llegar con más claridad a tus controles.'
+      : 'Este tipo de interacción fortalece atención, coordinación, curiosidad y vínculo.');
+  const todayPlanQuestion = `Sobre ${childFirstName}: ${todayPlanAction}`;
+  const specialistPromoTitle = isPregnancyProfile
+    ? 'Acompaña tu embarazo con una especialista'
+    : `¿Algo te preocupa de ${childFirstName}?`;
+  const specialistPromoSubtitle = isPregnancyProfile
+    ? 'Nutrición, psicología prenatal y orientación para esta etapa.'
+    : 'Pediatría, lactancia, sueño y nutrición cuando necesitas una guía profesional.';
+  const specialistPromoChips = isPregnancyProfile
+    ? ['Embarazo', 'Nutrición', 'Psicología']
+    : ['Pediatría', 'Lactancia', 'Sueño'];
+  const specialistDouliQuestion = isPregnancyProfile
+    ? '¿Esta duda de embarazo debería verla con un especialista?'
+    : `¿Esta duda de ${childFirstName} debería verla con un especialista?`;
 
   return (
     <View style={styles.container}>
       <ScrollView
         ref={scrollViewRef}
         style={styles.scrollView}
+        contentContainerStyle={styles.homeScrollContent}
         showsVerticalScrollIndicator={false}
       >
         {loading && (
@@ -2206,142 +2526,195 @@ const HomeScreen: React.FC = () => {
             <Text style={styles.loadingText}>Cargando...</Text>
           </View>
         )}
-        <View style={styles.greetingBlock}>
-          <Text style={styles.greetingTitle}>
-            {getGreeting()}, {userFirstName}! {getGreetingEmoji()}
-          </Text>
+        <View style={styles.homeHero}>
+          <View style={styles.homeHeroCard}>
+            <View style={styles.homeHeroTopRow}>
+              <View style={styles.homeHeroCopy}>
+                <Text style={styles.homeHeroEyebrow}>{getGreeting()}</Text>
+                <Text style={styles.homeHeroTitle}>Hola, {userFirstName}</Text>
+                <Text style={styles.homeHeroSubtitle}>
+                  {selectedChild
+                    ? `Hoy acompañamos a ${childFirstName}`
+                    : 'Todo lo importante para cuidar con calma'}
+                </Text>
+              </View>
+
+              {selectedChild ? (
+                <TouchableOpacity
+                  style={styles.homeHeroAvatarButton}
+                  onPress={() => handleChildPress(selectedChild)}
+                  activeOpacity={0.85}
+                >
+                  <Image
+                    source={getChildAvatar(selectedChild, selectedChildIndex)}
+                    style={styles.homeHeroAvatar}
+                    onError={() => handleImageError(selectedChild.id)}
+                  />
+                </TouchableOpacity>
+              ) : (
+                <View style={styles.homeHeroAvatarPlaceholder}>
+                  <Ionicons name="heart" size={26} color="#E84D8A" />
+                </View>
+              )}
+            </View>
+
+            <View style={styles.homeHeroFooter}>
+              <View style={styles.homeHeroBadge}>
+                <Ionicons
+                  name={isPregnancyProfile ? "leaf-outline" : "sparkles-outline"}
+                  size={16}
+                  color="#178A84"
+                />
+                <Text style={styles.homeHeroBadgeText}>{childAgeLabel}</Text>
+              </View>
+              <TouchableOpacity
+                style={styles.homeHeroAskButton}
+                onPress={() => navigateToDouli('')}
+                activeOpacity={0.85}
+              >
+                <Ionicons name="chatbubble-ellipses-outline" size={16} color="#6B5CA5" />
+                <Text style={styles.homeHeroAskText}>Preguntar</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
         </View>
 
         {!isPregnancyProfile && (
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.quickActionsContainer}
-          >
-            <TouchableOpacity
-              style={[styles.quickActionButton, styles.quickActionTeal]}
-              onPress={() => {
-                analyticsService.logEvent('quick_action_clicked', {
-                  action: 'crecimiento',
-                  child_id: selectedChild?.id,
-                });
-                (navigation as any).navigate('Growth');
-              }}
+          <View style={styles.quickActionsShell}>
+            <View style={styles.quickActionsHeader}>
+              <Text style={styles.quickActionsTitle}>Atajos de cuidado</Text>
+              <Text style={styles.quickActionsHint}>{childFirstName}</Text>
+            </View>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.quickActionsContainer}
             >
-              <Ionicons name="scale-outline" size={20} color="#FFFFFF" />
-              <Text style={styles.quickActionLabel}>Crecimiento</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.quickActionButton, styles.quickActionGreen]}
-              onPress={() => {
-                analyticsService.logEvent('quick_action_clicked', {
-                  action: 'vacunas',
-                  child_id: selectedChild?.id,
-                });
-                // @ts-ignore
-                navigation.navigate('VaccineTracker');
-              }}
-            >
-              <Ionicons name="shield-checkmark-outline" size={20} color="#FFFFFF" />
-              <Text style={styles.quickActionLabel}>Vacunas</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.quickActionButton, styles.quickActionYellow]}
-              onPress={() => {
-                analyticsService.logEvent('quick_action_clicked', {
-                  action: 'medicacion',
-                  child_id: selectedChild?.id,
-                });
-                (navigation as any).navigate('Medications');
-              }}
-            >
-              <FontAwesome5 name="briefcase-medical" size={20} color="#FFFFFF" />
-              <Text style={styles.quickActionLabel}>Medicación</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.quickActionButton, styles.quickActionPurple]}
-              onPress={() => {
-                analyticsService.logEvent('quick_action_clicked', {
-                  action: 'denticion',
-                  child_id: selectedChild?.id,
-                });
-                // @ts-ignore
-                navigation.navigate('TeethingTracker');
-              }}
-            >
-              <FontAwesome5 name="tooth" size={20} color="#FFFFFF" />
-              <Text style={styles.quickActionLabel}>Dentición</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.quickActionButton, styles.quickActionPink]}
-              onPress={() => {
-                analyticsService.logEvent('quick_action_clicked', {
-                  action: 'hitos',
-                  child_id: selectedChild?.id,
-                });
-                // @ts-ignore
-                navigation.navigate('Milestones');
-              }}
-            >
-              <Ionicons name="trophy-outline" size={20} color="#FFFFFF" />
-              <Text style={styles.quickActionLabel}>Hitos</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.quickActionButton, styles.quickActionOrange]}
-              onPress={() => {
-                // Calcular edad desde birthDate si está disponible
-                let ageInMonths = selectedChild?.ageInMonths ?? 0;
+              <TouchableOpacity
+                style={[styles.quickActionButton, styles.quickActionTeal]}
+                onPress={() => {
+                  analyticsService.logEvent('quick_action_clicked', {
+                    action: 'crecimiento',
+                    child_id: selectedChild?.id,
+                  });
+                  (navigation as any).navigate('Growth');
+                }}
+              >
+                <Ionicons name="scale-outline" size={22} color="#FFFFFF" />
+                <Text style={styles.quickActionLabel}>Crecimiento</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.quickActionButton, styles.quickActionGreen]}
+                onPress={() => {
+                  analyticsService.logEvent('quick_action_clicked', {
+                    action: 'vacunas',
+                    child_id: selectedChild?.id,
+                  });
+                  // @ts-ignore
+                  navigation.navigate('VaccineTracker');
+                }}
+              >
+                <Ionicons name="shield-checkmark-outline" size={22} color="#FFFFFF" />
+                <Text style={styles.quickActionLabel}>Vacunas</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.quickActionButton, styles.quickActionYellow]}
+                onPress={() => {
+                  analyticsService.logEvent('quick_action_clicked', {
+                    action: 'medicacion',
+                    child_id: selectedChild?.id,
+                  });
+                  (navigation as any).navigate('Medications');
+                }}
+              >
+                <FontAwesome5 name="briefcase-medical" size={20} color="#FFFFFF" />
+                <Text style={styles.quickActionLabel}>Medicación</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.quickActionButton, styles.quickActionPurple]}
+                onPress={() => {
+                  analyticsService.logEvent('quick_action_clicked', {
+                    action: 'denticion',
+                    child_id: selectedChild?.id,
+                  });
+                  // @ts-ignore
+                  navigation.navigate('TeethingTracker');
+                }}
+              >
+                <FontAwesome5 name="tooth" size={20} color="#FFFFFF" />
+                <Text style={styles.quickActionLabel}>Dentición</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.quickActionButton, styles.quickActionPink]}
+                onPress={() => {
+                  analyticsService.logEvent('quick_action_clicked', {
+                    action: 'hitos',
+                    child_id: selectedChild?.id,
+                  });
+                  // @ts-ignore
+                  navigation.navigate('Milestones');
+                }}
+              >
+                <Ionicons name="trophy-outline" size={22} color="#FFFFFF" />
+                <Text style={styles.quickActionLabel}>Hitos</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.quickActionButton, styles.quickActionOrange]}
+                onPress={() => {
+                  // Calcular edad desde birthDate si está disponible
+                  let ageInMonths = selectedChild?.ageInMonths ?? 0;
 
-                if (selectedChild?.birthDate) {
-                  let birthDate: Date;
+                  if (selectedChild?.birthDate) {
+                    let birthDate: Date;
 
-                  // Manejar Firestore Timestamp
-                  if (typeof selectedChild.birthDate === 'object' && '_seconds' in selectedChild.birthDate) {
-                    birthDate = new Date((selectedChild.birthDate as any)._seconds * 1000);
-                  } else if (typeof selectedChild.birthDate === 'string') {
-                    birthDate = new Date(selectedChild.birthDate);
-                  } else {
-                    birthDate = new Date(selectedChild.birthDate as any);
+                    // Manejar Firestore Timestamp
+                    if (typeof selectedChild.birthDate === 'object' && '_seconds' in selectedChild.birthDate) {
+                      birthDate = new Date((selectedChild.birthDate as any)._seconds * 1000);
+                    } else if (typeof selectedChild.birthDate === 'string') {
+                      birthDate = new Date(selectedChild.birthDate);
+                    } else {
+                      birthDate = new Date(selectedChild.birthDate as any);
+                    }
+
+                    const today = new Date();
+                    const diffTime = Math.abs(today.getTime() - birthDate.getTime());
+                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                    ageInMonths = diffDays / 30.44; // Promedio de días por mes
                   }
 
-                  const today = new Date();
-                  const diffTime = Math.abs(today.getTime() - birthDate.getTime());
-                  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-                  ageInMonths = diffDays / 30.44; // Promedio de días por mes
-                }
 
-
-                const ageFloor = Math.floor(ageInMonths);
-                if (ageFloor < 5) {
-                  const monthsRemaining = 5 - ageFloor;
-                  Alert.alert(
-                    '🍎 Nutrición disponible pronto',
-                    `Esta funcionalidad estará disponible cuando ${selectedChild?.name || 'tu bebé'} cumpla 5 meses.\n\n¡Solo ${monthsRemaining} ${monthsRemaining === 1 ? 'mes' : 'meses'} más! 💙`,
-                    [{ text: 'Entendido', style: 'default' }]
-                  );
-                  analyticsService.logEvent('nutrition_early_access_attempted', {
+                  const ageFloor = Math.floor(ageInMonths);
+                  if (ageFloor < 5) {
+                    const monthsRemaining = 5 - ageFloor;
+                    Alert.alert(
+                      '🍎 Nutrición disponible pronto',
+                      `Esta funcionalidad estará disponible cuando ${selectedChild?.name || 'tu bebé'} cumpla 5 meses.\n\n¡Solo ${monthsRemaining} ${monthsRemaining === 1 ? 'mes' : 'meses'} más! 💙`,
+                      [{ text: 'Entendido', style: 'default' }]
+                    );
+                    analyticsService.logEvent('nutrition_early_access_attempted', {
+                      child_id: selectedChild?.id,
+                      age_in_months: ageInMonths,
+                    });
+                    return;
+                  }
+                  analyticsService.logEvent('quick_action_clicked', {
+                    action: 'nutricion',
                     child_id: selectedChild?.id,
                     age_in_months: ageInMonths,
                   });
-                  return;
-                }
-                analyticsService.logEvent('quick_action_clicked', {
-                  action: 'nutricion',
-                  child_id: selectedChild?.id,
-                  age_in_months: ageInMonths,
-                });
-                // @ts-ignore
-                navigation.navigate('Feeding');
-              }}
-            >
-              <Ionicons
-                name="restaurant-outline"
-                size={20}
-                color="#FFFFFF"
-              />
-              <Text style={styles.quickActionLabel}>Nutrición</Text>
-            </TouchableOpacity>
-          </ScrollView>
+                  // @ts-ignore
+                  navigation.navigate('Feeding');
+                }}
+              >
+                <Ionicons
+                  name="restaurant-outline"
+                  size={22}
+                  color="#FFFFFF"
+                />
+                <Text style={styles.quickActionLabel}>Nutrición</Text>
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
         )}
 
         {/* Consultas Activas */}
@@ -2502,485 +2875,471 @@ const HomeScreen: React.FC = () => {
         )}
 
         {/* Contenido principal */}
-        {selectedChild && (
-          <View style={styles.todaySection}>
-            {/* Banner Home 1 - Debajo de los botones de acción rápida */}
-            <View style={styles.bannerHome1Container}>
-              <BannerCarousel
-                section="home1"
-                fallbackToHome={false}
-                imageResizeMode="cover"
-                bannerHeight={140}
-                bannerWidth={290}
-                autoScroll={false}
-                showIndicators={false}
-              />
-            </View>
+        <View style={styles.todaySection}>
+          <View style={styles.bannerSlot}>
+            <BannerCarousel
+              style={styles.bannerHome1Carousel}
+              section="home1"
+              fallbackToHome={false}
+              imageResizeMode="cover"
+              bannerHeight={108}
+              bannerWidth={290}
+              autoScroll={false}
+              showIndicators={false}
+            />
+          </View>
 
-            <Text style={styles.todaySubtitle}></Text>
-            {pregnancySize && (
-              <View style={styles.pregnancySizeCard}>
-                <TouchableOpacity
-                  style={styles.pregnancySizeImageWrap}
-                  onPress={() => setShowPregnancyDetailModal(true)}
-                  activeOpacity={0.92}
-                >
-                  <View style={styles.pregnancySizeLearnMore}>
+          {pregnancySize && (
+            <View style={styles.pregnancySizeCard}>
+              <View style={styles.pregnancyWeekSelectorHeader}>
+                <View style={styles.pregnancyWeekHeadline}>
+                  <Text style={styles.pregnancyWeekSelectorTitle}>Semana {pregnancySize.week}</Text>
+                  <Text style={styles.pregnancySizeTitle}>{pregnancyComparisonLabel}</Text>
+                </View>
+                <View style={styles.pregnancyWeekActions}>
+                  {currentPregnancyWeek && pregnancyWeekToShow !== currentPregnancyWeek && (
+                    <TouchableOpacity
+                      style={styles.pregnancyWeekCurrentButton}
+                      onPress={() => setSelectedPregnancyWeek(currentPregnancyWeek)}
+                      activeOpacity={0.82}
+                    >
+                      <Text style={styles.pregnancyWeekCurrentButtonText}>Hoy</Text>
+                    </TouchableOpacity>
+                  )}
+                  <TouchableOpacity
+                    style={styles.pregnancySizeLearnMore}
+                    onPress={() => setShowPregnancyDetailModal(true)}
+                    activeOpacity={0.84}
+                  >
                     <Text style={styles.pregnancySizeLearnMoreText}>Saber más</Text>
                     <Ionicons name="chevron-forward" size={14} color="#FFFFFF" />
-                  </View>
-                  {pregnancySizeImage ? (
+                  </TouchableOpacity>
+                </View>
+              </View>
+              <ScrollView
+                ref={pregnancyWeekScrollRef}
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.pregnancyWeekScroller}
+                onLayout={(event) => setPregnancyWeekScrollerWidth(event.nativeEvent.layout.width)}
+              >
+                {PREGNANCY_WEEKS.map((week) => {
+                  const isActive = pregnancyWeekToShow === week;
+                  const isCurrent = currentPregnancyWeek === week;
+
+                  return (
+                    <TouchableOpacity
+                      key={week}
+                      style={[
+                        styles.pregnancyWeekChip,
+                        isActive && styles.pregnancyWeekChipActive,
+                      ]}
+                      onPress={() => setSelectedPregnancyWeek(week)}
+                      activeOpacity={0.84}
+                    >
+                      <Text
+                        style={[
+                          styles.pregnancyWeekChipText,
+                          isActive && styles.pregnancyWeekChipTextActive,
+                        ]}
+                      >
+                        {week}
+                      </Text>
+                      {isCurrent && <View style={styles.pregnancyWeekChipDot} />}
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+
+              <TouchableOpacity
+                style={[
+                  styles.pregnancySizeImageWrap,
+                  isHumanPregnancyComparison && styles.pregnancySizeImageWrapHuman,
+                ]}
+                onPress={openPregnancyImageViewer}
+                activeOpacity={0.92}
+              >
+                {pregnancySizeImage ? (
+                  <>
                     <Image
                       source={pregnancySizeImage}
-                      style={styles.pregnancySizeImage}
+                      style={[
+                        styles.pregnancySizeImage,
+                        isHumanPregnancyComparison && styles.pregnancySizeImageHuman,
+                      ]}
                       resizeMode="contain"
                     />
-                  ) : (
-                    <View style={styles.pregnancySizeImagePlaceholder}>
-                      <Text style={styles.pregnancySizeEmoji}>{pregnancySize.emoji}</Text>
-                      <Text style={styles.pregnancySizeMissingText}>
-                        Imagen pendiente
+                  </>
+                ) : (
+                  <View style={styles.pregnancySizeImagePlaceholder}>
+                    <Text style={styles.pregnancySizeEmoji}>
+                      {isEarlyPregnancyWeek ? '🤰' : pregnancySize.emoji}
+                    </Text>
+                    <Text style={styles.pregnancySizeMissingText}>
+                      {isEarlyPregnancyWeek ? 'Embarazo inicial' : 'Imagen pronto'}
+                    </Text>
+                    {isEarlyPregnancyWeek && (
+                      <Text style={styles.pregnancySizeMissingSubtext}>
+                        Aún es muy pequeño para compararlo con una imagen.
                       </Text>
-                    </View>
-                  )}
-                </TouchableOpacity>
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.pregnancyWeekScroller}
-                >
-                  {PREGNANCY_WEEKS.map((week) => {
-                    const isActive = week === pregnancySize.week;
-                    const hasImage = Boolean(PREGNANCY_SIZE_IMAGES[week]);
-                    return (
-                      <TouchableOpacity
-                        key={week}
-                        style={[
-                          styles.pregnancyWeekChip,
-                          isActive && styles.pregnancyWeekChipActive,
-                        ]}
-                        onPress={() => setSelectedPregnancyWeek(week)}
-                        activeOpacity={0.8}
-                      >
-                        <Text
-                          style={[
-                            styles.pregnancyWeekChipText,
-                            isActive && styles.pregnancyWeekChipTextActive,
-                          ]}
-                        >
-                          {week}
-                        </Text>
-                        {hasImage && <View style={styles.pregnancyWeekChipDot} />}
-                      </TouchableOpacity>
-                    );
-                  })}
-                </ScrollView>
-              </View>
-            )}
-            {isPregnancyProfile && pregnancyWeekToShow && (
-              <View style={styles.pregnancyHub}>
-                <View style={styles.pregnancyHubHeader}>
-                  <View>
-                    <Text style={styles.pregnancyHubTitle}>Embarazo esta semana</Text>
-                    <Text style={styles.pregnancyHubSubtitle}>{pregnancyCountdown}</Text>
+                    )}
                   </View>
-                  <View style={styles.pregnancyHubWeekBadge}>
-                    <Text style={styles.pregnancyHubWeekText}>{pregnancyWeekToShow}</Text>
-                  </View>
-                </View>
+                )}
+              </TouchableOpacity>
 
-                <View style={styles.pregnancyModuleGrid}>
-                  {PREGNANCY_MODULES.map((module) => (
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.pregnancyComparisonModes}
+              >
+                {PREGNANCY_COMPARISON_OPTIONS.map((option) => {
+                  const isActive = pregnancyComparisonMode === option.id;
+                  return (
                     <TouchableOpacity
-                      key={module.id}
-                      style={styles.pregnancyModuleTile}
-                      onPress={() => {
-                        setActivePregnancyModule(module.id);
-                        setShowPregnancyModuleModal(true);
-                      }}
-                      activeOpacity={0.85}
+                      key={option.id}
+                      style={[
+                        styles.pregnancyComparisonMode,
+                        isActive && styles.pregnancyComparisonModeActive,
+                      ]}
+                      onPress={() => updatePregnancyComparisonMode(option.id)}
+                      activeOpacity={0.84}
                     >
-                      <View style={styles.pregnancyModuleTileIcon}>
-                        <Ionicons name={module.icon as any} size={18} color="#E84D8A" />
-                      </View>
-                      <Text style={styles.pregnancyModuleTileTitle}>{module.label}</Text>
-                      <Text style={styles.pregnancyModuleTilePreview} numberOfLines={2}>
-                        {pregnancyModulePreviews[module.id]}
+                      <Text style={styles.pregnancyComparisonModeIcon}>{option.icon}</Text>
+                      <Text
+                        style={[
+                          styles.pregnancyComparisonModeText,
+                          isActive && styles.pregnancyComparisonModeTextActive,
+                        ]}
+                      >
+                        {option.label}
                       </Text>
                     </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
-            )}
-            <View style={styles.todayGuideCard}>
-              <Text style={styles.todayGuideLabel}>Tu guía de hoy</Text>
-              {loadingTodayGuide ? (
-                <View style={styles.todayGuideLoading}>
-                  <ActivityIndicator color="#6B5CA5" />
-                  <Text style={styles.todayGuideLoadingText}>
-                    Douli está aprendiendo de {childFirstName}...
-                  </Text>
-                </View>
-              ) : (
-                <>
-                  <Text style={styles.todayGuideWeek}>
-                    {todayGuide?.title ||
-                      `🌱 Semana ${selectedChild?.ageInMonths ? Math.max(1, Math.round(selectedChild.ageInMonths * 4.345)) : 1}: El descubrimiento`}
-                  </Text>
-                  {todayGuide?.subtitle ? (
-                    <Text style={styles.todayGuideSubtitle}>{todayGuide.subtitle}</Text>
-                  ) : null}
-                  <Text style={styles.todayGuideText}>
-                    {todayGuide?.description ||
-                      `A esta edad, ${childFirstName} descubre nuevas texturas, sonidos y movimientos. Unos minutos de juego guiado pueden marcar la diferencia.`}
-                  </Text>
-                  <View style={styles.todayGuideTipCard}>
-                    <View style={styles.todayGuideTipIcon}>
-                      <Ionicons name="bulb" size={16} color="#6B5CA5" />
-                    </View>
-                    <Text style={styles.todayGuideTipText}>
-                      {todayGuide?.tip ||
-                        activitySuggestions?.suggestions?.generalTip ||
-                        activitySuggestions?.suggestions?.warningIfTired ||
-                        `${childFirstName} parece aburrido. El juego con un espejo ayuda a su autoconocimiento.`}
-                    </Text>
-                  </View>
-                </>
-              )}
+                  );
+                })}
+              </ScrollView>
             </View>
+          )}
 
-            {/* Sección de Receta del día */}
-            {todayRecipe && (
-              <View style={styles.recipeSection}>
-                <View style={styles.recipeSectionHeader}>
-                  <Text style={styles.recipeSectionTitle}>🍽️ Receta del día</Text>
-                  <TouchableOpacity onPress={() => {
-                    analyticsService.logEvent('nutrition_view_more_clicked', {
-                      child_id: selectedChild?.id,
-                      recipe_name: todayRecipe.name,
-                      from: 'home',
-                    });
-                    (navigation as any).navigate('Feeding');
-                  }}>
-                    <Text style={styles.recipeSectionLink}>Ver más</Text>
-                  </TouchableOpacity>
+          {isPregnancyProfile && pregnancyWeekToShow && (
+            <View style={styles.pregnancyHub}>
+              <View style={styles.pregnancyHubHeader}>
+                <View>
+                  <Text style={styles.pregnancyHubTitle}>Embarazo esta semana</Text>
+                  <Text style={styles.pregnancyHubSubtitle}>{pregnancyCountdown}</Text>
                 </View>
-                <RecipeCard recipe={todayRecipe} />
+                <View style={styles.pregnancyHubWeekBadge}>
+                  <Text style={styles.pregnancyHubWeekText}>{pregnancyWeekToShow}</Text>
+                </View>
               </View>
-            )}
 
-            {!isPregnancyProfile && (
+              <View style={styles.pregnancyModuleGrid}>
+                {PREGNANCY_MODULES.slice(0, 4).map((module) => (
+                  <TouchableOpacity
+                    key={module.id}
+                    style={styles.pregnancyModuleTile}
+                    onPress={() => {
+                      setActivePregnancyModule(module.id);
+                      setShowPregnancyModuleModal(true);
+                    }}
+                    activeOpacity={0.85}
+                  >
+                    <View style={styles.pregnancyModuleTileIcon}>
+                      <Ionicons name={module.icon as any} size={18} color="#E84D8A" />
+                    </View>
+                    <Text style={styles.pregnancyModuleTileTitle}>{module.label}</Text>
+                    <Text style={styles.pregnancyModuleTilePreview} numberOfLines={2}>
+                      {pregnancyModulePreviews[module.id]}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+          )}
+
+          <View style={styles.todayGuideCard}>
+            <View style={styles.todayGuideHeader}>
+              <View style={styles.todayGuideIcon}>
+                <Ionicons name="sparkles-outline" size={18} color="#9A6B00" />
+              </View>
+              <View style={styles.todayGuideHeaderCopy}>
+                <Text style={styles.todayGuideLabel}>Plan de hoy</Text>
+                <Text style={styles.todayGuideHeaderSubtitle}>Una acción concreta para {childFirstName}</Text>
+              </View>
+              <View style={styles.todayGuideMetaPill}>
+                <Ionicons name="time-outline" size={13} color="#9A6B00" />
+                <Text style={styles.todayGuideMetaText}>5 min</Text>
+              </View>
+            </View>
+            {loadingTodayGuide ? (
+              <View style={styles.todayGuideLoading}>
+                <ActivityIndicator color="#6B5CA5" />
+                <Text style={styles.todayGuideLoadingText}>
+                  Preparando recomendaciones...
+                </Text>
+              </View>
+            ) : (
               <>
-                <Text style={styles.todaySectionTitle}>Herramientas</Text>
+                <Text style={styles.todayGuideWeek}>
+                  {todayPlanTitle}
+                </Text>
+                <Text style={styles.todayGuideSubtitle}>{todayPlanFocus}</Text>
 
-                {/* Banner Home 2 - Debajo del título Herramientas */}
-                <View style={styles.bannerHome2Container}>
-                  <BannerCarousel
-                    section="home2"
-                    fallbackToHome={false}
-                  />
+                <View style={styles.todayPlanActionCard}>
+                  <View style={styles.todayPlanStepBadge}>
+                    <Text style={styles.todayPlanStepText}>1</Text>
+                  </View>
+                  <View style={styles.todayPlanActionCopy}>
+                    <Text style={styles.todayPlanActionLabel}>Haz esto hoy</Text>
+                    <Text style={styles.todayPlanActionText}>{todayPlanAction}</Text>
+                  </View>
                 </View>
 
-                <View style={styles.todayToolsRow}>
+                <View style={styles.todayGuideWhyRow}>
+                  <Ionicons name="heart-circle-outline" size={20} color="#6B5CA5" />
+                  <Text style={styles.todayGuideWhyText} numberOfLines={3}>
+                    {todayPlanWhy}
+                  </Text>
+                </View>
+
+                <View style={styles.todayGuideActions}>
                   <TouchableOpacity
-                    style={[styles.todayToolCard, styles.todayToolCardSounds]}
-                    onPress={openWhiteNoiseModal}
+                    style={styles.todayGuidePrimaryButton}
+                    onPress={openHealthProfile}
+                    activeOpacity={0.86}
                   >
-                    <Ionicons name="musical-notes" size={22} color="#FFF" />
-                    <Text style={styles.todayToolTitle}>Sonidos</Text>
-                    <Text style={styles.todayToolSubtitle}>Ruido Blanco</Text>
+                    <Ionicons name="play-outline" size={16} color="#FFFFFF" />
+                    <Text style={styles.todayGuidePrimaryButtonText}>Hacer actividad</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity style={[styles.todayToolCard, styles.todayToolCardAdvisories]} onPress={openAdvisories}>
-                    <Ionicons name="medical" size={22} color="#FFF" />
-                    <Text style={styles.todayToolTitle}>Primeros Auxilios</Text>
-                    <Text style={styles.todayToolSubtitle}>Una guía rápida</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={[styles.todayToolCard, styles.todayToolCardHealth]} onPress={openHealthProfile}>
-                    <Ionicons name="fitness" size={22} color="#FFF" />
-                    <Text style={styles.todayToolTitle}>Desarrollo</Text>
-                    <Text style={styles.todayToolSubtitle}>Ejercicios</Text>
+                  <TouchableOpacity
+                    style={styles.todayGuideSecondaryButton}
+                    onPress={() => navigateToDouli(todayPlanQuestion)}
+                    activeOpacity={0.86}
+                  >
+                    <Ionicons name="chatbubble-ellipses-outline" size={16} color="#6B5CA5" />
+                    <Text style={styles.todayGuideSecondaryButtonText}>Preguntar</Text>
                   </TouchableOpacity>
                 </View>
               </>
             )}
+          </View>
 
-            <View style={styles.todayBannerContainer}>
-              <BannerCarousel
-                section="home"
-                style={styles.todayBanner}
-                imageResizeMode="cover"
-                bannerRadius={16}
-                bannerBackgroundColor="transparent"
-                scrollEnabled={false}
-              />
+          <View style={styles.specialistPromoCard}>
+            <View style={styles.specialistPromoTop}>
+              <View style={styles.specialistPromoIcon}>
+                <Ionicons name="medical-outline" size={22} color="#178A84" />
+              </View>
+              <View style={styles.specialistPromoCopy}>
+                <Text style={styles.specialistPromoEyebrow}>Especialistas verificados</Text>
+                <Text style={styles.specialistPromoTitle}>{specialistPromoTitle}</Text>
+                <Text style={styles.specialistPromoSubtitle}>{specialistPromoSubtitle}</Text>
+              </View>
             </View>
 
-            <View style={styles.todayDouliSection}>
-              <Text style={styles.todaySectionTitle}>Douli te ayuda</Text>
-              <Text style={styles.todayDouliSubtitle}>
-                Preguntas frecuentes de {childFirstName}
-              </Text>
-              {(loadingTodayFaq ? ['Cargando preguntas...'] : todayFaqQuestions).slice(0, 4).map((q) => (
-                <TouchableOpacity
-                  key={q}
-                  style={styles.todayDouliQuestion}
-                  onPress={() => navigateToDouli(q)}
-                >
-                  <Ionicons name="help-circle-outline" size={18} color="#6B5CA5" />
-                  <Text style={styles.todayDouliQuestionText}>{q}</Text>
-                  <Ionicons name="chevron-forward" size={16} color="#6B7280" />
-                </TouchableOpacity>
+            <View style={styles.specialistPromoBody}>
+              <View style={styles.specialistAvatarStack}>
+                <View style={[styles.specialistMiniAvatar, styles.specialistMiniAvatarTeal]}>
+                  <Ionicons name="chatbubbles-outline" size={17} color="#178A84" />
+                </View>
+                <View style={[styles.specialistMiniAvatar, styles.specialistMiniAvatarPink]}>
+                  <Ionicons name="heart-outline" size={17} color="#C93B78" />
+                </View>
+                <View style={[styles.specialistMiniAvatar, styles.specialistMiniAvatarPurple]}>
+                  <Ionicons name="videocam-outline" size={17} color="#6B5CA5" />
+                </View>
+              </View>
+
+              <View style={styles.specialistTrustGrid}>
+                <View style={styles.specialistTrustPill}>
+                  <Ionicons name="shield-checkmark-outline" size={14} color="#178A84" />
+                  <Text style={styles.specialistTrustText}>Verificados</Text>
+                </View>
+                <View style={styles.specialistTrustPill}>
+                  <Ionicons name="videocam-outline" size={14} color="#178A84" />
+                  <Text style={styles.specialistTrustText}>Video disponible</Text>
+                </View>
+              </View>
+            </View>
+
+            <View style={styles.specialistPromoChips}>
+              {specialistPromoChips.map((chip) => (
+                <View key={chip} style={styles.specialistPromoChip}>
+                  <Text style={styles.specialistPromoChipText}>{chip}</Text>
+                </View>
               ))}
+            </View>
+
+            <Text style={styles.specialistPromoNote}>
+              Si algo te inquieta, puedes pedir orientación sin salir de Munpa.
+            </Text>
+
+            <View style={styles.specialistPromoActions}>
               <TouchableOpacity
-                style={styles.todayDouliInputRow}
-                onPress={() => navigateToDouli('')}
-                activeOpacity={0.8}
+                style={styles.specialistPromoPrimary}
+                onPress={() => openSpecialists('home_contextual_card', 'chat')}
+                activeOpacity={0.86}
               >
-                <Ionicons name="chatbubble-ellipses" size={18} color="#6B5CA5" />
-                <Text style={styles.todayDouliInput}>
-                  Escribe tu propia pregunta a Douli...
-                </Text>
+                <Ionicons name="chatbubbles-outline" size={17} color="#FFFFFF" />
+                <Text style={styles.specialistPromoPrimaryText}>Chat con especialista</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.specialistPromoSecondary}
+                onPress={() => openSpecialists('home_contextual_card', 'browse')}
+                activeOpacity={0.86}
+              >
+                <Text style={styles.specialistPromoSecondaryText}>Ver especialistas</Text>
               </TouchableOpacity>
             </View>
-
-
-            <Text style={styles.todaySectionTitle}>Explora Munpa</Text>
-
-            {todayRecommendations.length > 0 && (
-              <View style={styles.todayNearbySection}>
-                <View style={styles.todayNearbyHeader}>
-                  <Text style={styles.todayNearbyTitle}>Recomendaciones cerca de ti</Text>
-                  <TouchableOpacity onPress={() => (navigation as any).navigate('Recommendations')}>
-                    <Text style={styles.todayNearbyLink}>Ver todas</Text>
-                  </TouchableOpacity>
-                </View>
-
-                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                  {todayRecommendations.map((rec) => (
-                    <TouchableOpacity
-                      key={rec.id}
-                      style={styles.todayNearbyCard}
-                      onPress={() =>
-                        (navigation as any).navigate('Recommendations', {
-                          screen: 'RecommendationDetail',
-                          params: { recommendationId: rec.id },
-                        })
-                      }
-                    >
-                      {rec.imageUrl ? (
-                        <Image source={{ uri: rec.imageUrl }} style={styles.todayNearbyImage} />
-                      ) : (
-                        <View style={styles.todayNearbyImagePlaceholder}>
-                          <Ionicons name="sparkles" size={20} color="#FFF" />
-                        </View>
-                      )}
-                      <Text style={styles.todayNearbyName} numberOfLines={2}>
-                        {rec.name}
-                      </Text>
-                      <View style={styles.todayNearbyMeta}>
-                        <Ionicons name="location" size={12} color="#59C6C0" />
-                        <Text style={styles.todayNearbyDistance}>
-                          {rec.distance != null ? `${Number(rec.distance).toFixed(2)} km` : 'Cerca de ti'}
-                        </Text>
-                        <Text style={styles.todayNearbyRating}>
-                          {(() => {
-                            const total = rec.totalReviews || rec.stats?.totalReviews || 0;
-                            const avg = rec.averageRating || rec.stats?.averageRating || 0;
-                            const recommendations = calculateRecommendations(total, avg);
-                            return recommendations > 0
-                              ? `👥 ${recommendations} ${recommendations === 1 ? 'mamá lo recomienda' : 'mamás lo recomiendan'}`
-                              : '👥 Sin recomendaciones';
-                          })()}
-                        </Text>
-                      </View>
-                      {(rec.cityName || rec.city || rec.countryName || rec.country) && (
-                        <Text style={styles.todayNearbyLocation} numberOfLines={1}>
-                          {(rec.cityName || rec.city || 'Ciudad')} · {rec.countryName || rec.country || 'País'}
-                        </Text>
-                      )}
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
-              </View>
-            )}
-
-            <View style={styles.todayNearbySection}>
-              <View style={styles.todayNearbyHeader}>
-                <Text style={styles.todayNearbyTitle}>Munpa Market cerca de ti</Text>
-                <TouchableOpacity onPress={() => (navigation as any).navigate('MunpaMarket')}>
-                  <Text style={styles.todayNearbyLink}>Ver todo</Text>
-                </TouchableOpacity>
-              </View>
-
-              {todayLocationLoading && (
-                <ActivityIndicator color="#FFF" />
-              )}
-
-              {!todayLocationLoading && !todayLocationGranted && (
-                <Text style={styles.todayNearbyEmpty}>Activa tu ubicación para ver productos cercanos.</Text>
-              )}
-
-              {todayLocationGranted && loadingTodayMarket && (
-                <ActivityIndicator color="#FFF" />
-              )}
-
-              {todayLocationGranted && !loadingTodayMarket && todayMarketProducts.length === 0 && (
-                <Text style={styles.todayNearbyEmpty}>
-                  {todayMarketError || 'No hay productos cercanos por ahora.'}
-                </Text>
-              )}
-
-              {todayMarketProducts.length > 0 && (
-                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                  {todayMarketProducts.map((product) => {
-                    const image =
-                      product.images?.[0] ||
-                      (product as any)?.photos?.[0] ||
-                      product.imageUrl ||
-                      (product as any)?.image ||
-                      (product as any)?.photoUrl;
-                    const title = product.title || product.name || 'Producto';
-                    return (
-                      <TouchableOpacity
-                        key={product.id}
-                        style={styles.todayNearbyCard}
-                        onPress={() => {
-                          analyticsService.logEvent('market_product_view', {
-                            product_id: product.id,
-                            title,
-                            type: (product as any)?.type || null,
-                            price: (product as any)?.price ?? null,
-                            category: (product as any)?.category || null,
-                            city: (product as any)?.location?.city || null,
-                            country: (product as any)?.location?.country || null,
-                          });
-                          (navigation as any).navigate('ProductDetail', { productId: product.id });
-                        }}
-                      >
-                        {image ? (
-                          <Image source={{ uri: image }} style={styles.todayNearbyImage} />
-                        ) : (
-                          <View style={styles.todayNearbyImagePlaceholder}>
-                            <Ionicons name="bag-handle" size={20} color="#FFF" />
-                          </View>
-                        )}
-                        <Text style={styles.todayNearbyName} numberOfLines={2}>
-                          {title}
-                        </Text>
-                        <View style={styles.todayNearbyMeta}>
-                          <Ionicons name="location" size={12} color="#59C6C0" />
-                          <Text style={styles.todayNearbyDistance}>
-                          {product.distance != null ? `${Number(product.distance).toFixed(2)} km` : 'Cerca de ti'}
-                          </Text>
-                        </View>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </ScrollView>
-              )}
-            </View>
-
-            {/* Banner Home 3 - Sobre Popular en la comunidad */}
-            <View style={styles.bannerHome3Container}>
-            <BannerCarousel
-                section="home3"
-                fallbackToHome={false}
-                imageResizeMode="cover"
-                bannerHeight={140}
-                bannerWidth={290}
-                autoScroll={false}
-                showIndicators={false}
-              />
-            </View>
-
-            <View style={styles.todayNearbySection}>
-              <View style={styles.todayNearbyHeader}>
-                <Text style={styles.todayNearbyTitle}>Popular en la comunidad</Text>
-                <TouchableOpacity onPress={() => (navigation as any).navigate('Communities')}>
-                  <Text style={styles.todayNearbyLink}>Ver todo</Text>
-                </TouchableOpacity>
-              </View>
-
-              {loadingTodayCommunityPosts && (
-                <ActivityIndicator color="#6B7280" />
-              )}
-
-              {!loadingTodayCommunityPosts && todayCommunityPosts.length === 0 && (
-                <Text style={styles.todayNearbyEmpty}>
-                  {todayCommunityError || 'No hay posts populares por ahora.'}
-                </Text>
-              )}
-
-              {todayCommunityPosts.length > 0 && (
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.popularPostList}
-                >
-                  {todayCommunityPosts.map((post) => (
-                    <TouchableOpacity
-                      key={post.id}
-                      style={[styles.popularPostCard, { width: POPULAR_POST_CARD_WIDTH }]}
-                      onPress={() => (navigation as any).navigate('PostDetail', { post })}
-                    >
-                      <View style={styles.popularPostHeader}>
-                        <View style={styles.popularPostAvatar}>
-                          <Ionicons name="person" size={20} color="#6B7280" />
-                        </View>
-                        <View style={styles.popularPostHeaderInfo}>
-                          <View style={styles.popularPostHeaderRow}>
-                            <Text style={styles.popularPostAuthor}>
-                              {post.authorName || 'Usuario Munpa'}
-                            </Text>
-                            {post.createdAt ? (
-                              <>
-                                <Text style={styles.popularPostMetaDot}>·</Text>
-                                <Text style={styles.popularPostTime}>
-                                  {formatTimeAgo(post.createdAt)}
-                                </Text>
-                              </>
-                            ) : null}
-                          </View>
-                          <Text style={styles.popularPostCommunity}>
-                            {post.communityName || 'Comunidad Munpa'}
-                          </Text>
-                        </View>
-                      </View>
-
-                      {post.title ? (
-                        <>
-                          <Text style={styles.popularPostTitle} numberOfLines={2}>
-                            {post.title}
-                          </Text>
-                          <Text style={styles.popularPostExcerpt} numberOfLines={3}>
-                            {post.content || ''}
-                          </Text>
-                        </>
-                      ) : (
-                        <Text style={styles.popularPostTitle} numberOfLines={5}>
-                          {post.content || 'Publicación destacada'}
-                        </Text>
-                      )}
-
-                      <View style={styles.popularPostActions}>
-                        <View style={styles.popularPostActionItem}>
-                          <Ionicons name="heart-outline" size={18} color="#4A5568" />
-                          <Text style={styles.popularPostActionText}>
-                            {post.likeCount ?? 0}
-                          </Text>
-                        </View>
-                        <View style={styles.popularPostActionItem}>
-                          <Ionicons name="share-social-outline" size={18} color="#4A5568" />
-                        </View>
-                      </View>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
-              )}
-            </View>
-
           </View>
-        )}
+
+          {todayRecipe && (
+            <View style={styles.recipeSection}>
+              <View style={styles.recipeSectionHeader}>
+                <Text style={styles.recipeSectionTitle}>Receta del día</Text>
+                <TouchableOpacity onPress={() => {
+                  analyticsService.logEvent('nutrition_view_more_clicked', {
+                    child_id: selectedChild?.id,
+                    recipe_name: todayRecipe.name,
+                    from: 'home',
+                  });
+                  (navigation as any).navigate('Feeding');
+                }}>
+                  <Text style={styles.recipeSectionLink}>Ver más</Text>
+                </TouchableOpacity>
+              </View>
+              <RecipeCard recipe={todayRecipe} />
+            </View>
+          )}
+
+          {!isPregnancyProfile && (
+            <>
+              <View style={styles.homeSectionHeader}>
+                <View>
+                  <Text style={styles.todaySectionTitle}>Apoyo rápido</Text>
+                  <Text style={styles.homeSectionSubtitle}>Herramientas para resolver algo ahora</Text>
+                </View>
+              </View>
+
+              <View style={styles.todayToolsRow}>
+                <TouchableOpacity
+                  style={[styles.todayToolCard, styles.todayToolCardSounds]}
+                  onPress={openWhiteNoiseModal}
+                >
+                  <Ionicons name="musical-notes" size={24} color="#9A6B00" />
+                  <Text style={styles.todayToolTitle}>Sonidos</Text>
+                  <Text style={styles.todayToolSubtitle}>Ruido blanco</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[styles.todayToolCard, styles.todayToolCardAdvisories]} onPress={openAdvisories}>
+                  <Ionicons name="medical" size={24} color="#6B5CA5" />
+                  <Text style={styles.todayToolTitle}>Primeros auxilios</Text>
+                  <Text style={styles.todayToolSubtitle}>Guía rápida</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.todayToolCard, styles.todayToolCardSpecialist]}
+                  onPress={() => openSpecialists('home_quick_support', 'quick_help')}
+                >
+                  <Ionicons name="medkit-outline" size={24} color="#178A84" />
+                  <Text style={styles.todayToolTitle}>Especialista</Text>
+                  <Text style={styles.todayToolSubtitle}>Chat o video</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[styles.todayToolCard, styles.todayToolCardHealth]} onPress={openHealthProfile}>
+                  <Ionicons name="fitness" size={24} color="#C93B78" />
+                  <Text style={styles.todayToolTitle}>Desarrollo</Text>
+                  <Text style={styles.todayToolSubtitle}>Ejercicios</Text>
+                </TouchableOpacity>
+              </View>
+            </>
+          )}
+
+          <View style={styles.todayDouliSection}>
+            <View style={styles.homeSectionHeaderCompact}>
+              <View>
+                <Text style={styles.todaySectionTitle}>Pregúntale a Douli</Text>
+                <Text style={styles.todayDouliSubtitle}>Resuelve dudas sin salir del Home</Text>
+              </View>
+              <View style={styles.douliBadge}>
+                <Ionicons name="sparkles" size={15} color="#6B5CA5" />
+              </View>
+            </View>
+            {visibleDouliQuestions.slice(0, 2).map((q) => (
+              <TouchableOpacity
+                key={q}
+                style={styles.todayDouliQuestion}
+                onPress={() => !loadingTodayFaq && navigateToDouli(q)}
+              >
+                <Ionicons name="help-circle-outline" size={18} color="#6B5CA5" />
+                <Text style={styles.todayDouliQuestionText} numberOfLines={2}>{q}</Text>
+                <Ionicons name="chevron-forward" size={16} color="#6B7280" />
+              </TouchableOpacity>
+            ))}
+            <TouchableOpacity
+              style={styles.douliSpecialistSuggestion}
+              onPress={() => openSpecialists('home_douli_bridge', 'medical_question')}
+              activeOpacity={0.84}
+            >
+              <View style={styles.douliSpecialistIcon}>
+                <Ionicons name="medical-outline" size={17} color="#178A84" />
+              </View>
+              <View style={styles.douliSpecialistCopy}>
+                <Text style={styles.douliSpecialistTitle}>¿Prefieres hablar con una especialista?</Text>
+                <Text style={styles.douliSpecialistText}>{specialistDouliQuestion}</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={16} color="#178A84" />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.todayDouliInputRow}
+              onPress={() => navigateToDouli('')}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="chatbubble-ellipses" size={18} color="#6B5CA5" />
+              <Text style={styles.todayDouliInput}>Escribe tu propia pregunta...</Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.homeSectionHeader}>
+            <View>
+              <Text style={styles.todaySectionTitle}>Explora Munpa</Text>
+              <Text style={styles.homeSectionSubtitle}>Todo sigue disponible cuando lo necesites</Text>
+            </View>
+          </View>
+
+          <View style={styles.exploreGrid}>
+            <TouchableOpacity
+              style={styles.exploreCard}
+              onPress={() => (navigation as any).navigate('Recommendations')}
+              activeOpacity={0.86}
+            >
+              <View style={[styles.exploreIcon, styles.exploreIconTeal]}>
+                <Ionicons name="star-outline" size={22} color="#178A84" />
+              </View>
+              <Text style={styles.exploreTitle}>Recomendaciones</Text>
+              <Text style={styles.exploreSubtitle}>Lugares y servicios</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.exploreCard}
+              onPress={() => (navigation as any).navigate('MunpaMarket')}
+              activeOpacity={0.86}
+            >
+              <View style={[styles.exploreIcon, styles.exploreIconYellow]}>
+                <Ionicons name="bag-handle-outline" size={22} color="#9A6B00" />
+              </View>
+              <Text style={styles.exploreTitle}>Market</Text>
+              <Text style={styles.exploreSubtitle}>Compra y vende</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.exploreCard}
+              onPress={() => (navigation as any).navigate('Communities')}
+              activeOpacity={0.86}
+            >
+              <View style={[styles.exploreIcon, styles.exploreIconPurple]}>
+                <Ionicons name="people-outline" size={22} color="#6B5CA5" />
+              </View>
+              <Text style={styles.exploreTitle}>Comunidad</Text>
+              <Text style={styles.exploreSubtitle}>Posts y grupos</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
 
         {/* Espacio final - con padding extra para el botón fijo */}
         <View style={[styles.finalSpacing, { height: 100 }]} />
@@ -3270,11 +3629,21 @@ const HomeScreen: React.FC = () => {
               showsVerticalScrollIndicator={false}
             >
               {pregnancySizeImage && (
-                <Image
-                  source={pregnancySizeImage}
-                  style={styles.pregnancyDetailImage}
-                  resizeMode="contain"
-                />
+                <TouchableOpacity
+                  style={styles.pregnancyDetailImageButton}
+                  onPress={openPregnancyImageViewerFromDetail}
+                  activeOpacity={0.9}
+                >
+                  <Image
+                    source={pregnancySizeImage}
+                    style={styles.pregnancyDetailImage}
+                    resizeMode="contain"
+                  />
+                  <View style={styles.pregnancyDetailImageHint}>
+                    <Ionicons name="expand-outline" size={14} color="#FFFFFF" />
+                    <Text style={styles.pregnancyDetailImageHintText}>Ver grande</Text>
+                  </View>
+                </TouchableOpacity>
               )}
 
               {pregnancyWeekDetail && (
@@ -3420,6 +3789,74 @@ const HomeScreen: React.FC = () => {
                 </>
               )}
             </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Visor de imagen de embarazo */}
+      <Modal
+        visible={showPregnancyImageModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowPregnancyImageModal(false)}
+      >
+        <View style={styles.pregnancyImageViewerOverlay}>
+          <View style={styles.pregnancyImageViewerHeader}>
+            <TouchableOpacity
+              style={styles.pregnancyImageViewerIconButton}
+              onPress={() => setShowPregnancyImageModal(false)}
+              activeOpacity={0.82}
+            >
+              <Ionicons name="close" size={24} color="#FFFFFF" />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.pregnancyImageViewerShareButton}
+              onPress={sharePregnancyImage}
+              activeOpacity={0.86}
+            >
+              <Ionicons name="share-social-outline" size={18} color="#FFFFFF" />
+              <Text style={styles.pregnancyImageViewerShareText}>Compartir</Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.pregnancyImageViewerTitleWrap}>
+            <Text style={styles.pregnancyImageViewerEyebrow}>
+              {pregnancyComparisonLabel}
+            </Text>
+            <Text style={styles.pregnancyImageViewerTitle}>
+              {pregnancyImageShareTitle}
+            </Text>
+            <Text style={styles.pregnancyImageViewerInsight}>
+              {pregnancyImageShareMeasurement
+                ? `${pregnancyImageShareMeasurement} ${pregnancyImageShareFact}`
+                : pregnancyImageShareFact}
+            </Text>
+          </View>
+
+          {pregnancySizeImage ? (
+            <Image
+              source={pregnancySizeImage}
+              style={styles.pregnancyImageViewerImage}
+              resizeMode="contain"
+            />
+          ) : (
+            <View style={styles.pregnancyImageViewerFallback}>
+              <Text style={styles.pregnancySizeEmoji}>{pregnancySize?.emoji || '✨'}</Text>
+              <Text style={styles.pregnancyImageViewerFallbackText}>Imagen pronto</Text>
+            </View>
+          )}
+
+          <View style={styles.pregnancyImageViewerFooter}>
+            <TouchableOpacity
+              style={styles.pregnancyImageViewerPrimaryAction}
+              onPress={sharePregnancyImage}
+              activeOpacity={0.86}
+            >
+              <Ionicons name="send-outline" size={18} color="#FFFFFF" />
+              <Text style={styles.pregnancyImageViewerPrimaryText}>
+                Compartir imagen
+              </Text>
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>
@@ -3588,6 +4025,10 @@ const styles = StyleSheet.create({
   scrollView: {
     flex: 1,
   },
+  homeScrollContent: {
+    backgroundColor: '#FFFFFF',
+    paddingBottom: 24,
+  },
 
   // Header principal Home
   homeHeaderBar: {
@@ -3681,6 +4122,122 @@ const styles = StyleSheet.create({
     color: "#2D3748",
     marginBottom: 6,
   },
+  homeHero: {
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    paddingBottom: 10,
+  },
+  homeHeroCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 20,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: "#D8F1EF",
+    shadowColor: "#178A84",
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 2,
+  },
+  homeHeroTopRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 14,
+  },
+  homeHeroCopy: {
+    flex: 1,
+  },
+  homeHeroEyebrow: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#178A84",
+    textTransform: "uppercase",
+  },
+  homeHeroTitle: {
+    fontSize: 23,
+    fontWeight: "700",
+    color: "#24323F",
+    marginTop: 4,
+    lineHeight: 30,
+  },
+  homeHeroSubtitle: {
+    fontSize: 14,
+    fontWeight: "500",
+    color: "#526170",
+    marginTop: 6,
+    lineHeight: 20,
+  },
+  homeHeroAvatarButton: {
+    width: 62,
+    height: 62,
+    borderRadius: 20,
+    backgroundColor: "#FFFFFF",
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 3,
+    borderColor: "#FFFFFF",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 10,
+    elevation: 3,
+    overflow: "hidden",
+  },
+  homeHeroAvatar: {
+    width: "100%",
+    height: "100%",
+  },
+  homeHeroAvatarPlaceholder: {
+    width: 62,
+    height: 62,
+    borderRadius: 20,
+    backgroundColor: "#FFF0F6",
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 3,
+    borderColor: "#FFFFFF",
+  },
+  homeHeroFooter: {
+    marginTop: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+  },
+  homeHeroBadge: {
+    flex: 1,
+    minHeight: 38,
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#F4FBFA",
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    gap: 8,
+  },
+  homeHeroBadgeText: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#2D3748",
+  },
+  homeHeroAskButton: {
+    minHeight: 38,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#FFFFFF",
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    gap: 6,
+    borderWidth: 1,
+    borderColor: "#E5E1F2",
+  },
+  homeHeroAskText: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#6B5CA5",
+  },
 
   // Sección de saludo
   greetingSection: {
@@ -3717,25 +4274,50 @@ const styles = StyleSheet.create({
     fontWeight: "500",
   },
   quickActionsContainer: {
-    paddingHorizontal: 12,
-    gap: 8,
-    paddingBottom: 10,
+    paddingHorizontal: 20,
+    gap: 9,
+    paddingBottom: 4,
     flexGrow: 1,
-    justifyContent: "center",
+  },
+  quickActionsShell: {
+    paddingBottom: 14,
+  },
+  quickActionsHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 20,
+    marginBottom: 10,
+  },
+  quickActionsTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#24323F",
+  },
+  quickActionsHint: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#718096",
   },
   quickActionButton: {
     flexDirection: "column",
     alignItems: "center",
     justifyContent: "center",
-    width: 58,
-    height: 58,
-    borderRadius: 10,
+    width: 88,
+    height: 78,
+    borderRadius: 16,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    elevation: 2,
   },
   quickActionLabel: {
-    marginTop: 2,
-    fontSize: 9,
+    marginTop: 8,
+    fontSize: 11,
     fontWeight: "600",
     color: "#FFFFFF",
+    textAlign: "center",
   },
   quickActionTeal: {
     backgroundColor: "#59C6C0",
@@ -3759,9 +4341,18 @@ const styles = StyleSheet.create({
   // Consultas Activas
   activeConsultationsContainer: {
     backgroundColor: '#FFFFFF',
-    paddingVertical: 20,
+    paddingVertical: 18,
     paddingHorizontal: 20,
-    marginBottom: 8,
+    marginHorizontal: 20,
+    marginBottom: 18,
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: '#E9EEF2',
+    shadowColor: '#2D3748',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.07,
+    shadowRadius: 16,
+    elevation: 3,
   },
   consultationsHeader: {
     flexDirection: 'row',
@@ -3790,12 +4381,12 @@ const styles = StyleSheet.create({
   },
   consultationCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    padding: 20,
+    borderRadius: 18,
+    padding: 18,
     marginRight: 16,
     width: 300,
-    borderWidth: 2,
-    borderColor: '#F3F4F6',
+    borderWidth: 1,
+    borderColor: '#E9EEF2',
     shadowColor: '#887CBC',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.15,
@@ -3913,15 +4504,46 @@ const styles = StyleSheet.create({
   },
 
   bannerHome1Container: {
-    marginTop: -15,
-    marginBottom: -28,
+    marginTop: 0,
+    marginBottom: 12,
+    alignItems: 'center',
+  },
+  bannerSlot: {
+    marginTop: 0,
+    marginBottom: 14,
+    alignItems: 'center',
+  },
+  bannerHome1Carousel: {
+    height: 144,
+    maxHeight: 144,
+    overflow: 'hidden',
+  },
+  bannerSlotCompact: {
+    marginTop: -4,
+    marginBottom: 10,
+    alignItems: 'center',
+  },
+  bannerSlotWide: {
+    height: 112,
+    maxHeight: 112,
+    marginBottom: 16,
+    alignItems: 'center',
+    overflow: 'hidden',
+  },
+  bannerCompactCarousel: {
+    height: 118,
+    maxHeight: 118,
+    overflow: 'hidden',
   },
   bannerHome2Container: {
-    marginVertical: 12,
+    marginTop: 2,
+    marginBottom: 14,
+    alignItems: 'center',
   },
   bannerHome3Container: {
-    marginTop: -15,
-    marginVertical: 12,
+    marginTop: 4,
+    marginBottom: 16,
+    alignItems: 'center',
   },
   childSelectorModal: {
     backgroundColor: "#FFF",
@@ -6357,39 +6979,83 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
   },
   pregnancySizeCard: {
-    alignItems: 'center',
     backgroundColor: '#FFFFFF',
     borderRadius: 18,
-    padding: 8,
-    marginBottom: 12,
+    padding: 14,
+    marginBottom: 16,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: '#E9EEF2',
+    shadowColor: '#2D3748',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.04,
+    shadowRadius: 12,
+    elevation: 2,
+  },
+  pregnancyComparisonModes: {
+    gap: 8,
+    paddingTop: 10,
+    paddingBottom: 2,
+    paddingRight: 14,
+  },
+  pregnancyComparisonMode: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    minHeight: 38,
+    paddingHorizontal: 13,
+    borderRadius: 19,
+    backgroundColor: '#F9FAFB',
+    borderWidth: 1,
+    borderColor: '#E9EEF2',
+    marginRight: 8,
+  },
+  pregnancyComparisonModeActive: {
+    backgroundColor: '#59C6C0',
+    borderColor: '#59C6C0',
+  },
+  pregnancyComparisonModeIcon: {
+    fontSize: 15,
+  },
+  pregnancyComparisonModeText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#526170',
+  },
+  pregnancyComparisonModeTextActive: {
+    color: '#FFFFFF',
   },
   pregnancySizeImageWrap: {
     width: '100%',
-    height: PREGNANCY_SIZE_IMAGE_HEIGHT,
+    height: Math.min(PREGNANCY_SIZE_IMAGE_HEIGHT, 260),
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'transparent',
-    borderRadius: 16,
-    marginBottom: 6,
+    borderRadius: 18,
+    marginBottom: 2,
+    overflow: 'hidden',
+  },
+  pregnancySizeImageWrapHuman: {
+    height: Math.min(PREGNANCY_SIZE_IMAGE_HEIGHT, 302),
+    marginTop: 4,
+    marginHorizontal: 0,
+    alignSelf: 'stretch',
+    borderRadius: 18,
     overflow: 'hidden',
   },
   pregnancySizeImage: {
     width: '100%',
     height: '100%',
   },
+  pregnancySizeImageHuman: {
+    borderRadius: 18,
+  },
   pregnancySizeLearnMore: {
-    position: 'absolute',
-    top: 10,
-    right: 10,
-    zIndex: 2,
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#E84D8A',
-    borderRadius: 18,
-    paddingVertical: 7,
-    paddingHorizontal: 10,
+    borderRadius: 17,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.18,
@@ -6398,7 +7064,7 @@ const styles = StyleSheet.create({
   },
   pregnancySizeLearnMoreText: {
     fontSize: 12,
-    fontWeight: '900',
+    fontWeight: '700',
     color: '#FFFFFF',
     marginRight: 2,
   },
@@ -6407,56 +7073,88 @@ const styles = StyleSheet.create({
     height: '100%',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#F9FAFB',
   },
   pregnancySizeEmoji: {
-    fontSize: 56,
+    fontSize: 72,
   },
   pregnancySizeMissingText: {
-    fontSize: 12,
+    fontSize: 16,
     fontWeight: '700',
-    color: '#8A8F98',
+    color: '#2D3748',
     marginTop: 8,
+    textAlign: 'center',
+    paddingHorizontal: 18,
   },
-  pregnancySizeLabel: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#178A84',
-    textTransform: 'uppercase',
+  pregnancySizeMissingSubtext: {
+    maxWidth: 250,
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#6B7280',
+    lineHeight: 18,
+    marginTop: 6,
     textAlign: 'center',
   },
   pregnancySizeTitle: {
-    fontSize: 18,
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#6B7280',
+    marginTop: 2,
+    lineHeight: 18,
+    textAlign: 'left',
+  },
+  pregnancyWeekSelectorHeader: {
+    marginBottom: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  pregnancyWeekHeadline: {
+    flex: 1,
+    minWidth: 0,
+  },
+  pregnancyWeekSelectorTitle: {
+    fontSize: 22,
     fontWeight: '800',
     color: '#2D3748',
-    marginTop: 6,
-    lineHeight: 23,
-    textAlign: 'center',
+    lineHeight: 26,
   },
-  pregnancySizeDetail: {
+  pregnancyWeekActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  pregnancyWeekCurrentButton: {
+    minHeight: 34,
+    justifyContent: 'center',
+    paddingHorizontal: 12,
+    borderRadius: 17,
+    backgroundColor: '#F1FBFA',
+    borderWidth: 1,
+    borderColor: '#D8F1EF',
+  },
+  pregnancyWeekCurrentButtonText: {
     fontSize: 12,
-    color: '#4A5568',
-    marginTop: 2,
-    lineHeight: 16,
-    textAlign: 'center',
-    paddingHorizontal: 8,
+    fontWeight: '700',
+    color: '#178A84',
   },
   pregnancyWeekScroller: {
-    paddingTop: 8,
-    paddingBottom: 2,
-    paddingHorizontal: 4,
+    paddingTop: 6,
+    paddingBottom: 10,
+    paddingHorizontal: 2,
     gap: 8,
   },
   pregnancyWeekChip: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
+    width: PREGNANCY_WEEK_CHIP_SIZE,
+    height: PREGNANCY_WEEK_CHIP_SIZE,
+    borderRadius: PREGNANCY_WEEK_CHIP_SIZE / 2,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
     borderColor: '#D8F1EF',
-    marginRight: 8,
   },
   pregnancyWeekChipActive: {
     backgroundColor: '#59C6C0',
@@ -6464,7 +7162,7 @@ const styles = StyleSheet.create({
   },
   pregnancyWeekChipText: {
     fontSize: 13,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#4A5568',
   },
   pregnancyWeekChipTextActive: {
@@ -6479,7 +7177,12 @@ const styles = StyleSheet.create({
     bottom: 6,
   },
   pregnancyHub: {
-    marginBottom: 14,
+    marginBottom: 16,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 22,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#E9EEF2',
   },
   pregnancyHubHeader: {
     flexDirection: 'row',
@@ -6489,7 +7192,7 @@ const styles = StyleSheet.create({
   },
   pregnancyHubTitle: {
     fontSize: 18,
-    fontWeight: '900',
+    fontWeight: '700',
     color: '#2D3748',
   },
   pregnancyHubSubtitle: {
@@ -6508,7 +7211,7 @@ const styles = StyleSheet.create({
   },
   pregnancyHubWeekText: {
     fontSize: 16,
-    fontWeight: '900',
+    fontWeight: '700',
     color: '#FFFFFF',
   },
   pregnancyModuleGrid: {
@@ -6519,7 +7222,7 @@ const styles = StyleSheet.create({
   pregnancyModuleTile: {
     width: '48%',
     minHeight: 112,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#F9FAFB',
     borderRadius: 16,
     padding: 12,
     borderWidth: 1,
@@ -6830,11 +7533,132 @@ const styles = StyleSheet.create({
     marginHorizontal: -2,
     paddingHorizontal: 2,
   },
-  pregnancyDetailImage: {
+  pregnancyDetailImageButton: {
     width: '100%',
     height: 220,
     borderRadius: 18,
     marginBottom: 14,
+    overflow: 'hidden',
+  },
+  pregnancyDetailImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 18,
+  },
+  pregnancyDetailImageHint: {
+    position: 'absolute',
+    right: 10,
+    bottom: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: 'rgba(45, 55, 72, 0.82)',
+    borderRadius: 16,
+    paddingVertical: 7,
+    paddingHorizontal: 10,
+  },
+  pregnancyDetailImageHintText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#FFFFFF',
+  },
+  pregnancyImageViewerOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(12, 16, 24, 0.96)',
+    paddingTop: Platform.OS === 'ios' ? 58 : 34,
+    paddingHorizontal: 18,
+    paddingBottom: Platform.OS === 'ios' ? 34 : 24,
+  },
+  pregnancyImageViewerHeader: {
+    minHeight: 44,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  pregnancyImageViewerIconButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.14)',
+  },
+  pregnancyImageViewerShareButton: {
+    minHeight: 42,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    paddingHorizontal: 14,
+    borderRadius: 21,
+    backgroundColor: '#E84D8A',
+  },
+  pregnancyImageViewerShareText: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#FFFFFF',
+  },
+  pregnancyImageViewerTitleWrap: {
+    alignItems: 'center',
+    marginTop: 14,
+    marginBottom: 10,
+  },
+  pregnancyImageViewerEyebrow: {
+    fontSize: 12,
+    fontWeight: '900',
+    color: '#F9A8D4',
+    textTransform: 'uppercase',
+  },
+  pregnancyImageViewerTitle: {
+    fontSize: 22,
+    fontWeight: '900',
+    color: '#FFFFFF',
+    marginTop: 4,
+  },
+  pregnancyImageViewerInsight: {
+    maxWidth: 320,
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#E5E7EB',
+    lineHeight: 18,
+    textAlign: 'center',
+    marginTop: 8,
+  },
+  pregnancyImageViewerImage: {
+    flex: 1,
+    width: '100%',
+    maxHeight: '74%',
+    alignSelf: 'center',
+  },
+  pregnancyImageViewerFallback: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pregnancyImageViewerFallbackText: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    marginTop: 8,
+  },
+  pregnancyImageViewerFooter: {
+    marginTop: 16,
+    alignItems: 'center',
+  },
+  pregnancyImageViewerPrimaryAction: {
+    minHeight: 50,
+    width: '100%',
+    maxWidth: 320,
+    borderRadius: 25,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#E84D8A',
+  },
+  pregnancyImageViewerPrimaryText: {
+    fontSize: 15,
+    fontWeight: '900',
+    color: '#FFFFFF',
   },
   pregnancyMeasurementCard: {
     backgroundColor: '#FFF0F6',
@@ -7059,45 +7883,181 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
   todayGuideCard: {
-    backgroundColor: "#FFF7D6",
-    borderRadius: 18,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 20,
     padding: 16,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: "#FFC211",
+    borderColor: "#F3E2A0",
+    shadowColor: "#9A6B00",
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.06,
+    shadowRadius: 12,
+    elevation: 2,
+  },
+  todayGuideHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginBottom: 8,
+  },
+  todayGuideHeaderCopy: {
+    flex: 1,
+  },
+  todayGuideIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 12,
+    backgroundColor: "#FFF4D1",
+    alignItems: "center",
+    justifyContent: "center",
   },
   todayGuideLabel: {
     fontSize: 12,
-    fontWeight: "600",
-    color: "#6B7280",
+    fontWeight: "700",
+    color: "#9A6B00",
     textTransform: "uppercase",
-    letterSpacing: 0.8,
+  },
+  todayGuideHeaderSubtitle: {
+    fontSize: 12,
+    fontWeight: "500",
+    color: "#718096",
+    marginTop: 2,
+  },
+  todayGuideMetaPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: "#FFF4D1",
+    borderRadius: 14,
+    paddingHorizontal: 9,
+    paddingVertical: 6,
+    borderWidth: 1,
+    borderColor: "#FFE08A",
+  },
+  todayGuideMetaText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#9A6B00",
   },
   todayGuideWeek: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: "700",
-    color: "#2D3748",
-    marginTop: 6,
+    color: "#24323F",
+    marginTop: 8,
+    lineHeight: 25,
   },
   todayGuideText: {
-    fontSize: 13,
+    fontSize: 14,
     color: "#4A5568",
-    marginTop: 6,
-    lineHeight: 18,
+    marginTop: 8,
+    lineHeight: 21,
   },
   todayGuideSubtitle: {
     fontSize: 13,
     color: "#6B7280",
     marginTop: 4,
-    fontStyle: "italic",
+    lineHeight: 18,
+  },
+  todayPlanActionCard: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    backgroundColor: "#F4FBFA",
+    borderRadius: 16,
+    padding: 13,
+    marginTop: 14,
+    borderWidth: 1,
+    borderColor: "#D8F1EF",
+    gap: 10,
+  },
+  todayPlanStepBadge: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: "#59C6C0",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  todayPlanStepText: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#FFFFFF",
+  },
+  todayPlanActionCopy: {
+    flex: 1,
+  },
+  todayPlanActionLabel: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#178A84",
+    textTransform: "uppercase",
+    marginBottom: 3,
+  },
+  todayPlanActionText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#24323F",
+    lineHeight: 20,
+  },
+  todayGuideWhyRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 8,
+    marginTop: 12,
+    paddingHorizontal: 2,
+  },
+  todayGuideWhyText: {
+    flex: 1,
+    fontSize: 12,
+    color: "#526170",
+    lineHeight: 17,
+  },
+  todayGuideActions: {
+    flexDirection: "row",
+    gap: 10,
+    marginTop: 16,
+  },
+  todayGuidePrimaryButton: {
+    flex: 1.2,
+    minHeight: 44,
+    borderRadius: 14,
+    backgroundColor: "#887CBC",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+  },
+  todayGuidePrimaryButtonText: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#FFFFFF",
+  },
+  todayGuideSecondaryButton: {
+    flex: 1,
+    minHeight: 44,
+    borderRadius: 14,
+    backgroundColor: "#F1EEFA",
+    borderWidth: 1,
+    borderColor: "#DCD6F0",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+  },
+  todayGuideSecondaryButtonText: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#6B5CA5",
   },
   todayGuideTipCard: {
     flexDirection: "row",
     alignItems: "flex-start",
-    backgroundColor: "#EAF6E5",
-    borderRadius: 14,
+    backgroundColor: "#F4FBFA",
+    borderRadius: 16,
     padding: 12,
-    marginTop: 10,
+    marginTop: 14,
+    borderWidth: 1,
+    borderColor: "#D8F1EF",
   },
   todayGuideTipIcon: {
     width: 28,
@@ -7192,16 +8152,202 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: "#9CA3AF",
   },
+  specialistPromoCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 20,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: "#D8F1EF",
+    shadowColor: "#178A84",
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.06,
+    shadowRadius: 12,
+    elevation: 2,
+  },
+  specialistPromoTop: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 12,
+  },
+  specialistPromoIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 15,
+    backgroundColor: "#E9FAF8",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  specialistPromoCopy: {
+    flex: 1,
+  },
+  specialistPromoEyebrow: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: "#178A84",
+    textTransform: "uppercase",
+  },
+  specialistPromoTitle: {
+    fontSize: 18,
+    fontWeight: "800",
+    color: "#24323F",
+    lineHeight: 23,
+    marginTop: 3,
+  },
+  specialistPromoSubtitle: {
+    fontSize: 13,
+    color: "#526170",
+    lineHeight: 18,
+    marginTop: 5,
+  },
+  specialistPromoBody: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    marginTop: 14,
+  },
+  specialistAvatarStack: {
+    width: 86,
+    height: 38,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  specialistMiniAvatar: {
+    width: 38,
+    height: 38,
+    borderRadius: 15,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 2,
+    borderColor: "#FFFFFF",
+    marginRight: -10,
+  },
+  specialistMiniAvatarTeal: {
+    backgroundColor: "#E9FAF8",
+  },
+  specialistMiniAvatarPink: {
+    backgroundColor: "#FFF0F6",
+  },
+  specialistMiniAvatarPurple: {
+    backgroundColor: "#F1EEFA",
+  },
+  specialistTrustGrid: {
+    flex: 1,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 7,
+  },
+  specialistTrustPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    backgroundColor: "#F4FBFA",
+    borderRadius: 12,
+    paddingHorizontal: 9,
+    paddingVertical: 6,
+    borderWidth: 1,
+    borderColor: "#D8F1EF",
+  },
+  specialistTrustText: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: "#178A84",
+  },
+  specialistPromoChips: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginTop: 14,
+  },
+  specialistPromoChip: {
+    backgroundColor: "#F8FAFC",
+    borderRadius: 13,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderWidth: 1,
+    borderColor: "#E9EEF2",
+  },
+  specialistPromoChipText: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: "#526170",
+  },
+  specialistPromoNote: {
+    fontSize: 12,
+    color: "#718096",
+    lineHeight: 17,
+    marginTop: 12,
+  },
+  specialistPromoActions: {
+    flexDirection: "row",
+    gap: 10,
+    marginTop: 14,
+  },
+  specialistPromoPrimary: {
+    flex: 1.35,
+    minHeight: 44,
+    borderRadius: 15,
+    backgroundColor: "#59C6C0",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 7,
+    paddingHorizontal: 12,
+  },
+  specialistPromoPrimaryText: {
+    fontSize: 13,
+    fontWeight: "800",
+    color: "#FFFFFF",
+  },
+  specialistPromoSecondary: {
+    flex: 1,
+    minHeight: 44,
+    borderRadius: 15,
+    backgroundColor: "#F1FBFA",
+    borderWidth: 1,
+    borderColor: "#D8F1EF",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 10,
+  },
+  specialistPromoSecondaryText: {
+    fontSize: 13,
+    fontWeight: "800",
+    color: "#178A84",
+  },
   todaySectionTitle: {
-    fontSize: 16,
+    fontSize: 17,
     fontWeight: "700",
-    color: "#2D3748",
-    marginBottom: 10,
+    color: "#24323F",
+    marginBottom: 2,
+  },
+  homeSectionHeader: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    justifyContent: "space-between",
+    marginBottom: 12,
+  },
+  homeSectionHeaderCompact: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 12,
+  },
+  homeSectionSubtitle: {
+    fontSize: 12,
+    color: "#718096",
+    fontWeight: "500",
+    marginTop: 3,
   },
 
   // Estilos para sección de Receta
   recipeSection: {
-    marginBottom: 20,
+    marginBottom: 16,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 18,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#E9EEF2',
   },
   recipeSectionHeader: {
     flexDirection: 'row',
@@ -7210,53 +8356,67 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   recipeSectionTitle: {
-    fontSize: 16,
+    fontSize: 17,
     fontWeight: '700',
-    color: '#2D3748',
+    color: '#24323F',
   },
   recipeSectionLink: {
     fontSize: 13,
-    fontWeight: '600',
-    color: '#59C6C0',
+    fontWeight: '700',
+    color: '#178A84',
   },
   todayToolsRow: {
     flexDirection: "row",
-    justifyContent: "center",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
     marginBottom: 16,
-    gap: 16,
+    gap: 10,
   },
   todayToolCard: {
-    width: 112,
-    height: 112,
+    width: "48%",
+    minHeight: 98,
     backgroundColor: "#FFFFFF",
-    borderRadius: 56,
-    paddingVertical: 16,
-    paddingHorizontal: 12,
+    borderRadius: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 10,
     alignItems: "center",
     justifyContent: "center",
-    borderWidth: 0,
+    borderWidth: 1,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
   },
   todayToolCardSounds: {
-    backgroundColor: "#FFC211",
+    backgroundColor: "#FFF4D1",
+    borderColor: "#FFE08A",
   },
   todayToolCardAdvisories: {
-    backgroundColor: "#887CBC",
+    backgroundColor: "#F1EEFA",
+    borderColor: "#DCD6F0",
+  },
+  todayToolCardSpecialist: {
+    backgroundColor: "#E9FAF8",
+    borderColor: "#BFEDEA",
   },
   todayToolCardHealth: {
-    backgroundColor: "#F08EB7",
+    backgroundColor: "#FFF0F6",
+    borderColor: "#FFD6E8",
   },
   todayToolTitle: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: "700",
-    color: "#FFF",
+    color: "#24323F",
     marginTop: 8,
     textAlign: "center",
   },
   todayToolSubtitle: {
-    fontSize: 10,
-    color: "rgba(255, 255, 255, 0.9)",
-    marginTop: 2,
+    fontSize: 11,
+    color: "#526170",
+    marginTop: 3,
     textAlign: "center",
+    fontWeight: "700",
   },
   todayTitle: {
     fontSize: 20,
@@ -7271,36 +8431,57 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   todayBannerContainer: {
-    marginBottom: 16,
+    height: 124,
+    maxHeight: 124,
+    marginBottom: 18,
     alignItems: 'center',
     width: '100%',
     position: 'relative',
+    overflow: 'hidden',
   },
-  todayBanner: {
-    width: '110%',
-
+  todayBannerCarousel: {
+    height: 112,
+    maxHeight: 112,
+    width: '100%',
+    overflow: 'hidden',
   },
   todayDouliSection: {
     backgroundColor: "#FFF",
-    borderRadius: 18,
+    borderRadius: 20,
     padding: 16,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: "#F08EB7",
+    borderColor: "#FFD6E8",
+    shadowColor: "#C93B78",
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.05,
+    shadowRadius: 12,
+    elevation: 2,
+  },
+  douliBadge: {
+    width: 32,
+    height: 32,
+    borderRadius: 12,
+    backgroundColor: "#F1EEFA",
+    alignItems: "center",
+    justifyContent: "center",
   },
   todayDouliSubtitle: {
     fontSize: 13,
     color: "#4A5568",
-    marginBottom: 10,
+    fontWeight: "500",
+    marginTop: 3,
   },
   todayDouliQuestion: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#F7ECF5",
-    borderRadius: 12,
-    paddingVertical: 10,
+    backgroundColor: "#FFF7FB",
+    borderRadius: 14,
+    paddingVertical: 12,
     paddingHorizontal: 12,
     marginBottom: 8,
+    borderWidth: 1,
+    borderColor: "#F6DCEB",
   },
   todayDouliQuestionText: {
     flex: 1,
@@ -7308,14 +8489,51 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: "#2D3748",
   },
+  douliSpecialistSuggestion: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    backgroundColor: "#F4FBFA",
+    borderRadius: 15,
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    marginTop: 2,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: "#D8F1EF",
+  },
+  douliSpecialistIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 13,
+    backgroundColor: "#E9FAF8",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  douliSpecialistCopy: {
+    flex: 1,
+  },
+  douliSpecialistTitle: {
+    fontSize: 13,
+    fontWeight: "800",
+    color: "#24323F",
+  },
+  douliSpecialistText: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: "#718096",
+    lineHeight: 15,
+    marginTop: 2,
+  },
   todayDouliInputRow: {
     flexDirection: "row",
     alignItems: "center",
     borderWidth: 1,
-    borderColor: "#E2E8F0",
-    borderRadius: 12,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+    borderColor: "#DCD6F0",
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    backgroundColor: "#F8F6FC",
   },
   todayDouliInput: {
     flex: 1,
@@ -7546,96 +8764,166 @@ const styles = StyleSheet.create({
   },
 
   todayNearbySection: {
-    marginBottom: 14,
+    marginBottom: 16,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#E9EEF2',
+    shadowColor: '#2D3748',
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.04,
+    shadowRadius: 12,
+    elevation: 2,
   },
   todayNearbyHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 12,
   },
   todayNearbyTitle: {
-    fontSize: 16,
+    fontSize: 17,
     fontWeight: '700',
-    color: '#2D3748',
+    color: '#24323F',
+    flex: 1,
+    paddingRight: 10,
   },
   todayNearbyLink: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#6B7280',
-    opacity: 0.9,
+    color: '#178A84',
   },
   todayNearbyEmpty: {
-    fontSize: 12,
+    flex: 1,
+    fontSize: 13,
     color: '#6B7280',
-    opacity: 0.85,
-    marginBottom: 8,
+    lineHeight: 18,
+  },
+  emptyStateBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: '#F4FBFA',
+    borderRadius: 14,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#D8F1EF',
+  },
+  exploreGrid: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 18,
+  },
+  exploreCard: {
+    flex: 1,
+    minHeight: 128,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: '#E9EEF2',
+    padding: 12,
+    justifyContent: 'space-between',
+    shadowColor: '#2D3748',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.04,
+    shadowRadius: 10,
+    elevation: 2,
+  },
+  exploreIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 10,
+  },
+  exploreIconTeal: {
+    backgroundColor: '#E9FAF8',
+  },
+  exploreIconYellow: {
+    backgroundColor: '#FFF4D1',
+  },
+  exploreIconPurple: {
+    backgroundColor: '#F1EEFA',
+  },
+  exploreTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#24323F',
+    lineHeight: 17,
+  },
+  exploreSubtitle: {
+    fontSize: 11,
+    fontWeight: '500',
+    color: '#718096',
+    lineHeight: 15,
+    marginTop: 3,
   },
   todayNearbyCard: {
-    width: 140,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
+    width: 154,
+    backgroundColor: '#F9FAFB',
+    borderRadius: 16,
     padding: 10,
-    marginRight: 10,
+    marginRight: 12,
     borderWidth: 1,
-    borderColor: '#59C6C0',
+    borderColor: '#E9EEF2',
   },
   todayNearbyImage: {
     width: '100%',
-    height: 70,
-    borderRadius: 8,
-    marginBottom: 6,
+    height: 84,
+    borderRadius: 12,
+    marginBottom: 8,
   },
   todayNearbyImagePlaceholder: {
     width: '100%',
-    height: 70,
-    borderRadius: 8,
-    marginBottom: 6,
-    backgroundColor: '#59C6C0',
+    height: 84,
+    borderRadius: 12,
+    marginBottom: 8,
+    backgroundColor: '#96d2d3',
     justifyContent: 'center',
     alignItems: 'center',
   },
   todayNearbyName: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '700',
-    color: '#2D3748',
-    marginBottom: 4,
+    color: '#24323F',
+    marginBottom: 6,
+    lineHeight: 17,
   },
   todayNearbyMeta: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
+    flexWrap: 'wrap',
   },
   todayNearbyDistance: {
     fontSize: 11,
-    color: '#4A5568',
+    color: '#526170',
+    fontWeight: '700',
   },
   todayNearbyRating: {
     fontSize: 11,
-    color: '#4A5568',
-    marginLeft: 6,
+    color: '#526170',
+    fontWeight: '700',
   },
   todayNearbyLocation: {
-    marginTop: 4,
+    marginTop: 6,
     fontSize: 11,
     color: '#6B7280',
+    fontWeight: '600',
   },
   popularPostList: {
-    paddingHorizontal: 20,
+    paddingRight: 4,
     paddingBottom: 6,
   },
   popularPostCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 22,
+    backgroundColor: '#F9FAFB',
+    borderRadius: 18,
     padding: 14,
-    marginRight: 20,
+    marginRight: 12,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    elevation: 4,
+    borderColor: '#E9EEF2',
   },
   popularPostHeader: {
     flexDirection: 'row',
@@ -7643,10 +8931,10 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   popularPostAvatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#F1F5F9',
+    width: 42,
+    height: 42,
+    borderRadius: 15,
+    backgroundColor: '#EEF2F6',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
@@ -7660,9 +8948,9 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
   },
   popularPostAuthor: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '700',
-    color: '#1F2937',
+    color: '#24323F',
   },
   popularPostMetaDot: {
     marginHorizontal: 6,
@@ -7682,9 +8970,10 @@ const styles = StyleSheet.create({
   },
   popularPostTitle: {
     fontSize: 15,
-    fontWeight: '400',
-    color: '#1F2937',
+    fontWeight: '600',
+    color: '#24323F',
     marginBottom: 6,
+    lineHeight: 20,
   },
   popularPostExcerpt: {
     fontSize: 12,

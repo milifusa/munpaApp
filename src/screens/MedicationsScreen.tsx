@@ -16,7 +16,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { childrenService } from '../services/api';
 import { medicationsService } from '../services/childProfileService';
@@ -40,6 +40,7 @@ const MUNPA_BG = '#96d2d3';
 
 const MedicationsScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
+  const navigation = useNavigation<any>();
   const [children, setChildren] = useState<Child[]>([]);
   const [selectedChild, setSelectedChild] = useState<Child | null>(null);
   const [loading, setLoading] = useState(true);
@@ -153,6 +154,18 @@ const MedicationsScreen: React.FC = () => {
       }
     }, [selectedChild?.id, children.length])
   );
+
+  const openMedicationSpecialists = useCallback(() => {
+    analyticsService.logEvent('medication_specialists_banner_clicked', {
+      child_id: selectedChild?.id,
+      source: 'medications_banner',
+    });
+
+    navigation.navigate('SpecialistsList', {
+      source: 'medications_banner',
+      intent: 'medication_support',
+    });
+  }, [navigation, selectedChild?.id]);
 
   const openAddMedicationModal = () => {
     analyticsService.logEvent('medication_add_opened', {
@@ -349,6 +362,7 @@ const MedicationsScreen: React.FC = () => {
               fallbackToHome={false} 
               imageResizeMode="cover"
               bannerHeight={180}
+              onBannerPress={openMedicationSpecialists}
             />
 
             <View style={styles.medicationsSection}>

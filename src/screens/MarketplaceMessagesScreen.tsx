@@ -19,6 +19,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import marketplaceService, { MarketplaceMessage } from '../services/marketplaceService';
 import { useAuth } from '../contexts/AuthContext';
 import { axiosInstance as api } from '../services/api';
+import LinkableText from '../components/LinkableText';
 
 const MarketplaceMessagesScreen = () => {
   const navigation = useNavigation<any>();
@@ -390,12 +391,15 @@ const MarketplaceMessagesScreen = () => {
             styles.messageBubble,
             isMe ? styles.myMessageBubble : styles.theirMessageBubble,
           ]}>
-            <Text style={[
+            <LinkableText
+              style={[
               styles.messageText,
               isMe ? styles.myMessageText : styles.theirMessageText,
-            ]}>
-              {item.message}
-            </Text>
+              ]}
+              linkStyle={isMe ? styles.myMessageLink : styles.theirMessageLink}
+            >
+              {item.message || ''}
+            </LinkableText>
           </View>
           <Text style={[
             styles.messageTime,
@@ -707,6 +711,16 @@ const styles = StyleSheet.create({
   theirMessageText: {
     color: '#333',
   },
+  myMessageLink: {
+    color: '#FFFFFF',
+    textDecorationLine: 'underline',
+    fontWeight: '800',
+  },
+  theirMessageLink: {
+    color: '#178A84',
+    textDecorationLine: 'underline',
+    fontWeight: '800',
+  },
   messageTime: {
     fontSize: 11,
     color: '#999',
@@ -752,4 +766,3 @@ const styles = StyleSheet.create({
 });
 
 export default MarketplaceMessagesScreen;
-

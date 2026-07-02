@@ -56,7 +56,7 @@ const CommunitiesScreen = () => {
   const [isSearching, setIsSearching] = useState(false);
   const [showSearchResults, setShowSearchResults] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  const [activeFilter, setActiveFilter] = useState<'all' | 'my' | 'public'>('all');
+  const [activeFilter, setActiveFilter] = useState<'my' | 'explore'>('my');
   
   // Estado para el modal de creación
   const [isCreateModalVisible, setIsCreateModalVisible] = useState(false);
@@ -181,15 +181,30 @@ const CommunitiesScreen = () => {
     return `Hace ${Math.floor(diffDays / 30)}mes`;
   };
 
+  const getActivityTimestamp = (date: any) => {
+    if (!date) return 0;
+    if (typeof date === 'object' && date._seconds) return date._seconds * 1000;
+    if (typeof date === 'string') {
+      const time = new Date(date).getTime();
+      return Number.isNaN(time) ? 0 : time;
+    }
+    return 0;
+  };
+
+  const sortCommunitiesByActivity = (items: Community[]) =>
+    [...items].sort((a, b) => {
+      const activityDiff = getActivityTimestamp(b.lastActivity) - getActivityTimestamp(a.lastActivity);
+      if (activityDiff !== 0) return activityDiff;
+      return (b.postCount || 0) - (a.postCount || 0);
+    });
+
   // Función para aplicar filtros
-  const applyFilter = (filter: 'all' | 'my' | 'public') => {
+  const applyFilter = (filter: 'my' | 'explore') => {
     setActiveFilter(filter);
     if (filter === 'my') {
       setFilteredCommunities(userCommunities);
-    } else if (filter === 'public') {
-      setFilteredCommunities(publicCommunities);
     } else {
-      setFilteredCommunities(communities);
+      setFilteredCommunities(publicCommunities);
     }
   };
 
@@ -222,7 +237,13 @@ const CommunitiesScreen = () => {
       // Combinar ambas listas (usuario primero, luego públicas)
       const allCommunities = [...userCommunitiesData, ...publicCommunitiesData];
       setCommunities(allCommunities);
-      setFilteredCommunities(allCommunities);
+      if (Array.isArray(userCommunitiesData) && userCommunitiesData.length > 0) {
+        setFilteredCommunities(userCommunitiesData);
+        setActiveFilter((current) => current || 'my');
+      } else {
+        setFilteredCommunities(Array.isArray(publicCommunitiesData) ? publicCommunitiesData : []);
+        setActiveFilter('explore');
+      }
     } catch (error) {
       console.error('Error cargando comunidades:', error);
       // En caso de error, usar datos de ejemplo
@@ -256,14 +277,15 @@ const CommunitiesScreen = () => {
   // Búsqueda inteligente con debounce
   useEffect(() => {
     if (searchQuery.trim() === '') {
-      setFilteredCommunities(communities);
+      setFilteredCommunities(activeFilter === 'my' ? userCommunities : publicCommunities);
       setShowSearchResults(false);
       setSearchResults([]);
       return;
     }
 
     // Filtro local como fallback inmediato
-    const localFiltered = communities.filter(community =>
+    const sourceCommunities = activeFilter === 'my' ? userCommunities : publicCommunities;
+    const localFiltered = sourceCommunities.filter(community =>
       (community.name?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
       (community.description?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
       (community.category?.toLowerCase() || '').includes(searchQuery.toLowerCase())
@@ -276,7 +298,7 @@ const CommunitiesScreen = () => {
     }, 500); // 500ms de debounce
 
     return () => clearTimeout(timeoutId);
-  }, [searchQuery, communities]);
+  }, [searchQuery, activeFilter, userCommunities, publicCommunities]);
 
   // Función para realizar búsqueda inteligente en el backend
   const performIntelligentSearch = async (query: string) => {
@@ -627,7 +649,7 @@ const CommunitiesScreen = () => {
     
     return (
       <View style={[styles.categoryIcon, { backgroundColor: getCategoryColor(community.category || 'general') }]}>
-        <Ionicons name={getCategoryIcon(community.category || 'general') as any} size={40} color="white" />
+        <Ionicons name={getCategoryIcon(community.category || 'general') as any} size={26} color="white" />
       </View>
     );
   };
@@ -639,8 +661,8 @@ const CommunitiesScreen = () => {
     
     // Determinar el texto del botón según el tipo de comunidad
     const getButtonText = () => {
-      if (isMyCommunity) return 'Ver Comunidad';
-      if (!community.isPublic) return 'Solicitar Unión';
+      if (isMyCommunity) return 'Entrar';
+      if (!community.isPublic) return 'Solicitar';
       return 'Unirse';
     };
 
@@ -680,6 +702,114 @@ const CommunitiesScreen = () => {
     );
   };
 
+  const CommunityMetric = ({
+    icon,
+    text,
+    color = '#6B7280',
+  }: {
+    icon: string;
+    text: string;
+    color?: string;
+  }) => (
+    <View style={styles.metricPill}>
+      <Ionicons name={icon as any} size={13} color={color} />
+      <Text style={styles.metricText}>{text}</Text>
+    </View>
+  );
+
+  const CommunityCard = ({
+    community,
+    featured = false,
+  }: {
+    community: Community;
+    featured?: boolean;
+  }) => {
+    const isMyCommunity = isUserCommunity(community);
+    const hasPendingRequest = !isMyCommunity && !community.isPublic && pendingRequests.includes(community.id);
+
+    return (
+      <TouchableOpacity
+        key={community.id || Math.random().toString()}
+        style={[
+          styles.communityCard,
+          featured && styles.featuredCommunityCard,
+          isMyCommunity && styles.myCommunityCard,
+        ]}
+        onPress={() => handleJoinCommunity(community)}
+        activeOpacity={0.88}
+      >
+        <View style={styles.communityCardTop}>
+          <CommunityIcon community={community} />
+          <View style={styles.communityMainInfo}>
+            <View style={styles.communityNameRow}>
+              <Text
+                style={styles.communityName}
+                numberOfLines={1}
+                ellipsizeMode="tail"
+              >
+                {community.name || 'Sin nombre'}
+              </Text>
+              {!community.isPublic && (
+                <Ionicons name="lock-closed" size={14} color="#6B7280" />
+              )}
+            </View>
+            <Text style={styles.communityCategory}>{community.category || 'General'}</Text>
+          </View>
+        </View>
+
+        <Text numberOfLines={2} style={styles.communityDescription}>
+          {community.description || 'Sin descripción disponible'}
+        </Text>
+
+        <View style={styles.metricsRow}>
+          <CommunityMetric icon="people-outline" text={`${community.memberCount || 0} miembros`} />
+          {community.postCount !== undefined && (
+            <CommunityMetric icon="chatbubbles-outline" text={`${community.postCount} posts`} color="#59C6C0" />
+          )}
+          <CommunityMetric icon="time-outline" text={getTimeAgo(community.lastActivity)} />
+        </View>
+
+        <View style={styles.communityCardFooter}>
+          <View style={styles.statusBadgesRow}>
+            {isMyCommunity && (
+              <View style={styles.memberBadge}>
+                <Ionicons name="checkmark-circle" size={13} color="#178A84" />
+                <Text style={styles.memberBadgeText}>Miembro</Text>
+              </View>
+            )}
+            {hasPendingRequest && (
+              <View style={styles.pendingRequestBadge}>
+                <Ionicons name="time" size={13} color="#B7791F" />
+                <Text style={styles.pendingRequestBadgeText}>Pendiente</Text>
+              </View>
+            )}
+            {!isMyCommunity && community.isPublic && (
+              <View style={styles.publicBadge}>
+                <Ionicons name="globe-outline" size={13} color="#526170" />
+                <Text style={styles.publicBadgeText}>Pública</Text>
+              </View>
+            )}
+          </View>
+          <CommunityActionButton community={community} />
+        </View>
+
+        {isMyCommunity && !community.isPublic && (
+          <TouchableOpacity
+            style={styles.requestsButton}
+            onPress={() => navigation.navigate('CommunityRequests', {
+              communityId: community.id,
+              communityName: community.name
+            })}
+            activeOpacity={0.84}
+          >
+            <Ionicons name="mail-outline" size={15} color="#178A84" />
+            <Text style={styles.requestsButtonText}>Solicitudes</Text>
+          </TouchableOpacity>
+        )}
+      </TouchableOpacity>
+    );
+  };
+
   // Componente de Skeleton para carga
   const CommunityCardSkeleton = () => (
     <View style={styles.communityCard}>
@@ -696,6 +826,26 @@ const CommunitiesScreen = () => {
     </View>
   );
 
+  const myCommunitiesSorted = sortCommunitiesByActivity(userCommunities);
+  const exploreCommunities = sortCommunitiesByActivity(
+    publicCommunities.filter((community) => !isUserCommunity(community))
+  );
+  const recommendedCommunities = getRecommendedCommunities(communities).filter(
+    (community) => !isUserCommunity(community)
+  );
+  const hasSearchQuery = searchQuery.trim().length > 0;
+  const communitiesToShow = hasSearchQuery
+    ? (showSearchResults ? searchResults : filteredCommunities)
+    : activeFilter === 'my'
+      ? myCommunitiesSorted
+      : exploreCommunities;
+  const emptyStateTitle = activeFilter === 'my'
+    ? 'Aún no estás en ninguna comunidad'
+    : 'No hay comunidades para explorar';
+  const emptyStateText = activeFilter === 'my'
+    ? 'Explora grupos de mamás, embarazo, sueño o alimentación.'
+    : 'Sé la primera en crear un espacio para otras familias.';
+
   return (
     <View style={styles.container}>
       <ScrollView 
@@ -710,16 +860,24 @@ const CommunitiesScreen = () => {
           />
         }
       >
-        {/* Carrusel de Banners de Comunidades */}
+        <View style={styles.heroSection}>
+          <View style={styles.heroCopy}>
+            <Text style={styles.heroTitle}>Comunidades</Text>
+            <Text style={styles.heroSubtitle}>Encuentra apoyo real según tu etapa.</Text>
+          </View>
+          <TouchableOpacity style={styles.headerCreateButton} onPress={handleAddCommunity} activeOpacity={0.86}>
+            <Ionicons name="add" size={24} color="#FFFFFF" />
+          </TouchableOpacity>
+        </View>
+
         <BannerCarousel section="comunidades" fallbackToHome={false} />
 
-        {/* Sección de Búsqueda */}
         <View style={styles.searchSection}>
           <View style={styles.searchContainer}>
             <Ionicons name="search" size={20} color="#666" style={styles.searchIcon} />
             <TextInput
               style={styles.searchInput}
-              placeholder="Buscar comunidades..."
+              placeholder="Buscar por etapa, tema o ciudad"
               placeholderTextColor="#999"
               value={searchQuery}
               onChangeText={setSearchQuery}
@@ -739,317 +897,149 @@ const CommunitiesScreen = () => {
           </View>
         </View>
 
-        {/* Filtros de Comunidades */}
-        {!showSearchResults && (
-          <View style={styles.filtersContainer}>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              <TouchableOpacity
-                style={[styles.filterChip, activeFilter === 'all' && styles.filterChipActive]}
-                onPress={() => applyFilter('all')}
-              >
-                <Text style={[styles.filterChipText, activeFilter === 'all' && styles.filterChipTextActive]}>
-                  Todas
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.filterChip, activeFilter === 'my' && styles.filterChipActive]}
-                onPress={() => applyFilter('my')}
-              >
-                <Text style={[styles.filterChipText, activeFilter === 'my' && styles.filterChipTextActive]}>
-                  Mis Comunidades ({userCommunities.length})
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.filterChip, activeFilter === 'public' && styles.filterChipActive]}
-                onPress={() => applyFilter('public')}
-              >
-                <Text style={[styles.filterChipText, activeFilter === 'public' && styles.filterChipTextActive]}>
-                  Públicas ({publicCommunities.length})
-                </Text>
-              </TouchableOpacity>
-            </ScrollView>
+        {!hasSearchQuery && (
+          <View style={styles.tabsContainer}>
+            <TouchableOpacity
+              style={[styles.tabButton, activeFilter === 'my' && styles.tabButtonActive]}
+              onPress={() => applyFilter('my')}
+              activeOpacity={0.86}
+            >
+              <Text style={[styles.tabButtonText, activeFilter === 'my' && styles.tabButtonTextActive]}>
+                Mis comunidades
+              </Text>
+              <Text style={[styles.tabButtonCount, activeFilter === 'my' && styles.tabButtonTextActive]}>
+                {userCommunities.length}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.tabButton, activeFilter === 'explore' && styles.tabButtonActive]}
+              onPress={() => applyFilter('explore')}
+              activeOpacity={0.86}
+            >
+              <Text style={[styles.tabButtonText, activeFilter === 'explore' && styles.tabButtonTextActive]}>
+                Explorar
+              </Text>
+              <Text style={[styles.tabButtonCount, activeFilter === 'explore' && styles.tabButtonTextActive]}>
+                {exploreCommunities.length}
+              </Text>
+            </TouchableOpacity>
           </View>
         )}
 
-        {/* Botón de Añadir Nueva Comunidad */}
-        <View style={styles.addSection}>
-          <TouchableOpacity style={styles.addButton} onPress={handleAddCommunity}>
-            <Ionicons name="add-circle" size={24} color="white" />
-            <Text style={styles.addButtonText}>Crear Nueva Comunidad</Text>
-          </TouchableOpacity>
-        </View>
-
-
-        {/* Skeleton Screens durante carga */}
-        {isLoading && (
+        {isLoading ? (
           <View style={styles.communitiesSection}>
-            <Text style={styles.sectionTitle}>Cargando comunidades...</Text>
+            <Text style={styles.sectionTitle}>Cargando comunidades</Text>
             <CommunityCardSkeleton />
             <CommunityCardSkeleton />
             <CommunityCardSkeleton />
           </View>
-        )}
-
-        {/* Resultados de Búsqueda Inteligente */}
-        {showSearchResults && (
+        ) : hasSearchQuery ? (
           <View style={styles.communitiesSection}>
             <View style={styles.searchResultsHeader}>
-              <Text style={styles.sectionTitle}>
-                Resultados de Búsqueda {isSearching && '🔍'}
-              </Text>
-              {isSearching && (
-                <ActivityIndicator size="small" color="#59C6C0" />
-              )}
+              <View>
+                <Text style={styles.sectionTitle}>Resultados</Text>
+                <Text style={styles.sectionSubtitle}>Búsqueda: "{searchQuery}"</Text>
+              </View>
+              {isSearching && <ActivityIndicator size="small" color="#59C6C0" />}
             </View>
-            
-            {(!Array.isArray(searchResults) || searchResults.length === 0) && !isSearching ? (
-              <View style={styles.noResultsContainer}>
-                <Ionicons name="search" size={48} color="#CCC" />
-                <Text style={styles.noResultsTitle}>No se encontraron comunidades</Text>
-                <Text style={styles.noResultsText}>
-                  Intenta con términos como "maternidad", "bebés" o "lactancia"
+
+            {(!Array.isArray(communitiesToShow) || communitiesToShow.length === 0) && !isSearching ? (
+              <View style={styles.emptyState}>
+                <Ionicons name="search-outline" size={44} color="#9CA3AF" />
+                <Text style={styles.emptyStateText}>No encontramos comunidades</Text>
+                <Text style={styles.emptyStateSubtext}>
+                  Prueba con lactancia, sueño, embarazo o el nombre de tu ciudad.
                 </Text>
-                <Text style={styles.noResultsSubtext}>
-                  Búsqueda: "{searchQuery}"
-                </Text>
+                <TouchableOpacity style={styles.emptyStateButton} onPress={handleAddCommunity}>
+                  <Text style={styles.emptyStateButtonText}>Crear comunidad</Text>
+                </TouchableOpacity>
               </View>
             ) : (
-              Array.isArray(searchResults) && searchResults.map((community) => (
-                <TouchableOpacity
-                  key={community.id || Math.random().toString()}
-                  style={[styles.communityCard, styles.searchResultCard]}
-                  onPress={() => handleJoinCommunity(community)}
-                >
-                  <View style={styles.communityHeader}>
-                    <CommunityIcon community={community} />
-                    <View style={styles.communityStats}>
-                      <Ionicons name="people" size={16} color="#666" />
-                      <Text style={styles.memberCount}>{community.memberCount || 0}</Text>
-                      {!community.isPublic && (
-                        <Ionicons name="lock-closed" size={16} color="#666" style={styles.privateIcon} />
-                      )}
-                    </View>
-                  </View>
-                  <View style={styles.communityTitleContainer}>
-                    <Text 
-                      style={styles.communityName}
-                      numberOfLines={2}
-                      ellipsizeMode="tail"
-                      textBreakStrategy="highQuality"
-                    >
-                      {community.name || 'Sin nombre'}
-                    </Text>
-                    <Text style={styles.communityCategory}>{community.category || 'General'}</Text>
-                  </View>
-                  <Text numberOfLines={2} style={styles.communityDescription}>
-                    {community.description || 'Sin descripción'}
-                  </Text>
-                  <Text style={styles.communityDescription}>
-                    {community.description || 'Sin descripción disponible'}
-                  </Text>
-                  <CommunityActionButton community={community} />
-                </TouchableOpacity>
-              )) || null
+              communitiesToShow.map((community) => (
+                <CommunityCard key={community.id || Math.random().toString()} community={community} />
+              ))
             )}
           </View>
-        )}
-
-        {/* Comunidades Filtradas */}
-        {!showSearchResults && activeFilter !== 'all' && filteredCommunities.length > 0 && (
+        ) : activeFilter === 'my' ? (
           <View style={styles.communitiesSection}>
-            <Text style={styles.sectionTitle}>
-              {activeFilter === 'my' ? 'Mis Comunidades' : 'Comunidades Públicas'}
-            </Text>
-            {filteredCommunities.map((community) => (
-              <TouchableOpacity
-                key={community.id || Math.random().toString()}
-                style={styles.communityCard}
-                onPress={() => handleJoinCommunity(community)}
-              >
-                <View style={styles.communityHeader}>
-                  <CommunityIcon community={community} />
-                  <View style={styles.communityStats}>
-                    <Ionicons name="people" size={16} color="#666" />
-                    <Text style={styles.memberCount}>{community.memberCount || 0}</Text>
-                    {!community.isPublic && (
-                      <Ionicons name="lock-closed" size={16} color="#666" style={styles.privateIcon} />
-                    )}
-                  </View>
-                </View>
-                <View style={styles.communityTitleContainer}>
-                  <Text 
-                    style={styles.communityName}
-                    numberOfLines={2}
-                    ellipsizeMode="tail"
-                    textBreakStrategy="highQuality"
-                  >
-                    {community.name || 'Sin nombre'}
-                  </Text>
-                  <Text style={styles.communityCategory}>{community.category || 'General'}</Text>
-                </View>
-                <Text style={styles.communityDescription}>
-                  {community.description || 'Sin descripción disponible'}
-                </Text>
-                
-                {/* Estadísticas de actividad */}
-                <View style={styles.activityStats}>
-                  {community.postCount !== undefined && (
-                    <View style={styles.activityItem}>
-                      <Ionicons name="chatbubbles" size={14} color="#59C6C0" />
-                      <Text style={styles.activityText}>{community.postCount} posts</Text>
-                    </View>
-                  )}
-                  {community.lastActivity && (
-                    <View style={styles.activityItem}>
-                      <Ionicons name="time" size={14} color="#999" />
-                      <Text style={styles.activityText}>{getTimeAgo(community.lastActivity)}</Text>
-                    </View>
-                  )}
-                  {community.activeMembers !== undefined && community.activeMembers > 0 && (
-                    <View style={styles.activityItem}>
-                      <Ionicons name="pulse" size={14} color="#32CD32" />
-                      <Text style={styles.activityText}>{community.activeMembers} activos</Text>
-                    </View>
-                  )}
-                </View>
-                
-                <CommunityActionButton community={community} />
-              </TouchableOpacity>
-            ))}
-          </View>
-        )}
-
-        {/* Mis Comunidades (solo cuando filtro está en "all") */}
-        {!showSearchResults && activeFilter === 'all' && userCommunities.length > 0 && (
-          <View style={styles.communitiesSection}>
-            <Text style={styles.sectionTitle}>Mis Comunidades</Text>
-            {userCommunities.map((community) => (
-              <TouchableOpacity
-                key={community.id || Math.random().toString()}
-                style={[styles.communityCard, styles.myCommunityCard]}
-                onPress={() => handleJoinCommunity(community)}
-              >
-                <View style={styles.communityHeader}>
-                  <CommunityIcon community={community} />
-                  <View style={styles.communityStats}>
-                    <Ionicons name="people" size={16} color="#666" />
-                    <Text style={styles.memberCount}>{community.memberCount || 0}</Text>
-                    {!community.isPublic && (
-                      <Ionicons name="lock-closed" size={16} color="#666" style={styles.privateIcon} />
-                    )}
-                    {isUserCommunity(community) && (
-                      <View style={styles.memberBadge}>
-                        <Ionicons name="checkmark-circle" size={16} color="#32CD32" />
-                        <Text style={styles.memberBadgeText}>Miembro</Text>
-                      </View>
-                    )}
-                    {!isUserCommunity(community) && !community.isPublic && pendingRequests.includes(community.id) && (
-                      <View style={styles.pendingRequestBadge}>
-                        <Ionicons name="time" size={16} color="#FFA500" />
-                        <Text style={styles.pendingRequestBadgeText}>Pendiente</Text>
-                      </View>
-                    )}
-                  </View>
-                </View>
-                <View style={styles.communityTitleContainer}>
-                  <Text 
-                    style={styles.communityName}
-                    numberOfLines={2}
-                    ellipsizeMode="tail"
-                    textBreakStrategy="highQuality"
-                  >
-                    {community.name || 'Sin nombre'}
-                  </Text>
-                  <Text style={styles.communityCategory}>{community.category || 'General'}</Text>
-                  <View style={styles.ownerBadge}>
-                    <Ionicons name="star" size={12} color="#FFD700" />
-                    <Text style={styles.ownerText}>Mi Comunidad</Text>
-                  </View>
-                </View>
-                <Text style={styles.communityDescription}>{community.description || 'Sin descripción'}</Text>
-                
-                <CommunityActionButton community={community} />
-                
-                {/* Botón para ver solicitudes pendientes (solo para comunidades privadas del usuario) */}
-                              {isUserCommunity(community) && !community.isPublic && (
-                <TouchableOpacity
-                  style={styles.requestsButton}
-                  onPress={() => navigation.navigate('CommunityRequests', {
-                    communityId: community.id,
-                    communityName: community.name
-                  })}
-                >
-                  <Ionicons name="mail" size={16} color="#59C6C0" />
-                  <Text style={styles.requestsButtonText}>Ver Solicitudes</Text>
-                </TouchableOpacity>
-              )}
-              
-
-              </TouchableOpacity>
-            ))}
-          </View>
-        )}
-
-        {/* Comunidades Públicas (solo cuando filtro está en "all") */}
-        {!showSearchResults && activeFilter === 'all' && (
-        <View style={styles.communitiesSection}>
-          <Text style={styles.sectionTitle}>
-            {userCommunities.length > 0 ? 'Otras Comunidades' : 'Comunidades Disponibles'}
-          </Text>
-          
-          {publicCommunities.length === 0 ? (
-            <View style={styles.emptyState}>
-              <Ionicons name="people-outline" size={48} color="#999" />
-              <Text style={styles.emptyStateText}>No hay comunidades públicas disponibles</Text>
-              <Text style={styles.emptyStateSubtext}>¡Sé el primero en crear una!</Text>
+            <View style={styles.sectionHeader}>
+              <View>
+                <Text style={styles.sectionTitle}>Mis comunidades activas</Text>
+                <Text style={styles.sectionSubtitle}>Entra rápido a donde ya participas.</Text>
+              </View>
             </View>
-          ) : (
-            publicCommunities.map((community) => (
-              <TouchableOpacity
-                key={community.id || Math.random().toString()}
-                style={styles.communityCard}
-                onPress={() => handleJoinCommunity(community)}
-              >
-                <View style={styles.communityHeader}>
-                  <CommunityIcon community={community} />
-                  <View style={styles.communityStats}>
-                    <Ionicons name="people" size={16} color="#666" />
-                    <Text style={styles.memberCount}>{community.memberCount || 0}</Text>
-                    {!community.isPublic && (
-                      <Ionicons name="lock-closed" size={16} color="#666" style={styles.privateIcon} />
-                    )}
-                    {isUserCommunity(community) && (
-                      <View style={styles.memberBadge}>
-                        <Ionicons name="checkmark-circle" size={16} color="#32CD32" />
-                        <Text style={styles.memberBadgeText}>Miembro</Text>
-                      </View>
-                    )}
-                    {!isUserCommunity(community) && !community.isPublic && pendingRequests.includes(community.id) && (
-                      <View style={styles.pendingRequestBadge}>
-                        <Ionicons name="time" size={16} color="#FFA500" />
-                        <Text style={styles.pendingRequestBadgeText}>Pendiente</Text>
-                      </View>
-                    )}
+
+            {myCommunitiesSorted.length === 0 ? (
+              <View style={styles.emptyState}>
+                <Ionicons name="people-outline" size={44} color="#9CA3AF" />
+                <Text style={styles.emptyStateText}>{emptyStateTitle}</Text>
+                <Text style={styles.emptyStateSubtext}>{emptyStateText}</Text>
+                <TouchableOpacity style={styles.emptyStateButton} onPress={() => applyFilter('explore')}>
+                  <Text style={styles.emptyStateButtonText}>Explorar comunidades</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              myCommunitiesSorted.map((community) => (
+                <CommunityCard key={community.id || Math.random().toString()} community={community} />
+              ))
+            )}
+          </View>
+        ) : (
+          <>
+            {recommendedCommunities.length > 0 && (
+              <View style={styles.communitiesSection}>
+                <View style={styles.sectionHeader}>
+                  <View>
+                    <Text style={styles.sectionTitle}>Para ti</Text>
+                    <Text style={styles.sectionSubtitle}>Grupos con más actividad o afinidad.</Text>
                   </View>
                 </View>
-                <View style={styles.communityTitleContainer}>
-                  <Text 
-                    style={styles.communityName}
-                    numberOfLines={2}
-                    ellipsizeMode="tail"
-                    textBreakStrategy="highQuality"
-                  >
-                    {community.name || 'Sin nombre'}
-                  </Text>
-                  <Text style={styles.communityCategory}>{community.category || 'General'}</Text>
+                {recommendedCommunities.slice(0, 3).map((community) => (
+                  <CommunityCard
+                    key={community.id || Math.random().toString()}
+                    community={community}
+                    featured
+                  />
+                ))}
+              </View>
+            )}
+
+            <View style={styles.communitiesSection}>
+              <View style={styles.sectionHeader}>
+                <View>
+                  <Text style={styles.sectionTitle}>Explorar comunidades</Text>
+                  <Text style={styles.sectionSubtitle}>Encuentra conversaciones útiles para tu etapa.</Text>
                 </View>
-                <Text style={styles.communityDescription}>{community.description || 'Sin descripción'}</Text>
-                
-                <CommunityActionButton community={community} />
-              </TouchableOpacity>
-            ))
-          )}
-        </View>
+              </View>
+
+              {exploreCommunities.length === 0 ? (
+                <View style={styles.emptyState}>
+                  <Ionicons name="compass-outline" size={44} color="#9CA3AF" />
+                  <Text style={styles.emptyStateText}>{emptyStateTitle}</Text>
+                  <Text style={styles.emptyStateSubtext}>{emptyStateText}</Text>
+                </View>
+              ) : (
+                exploreCommunities.map((community) => (
+                  <CommunityCard key={community.id || Math.random().toString()} community={community} />
+                ))
+              )}
+            </View>
+          </>
+        )}
+
+        {!isLoading && !hasSearchQuery && (
+          <View style={styles.createPrompt}>
+            <View style={styles.createPromptIcon}>
+              <Ionicons name="sparkles-outline" size={20} color="#178A84" />
+            </View>
+            <View style={styles.createPromptCopy}>
+              <Text style={styles.createPromptTitle}>¿No encuentras tu grupo?</Text>
+              <Text style={styles.createPromptText}>Crea una comunidad para otras familias como la tuya.</Text>
+            </View>
+            <TouchableOpacity style={styles.createPromptButton} onPress={handleAddCommunity} activeOpacity={0.86}>
+              <Text style={styles.createPromptButtonText}>Crear</Text>
+            </TouchableOpacity>
+          </View>
         )}
       </ScrollView>
 
@@ -1224,10 +1214,49 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F5F7FA',
   },
+  heroSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingTop: 18,
+    paddingBottom: 12,
+    backgroundColor: '#FFFFFF',
+  },
+  heroCopy: {
+    flex: 1,
+    paddingRight: 14,
+  },
+  heroTitle: {
+    fontSize: 28,
+    fontWeight: '800',
+    color: '#2D3748',
+  },
+  heroSubtitle: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginTop: 4,
+    lineHeight: 20,
+  },
+  headerCreateButton: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    backgroundColor: '#59C6C0',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#59C6C0',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.22,
+    shadowRadius: 8,
+    elevation: 4,
+  },
 
   // Sección de búsqueda
   searchSection: {
-    padding: 20,
+    paddingHorizontal: 20,
+    paddingTop: 14,
+    paddingBottom: 10,
     backgroundColor: 'transparent',
   },
   searchContainer: {
@@ -1253,9 +1282,49 @@ const styles = StyleSheet.create({
   },
   searchInput: {
     flex: 1,
-    fontSize: 16,
+    fontSize: 15,
     color: '#2C3E50',
     fontWeight: '500',
+  },
+  tabsContainer: {
+    flexDirection: 'row',
+    gap: 8,
+    marginHorizontal: 20,
+    marginTop: 4,
+    marginBottom: 8,
+    padding: 4,
+    borderRadius: 18,
+    backgroundColor: '#EAF0F4',
+  },
+  tabButton: {
+    flex: 1,
+    minHeight: 42,
+    borderRadius: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  tabButtonActive: {
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#2D3748',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 5,
+    elevation: 2,
+  },
+  tabButtonText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#6B7280',
+  },
+  tabButtonTextActive: {
+    color: '#178A84',
+  },
+  tabButtonCount: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#6B7280',
   },
 
   // Sección de añadir
@@ -1290,33 +1359,60 @@ const styles = StyleSheet.create({
 
   // Sección de comunidades
   communitiesSection: {
-    padding: 20,
+    paddingHorizontal: 20,
+    paddingTop: 14,
+    paddingBottom: 4,
     backgroundColor: 'transparent',
   },
+  sectionHeader: {
+    marginBottom: 12,
+  },
   sectionTitle: {
-    fontSize: 26,
+    fontSize: 20,
     fontWeight: '800',
     color: '#2C3E50',
-    marginBottom: 20,
+    marginBottom: 4,
+  },
+  sectionSubtitle: {
+    fontSize: 13,
+    color: '#6B7280',
+    lineHeight: 18,
   },
 
   // Tarjeta de comunidad
   communityCard: {
     backgroundColor: 'white',
-    borderRadius: 18,
-    padding: 20,
-    marginBottom: 18,
-    marginHorizontal: 2,
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 12,
     borderWidth: 1,
     borderColor: '#E8ECEF',
     shadowColor: '#887CBC',
     shadowOffset: {
       width: 0,
-      height: 6,
+      height: 3,
     },
-    shadowOpacity: 0.15,
-    shadowRadius: 10,
-    elevation: 8,
+    shadowOpacity: 0.08,
+    shadowRadius: 7,
+    elevation: 3,
+  },
+  featuredCommunityCard: {
+    borderColor: '#BFEDEA',
+    backgroundColor: '#FBFFFF',
+  },
+  communityCardTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  communityMainInfo: {
+    flex: 1,
+    minWidth: 0,
+  },
+  communityNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
   communityHeader: {
     flexDirection: 'row',
@@ -1332,36 +1428,35 @@ const styles = StyleSheet.create({
     paddingLeft: 0,
   },
   categoryIcon: {
-    width: 70,
-    height: 70,
-    borderRadius: 35,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
     flexShrink: 0,
   },
   communityImage: {
-    width: 70,
-    height: 70,
-    borderRadius: 35,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
     marginRight: 12,
     flexShrink: 0,
   },
   communityName: {
-    fontSize: 18,
-    fontWeight: '700',
+    flex: 1,
+    fontSize: 16,
+    fontWeight: '800',
     color: '#2C3E50',
-    marginBottom: 6,
-    lineHeight: 24,
-    letterSpacing: 0.2,
+    lineHeight: 21,
     textAlign: 'left',
-    width: '100%',
   },
   communityCategory: {
-    fontSize: 13,
+    fontSize: 12,
     color: '#7F8C8D',
     textTransform: 'capitalize',
-    fontWeight: '500',
+    fontWeight: '700',
+    marginTop: 3,
   },
   communityStats: {
     flexDirection: 'row',
@@ -1383,19 +1478,52 @@ const styles = StyleSheet.create({
     marginLeft: 5,
   },
   communityDescription: {
-    fontSize: 15,
-    color: '#7F8C8D',
-    lineHeight: 22,
-    marginBottom: 16,
+    fontSize: 13,
+    color: '#526170',
+    lineHeight: 19,
+    marginBottom: 10,
+  },
+  metricsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 7,
+    marginBottom: 12,
+  },
+  metricPill: {
+    minHeight: 28,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 9,
+    borderRadius: 14,
+    backgroundColor: '#F5F7FA',
+  },
+  metricText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#526170',
+  },
+  communityCardFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+  },
+  statusBadgesRow: {
+    flex: 1,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 7,
   },
   joinButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#96d2d3',
-    paddingVertical: 14,
-    paddingHorizontal: 24,
-    borderRadius: 25,
+    minHeight: 36,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 18,
     alignSelf: 'flex-start',
     shadowColor: '#887CBC',
     shadowOffset: {
@@ -1413,30 +1541,97 @@ const styles = StyleSheet.create({
   },
   joinButtonText: {
     color: 'white',
-    fontSize: 15,
+    fontSize: 13,
     fontWeight: '700',
-    marginRight: 8,
+    marginRight: 6,
   },
 
   // Estado vacío
   emptyState: {
     alignItems: 'center',
-    paddingVertical: 60,
-    paddingHorizontal: 40,
+    paddingVertical: 38,
+    paddingHorizontal: 24,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#E8ECEF',
   },
   emptyStateText: {
-    fontSize: 20,
-    fontWeight: '700',
+    fontSize: 17,
+    fontWeight: '800',
     color: '#2C3E50',
-    marginTop: 20,
-    marginBottom: 10,
+    marginTop: 14,
+    marginBottom: 8,
     textAlign: 'center',
   },
   emptyStateSubtext: {
-    fontSize: 15,
+    fontSize: 13,
     color: '#7F8C8D',
     textAlign: 'center',
-    lineHeight: 22,
+    lineHeight: 19,
+  },
+  emptyStateButton: {
+    marginTop: 16,
+    minHeight: 40,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#59C6C0',
+  },
+  emptyStateButtonText: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#FFFFFF',
+  },
+  createPrompt: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginHorizontal: 20,
+    marginTop: 10,
+    marginBottom: 30,
+    padding: 14,
+    borderRadius: 14,
+    backgroundColor: '#F1FBFA',
+    borderWidth: 1,
+    borderColor: '#D8F1EF',
+  },
+  createPromptIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
+  },
+  createPromptCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  createPromptTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#2D3748',
+  },
+  createPromptText: {
+    fontSize: 12,
+    color: '#526170',
+    lineHeight: 17,
+    marginTop: 2,
+  },
+  createPromptButton: {
+    minHeight: 36,
+    paddingHorizontal: 14,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#59C6C0',
+  },
+  createPromptButtonText: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#FFFFFF',
   },
 
   // Estilos del Modal
@@ -1618,9 +1813,8 @@ const styles = StyleSheet.create({
 
   // Estilos para comunidades del usuario
   myCommunityCard: {
-    borderWidth: 2,
-    borderColor: '#59C6C0',
-    backgroundColor: '#F0FFFE',
+    borderColor: '#BFEDEA',
+    backgroundColor: '#FBFFFF',
   },
   ownerBadge: {
     flexDirection: 'row',
@@ -1636,35 +1830,49 @@ const styles = StyleSheet.create({
   memberBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginLeft: 10,
-    backgroundColor: '#F0FFF0',
+    backgroundColor: '#E9FBFA',
     paddingHorizontal: 8,
-    paddingVertical: 4,
+    paddingVertical: 5,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#32CD32',
+    borderColor: '#C7F0ED',
   },
   memberBadgeText: {
-    fontSize: 10,
-    color: '#32CD32',
-    fontWeight: '600',
+    fontSize: 11,
+    color: '#178A84',
+    fontWeight: '800',
     marginLeft: 4,
   },
   pendingRequestBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginLeft: 10,
     backgroundColor: '#FFF8E1',
     paddingHorizontal: 8,
-    paddingVertical: 4,
+    paddingVertical: 5,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#FFA500',
+    borderColor: '#F6D58B',
   },
   pendingRequestBadgeText: {
-    fontSize: 10,
-    color: '#FFA500',
-    fontWeight: '600',
+    fontSize: 11,
+    color: '#B7791F',
+    fontWeight: '800',
+    marginLeft: 4,
+  },
+  publicBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F5F7FA',
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E8ECEF',
+  },
+  publicBadgeText: {
+    fontSize: 11,
+    color: '#526170',
+    fontWeight: '800',
     marginLeft: 4,
   },
   myCommunityButton: {

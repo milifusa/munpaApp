@@ -33,6 +33,7 @@ interface BannerCarouselProps {
   bannerWidth?: number; // NUEVO: Ancho personalizado del banner
   autoScroll?: boolean; // NUEVO: Controlar auto-scroll
   showIndicators?: boolean; // NUEVO: Mostrar/ocultar indicadores
+  onBannerPress?: (banner: Banner) => void | boolean | Promise<void | boolean>;
 }
 
 const BannerCarousel: React.FC<BannerCarouselProps> = ({
@@ -48,6 +49,7 @@ const BannerCarousel: React.FC<BannerCarouselProps> = ({
   bannerWidth,
   autoScroll = true,
   showIndicators = true,
+  onBannerPress,
 }) => {
   const resolvedBannerHeight = bannerHeight ?? BANNER_HEIGHT;
   const resolvedBannerWidth = bannerWidth ?? BANNER_WIDTH;
@@ -188,6 +190,13 @@ const BannerCarousel: React.FC<BannerCarouselProps> = ({
 
     // Registrar click
     await bannerService.registerClick(banner.id);
+
+    if (onBannerPress) {
+      const shouldContinue = await onBannerPress(banner);
+      if (shouldContinue !== true) {
+        return;
+      }
+    }
 
     // Mostrar alerta para el banner específico de "Consulta a un Pediatra"
     if (banner.id === 'AyXkG5GFtrvt6U5WanvI') {
@@ -667,4 +676,3 @@ const styles = StyleSheet.create({
 });
 
 export default BannerCarousel;
-

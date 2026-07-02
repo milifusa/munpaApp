@@ -25,6 +25,17 @@ import { useAuth } from '../contexts/AuthContext';
 import analyticsService from '../services/analyticsService';
 
 const MUNPA_PRIMARY = '#96d2d3';
+const MUNPA_ACCENT = '#59C6C0';
+const TEXT_PRIMARY = '#1F2937';
+
+const QUICK_CONCERNS = [
+  'Fiebre',
+  'No quiere comer',
+  'Llanto o irritabilidad',
+  'Piel o sarpullido',
+  'Sueño',
+  'Vómito o diarrea',
+];
 
 const ConsultationRequestScreen = () => {
   const navigation = useNavigation<any>();
@@ -50,6 +61,17 @@ const ConsultationRequestScreen = () => {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [showSymptoms, setShowSymptoms] = useState(false);
+  const [showCoupon, setShowCoupon] = useState(false);
+
+  const specialistDisplayName = specialist?.displayName || specialistName;
+  const specialistSpecialty = specialist?.specialties?.[0] || 'Especialista';
+  const currentPricing = consultationType === 'chat' ? chatPricing : videoPricing;
+  const fallbackPrice = consultationType === 'chat'
+    ? specialist?.pricing?.chatConsultation ?? 5
+    : specialist?.pricing?.videoConsultation ?? 15;
+  const totalPrice = currentPricing?.finalPrice ?? fallbackPrice;
+  const isReadyToSubmit = Boolean(selectedChild && description.trim().length >= 20);
 
   useEffect(() => {
     loadInitialData();
@@ -206,6 +228,18 @@ const ConsultationRequestScreen = () => {
     );
   };
 
+  const addConcernToDescription = (concern: string) => {
+    if (description.toLowerCase().includes(concern.toLowerCase())) {
+      return;
+    }
+
+    const nextText = description.trim()
+      ? `${description.trim()}\n${concern}: `
+      : `${concern}: `;
+
+    setDescription(nextText);
+  };
+
   const handleSubmit = async () => {
     if (!selectedChild) {
       Alert.alert('Error', 'Debes seleccionar un hijo');
@@ -296,7 +330,7 @@ const ConsultationRequestScreen = () => {
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
             <Ionicons name="arrow-back" size={24} color="white" />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Nueva Consulta</Text>
+          <Text style={styles.headerTitle}>Consulta con especialista</Text>
           <View style={{ width: 24 }} />
         </LinearGradient>
         <View style={styles.loadingContainer}>
@@ -314,7 +348,7 @@ const ConsultationRequestScreen = () => {
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color="white" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Nueva Consulta</Text>
+        <Text style={styles.headerTitle}>Consulta con especialista</Text>
         <View style={{ width: 24 }} />
       </LinearGradient>
 
@@ -322,14 +356,54 @@ const ConsultationRequestScreen = () => {
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-          {/* Progreso visual */}
-          <View style={styles.progressContainer}>
-            <View style={styles.progressBar}>
-              <View style={[styles.progressFill, { width: '20%' }]} />
+        <ScrollView
+          style={styles.content}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.consultationHero}>
+            <View style={styles.heroIcon}>
+              <Ionicons name="heart-circle" size={26} color={MUNPA_ACCENT} />
             </View>
-            <Text style={styles.progressText}>Paso 1 de 5</Text>
+            <View style={styles.heroCopy}>
+              <Text style={styles.heroTitle}>Preparemos tu consulta</Text>
+              <Text style={styles.heroText}>
+                Cuéntanos qué pasa y reunimos la información clave para el especialista.
+              </Text>
+            </View>
           </View>
+
+          {specialistDisplayName && (
+            <View style={styles.specialistSummaryCard}>
+              {specialist?.photoUrl ? (
+                <Image source={{ uri: specialist.photoUrl }} style={styles.specialistSummaryPhoto} />
+              ) : (
+                <View style={styles.specialistSummaryPhoto}>
+                  <Text style={styles.specialistSummaryInitial}>
+                    {specialistDisplayName.substring(0, 1).toUpperCase()}
+                  </Text>
+                </View>
+              )}
+              <View style={styles.specialistSummaryInfo}>
+                <Text style={styles.specialistSummaryLabel}>Te atenderá</Text>
+                <Text style={styles.specialistSummaryName} numberOfLines={1}>
+                  {specialistDisplayName}
+                </Text>
+                <View style={styles.specialistSummaryMeta}>
+                  <Ionicons name="checkmark-circle" size={15} color="#22C55E" />
+                  <Text style={styles.specialistSummaryMetaText} numberOfLines={1}>
+                    {specialistSpecialty}
+                  </Text>
+                </View>
+              </View>
+              <View style={styles.specialistSummaryPrice}>
+                <Text style={styles.specialistPriceLabel}>Desde</Text>
+                <Text style={styles.specialistPriceValue}>
+                  ${specialist?.pricing?.chatConsultation ?? totalPrice}
+                </Text>
+              </View>
+            </View>
+          )}
 
           {/* Seleccionar hijo */}
           <View style={styles.card}>
@@ -338,8 +412,8 @@ const ConsultationRequestScreen = () => {
                 <Ionicons name="person" size={20} color={MUNPA_PRIMARY} />
               </View>
               <View style={styles.cardHeaderText}>
-                <Text style={styles.cardTitle}>¿Para quién es la consulta?</Text>
-                <Text style={styles.cardSubtitle}>Selecciona a tu hijo/a</Text>
+                <Text style={styles.cardTitle}>Paciente</Text>
+                <Text style={styles.cardSubtitle}>Selecciona para quién es la consulta</Text>
               </View>
             </View>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.childrenScroll}>
@@ -382,13 +456,25 @@ const ConsultationRequestScreen = () => {
                 <Ionicons name="document-text" size={20} color={MUNPA_PRIMARY} />
               </View>
               <View style={styles.cardHeaderText}>
-                <Text style={styles.cardTitle}>¿Qué está pasando?</Text>
-                <Text style={styles.cardSubtitle}>Cuéntanos los síntomas en detalle</Text>
+                <Text style={styles.cardTitle}>¿Qué te preocupa?</Text>
+                <Text style={styles.cardSubtitle}>Empieza con lo más importante; puedes agregar detalles después</Text>
               </View>
+            </View>
+            <View style={styles.quickConcernRow}>
+              {QUICK_CONCERNS.map((concern) => (
+                <TouchableOpacity
+                  key={concern}
+                  style={styles.quickConcernChip}
+                  onPress={() => addConcernToDescription(concern)}
+                  activeOpacity={0.75}
+                >
+                  <Text style={styles.quickConcernText}>{concern}</Text>
+                </TouchableOpacity>
+              ))}
             </View>
             <TextInput
               style={styles.textArea}
-              placeholder="Ejemplo: Mi bebé tiene fiebre desde ayer por la tarde, 38.5°C. Está más irritable de lo normal y no ha querido comer..."
+              placeholder="Ejemplo: Tiene fiebre desde ayer, llegó a 38.5°C, está irritable y ha comido menos de lo normal..."
               placeholderTextColor="#9CA3AF"
               multiline
               numberOfLines={6}
@@ -410,8 +496,8 @@ const ConsultationRequestScreen = () => {
                 <Ionicons name="images" size={20} color={MUNPA_PRIMARY} />
               </View>
               <View style={styles.cardHeaderText}>
-                <Text style={styles.cardTitle}>Fotos (opcional)</Text>
-                <Text style={styles.cardSubtitle}>Ayuda al especialista a ver mejor</Text>
+                <Text style={styles.cardTitle}>Fotos que ayuden</Text>
+                <Text style={styles.cardSubtitle}>Una imagen puede darle más contexto al especialista</Text>
               </View>
             </View>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.photosScroll}>
@@ -451,48 +537,57 @@ const ConsultationRequestScreen = () => {
 
           {/* Síntomas */}
           <View style={styles.card}>
-            <View style={styles.cardHeader}>
+            <TouchableOpacity
+              style={[styles.cardHeader, !showSymptoms && styles.cardHeaderCollapsed]}
+              onPress={() => setShowSymptoms(prev => !prev)}
+              activeOpacity={0.75}
+            >
               <View style={styles.cardIconContainer}>
                 <Ionicons name="medkit" size={20} color={MUNPA_PRIMARY} />
               </View>
               <View style={styles.cardHeaderText}>
-                <Text style={styles.cardTitle}>Síntomas (opcional)</Text>
-                <Text style={styles.cardSubtitle}>Selecciona los que apliquen</Text>
+                <Text style={styles.cardTitle}>Agregar síntomas</Text>
+                <Text style={styles.cardSubtitle}>
+                  {selectedSymptoms.length > 0
+                    ? `${selectedSymptoms.length} seleccionado${selectedSymptoms.length > 1 ? 's' : ''}`
+                    : 'Opcional, ayuda a ordenar la consulta'}
+                </Text>
               </View>
-            </View>
-            <View style={styles.symptomsGrid}>
-              {symptoms && symptoms.length > 0 && symptoms.slice(0, 12).map(symptom => (
-                <TouchableOpacity
-                  key={symptom.id}
-                  style={[
-                    styles.symptomChip,
-                    selectedSymptoms.includes(symptom.id) && styles.symptomChipActive,
-                  ]}
-                  onPress={() => toggleSymptom(symptom.id)}
-                  activeOpacity={0.7}
-                >
-                  {symptom.imageUrl && (
-                    <Image 
-                      source={{ uri: symptom.imageUrl }} 
-                      style={styles.symptomIcon}
-                    />
-                  )}
-                  <Text
+              <Ionicons name={showSymptoms ? 'chevron-up' : 'chevron-down'} size={22} color="#9CA3AF" />
+            </TouchableOpacity>
+
+            {showSymptoms && (
+              <View style={styles.symptomsGrid}>
+                {symptoms && symptoms.length > 0 && symptoms.slice(0, 12).map(symptom => (
+                  <TouchableOpacity
+                    key={symptom.id}
                     style={[
-                      styles.symptomChipText,
-                      selectedSymptoms.includes(symptom.id) && styles.symptomChipTextActive,
+                      styles.symptomChip,
+                      selectedSymptoms.includes(symptom.id) && styles.symptomChipActive,
                     ]}
+                    onPress={() => toggleSymptom(symptom.id)}
+                    activeOpacity={0.7}
                   >
-                    {symptom.name}
-                  </Text>
-                  {selectedSymptoms.includes(symptom.id) && (
-                    <Ionicons name="checkmark" size={16} color="#FFFFFF" />
-                  )}
-                </TouchableOpacity>
-              ))}
-            </View>
-            {selectedSymptoms.length > 0 && (
-              <Text style={styles.selectedCount}>{selectedSymptoms.length} síntoma{selectedSymptoms.length > 1 ? 's' : ''} seleccionado{selectedSymptoms.length > 1 ? 's' : ''}</Text>
+                    {symptom.imageUrl && (
+                      <Image
+                        source={{ uri: symptom.imageUrl }}
+                        style={styles.symptomIcon}
+                      />
+                    )}
+                    <Text
+                      style={[
+                        styles.symptomChipText,
+                        selectedSymptoms.includes(symptom.id) && styles.symptomChipTextActive,
+                      ]}
+                    >
+                      {symptom.name}
+                    </Text>
+                    {selectedSymptoms.includes(symptom.id) && (
+                      <Ionicons name="checkmark" size={16} color="#FFFFFF" />
+                    )}
+                  </TouchableOpacity>
+                ))}
+              </View>
             )}
           </View>
 
@@ -525,16 +620,10 @@ const ConsultationRequestScreen = () => {
                     : specialist?.pricing?.chatConsultation ?? 5
                   }
                 </Text>
-                <Text style={styles.consultationTypeInfo}>⏱️ Respuesta en 30 min</Text>
-                <View style={styles.consultationTypeDescription}>
-                  <Text style={styles.consultationTypeDescriptionText}>
-                    Consulta escrita con respuestas detalladas
-                  </Text>
-                </View>
+                <Text style={styles.consultationTypeInfo}>Respuesta escrita</Text>
                 {consultationType === 'chat' && (
                   <View style={styles.selectedBadge}>
                     <Ionicons name="checkmark-circle" size={16} color={MUNPA_PRIMARY} />
-                    <Text style={styles.selectedBadgeText}>Seleccionado</Text>
                   </View>
                 )}
               </TouchableOpacity>
@@ -556,16 +645,10 @@ const ConsultationRequestScreen = () => {
                     : specialist?.pricing?.videoConsultation ?? 15
                   }
                 </Text>
-                <Text style={styles.consultationTypeInfo}>📹 Llamada en vivo</Text>
-                <View style={styles.consultationTypeDescription}>
-                  <Text style={styles.consultationTypeDescriptionText}>
-                    Evaluación visual completa en tiempo real
-                  </Text>
-                </View>
+                <Text style={styles.consultationTypeInfo}>Llamada en vivo</Text>
                 {consultationType === 'video' && (
                   <View style={styles.selectedBadge}>
                     <Ionicons name="checkmark-circle" size={16} color="#887CBC" />
-                    <Text style={[styles.selectedBadgeText, { color: '#887CBC' }]}>Seleccionado</Text>
                   </View>
                 )}
               </TouchableOpacity>
@@ -608,54 +691,64 @@ const ConsultationRequestScreen = () => {
 
           {/* Cupón */}
           <View style={styles.card}>
-            <View style={styles.cardHeader}>
+            <TouchableOpacity
+              style={[styles.cardHeader, !showCoupon && styles.cardHeaderCollapsed]}
+              onPress={() => setShowCoupon(prev => !prev)}
+              activeOpacity={0.75}
+            >
               <View style={styles.cardIconContainer}>
                 <Ionicons name="pricetag" size={20} color={MUNPA_PRIMARY} />
               </View>
               <View style={styles.cardHeaderText}>
-                <Text style={styles.cardTitle}>¿Tienes un cupón?</Text>
-                <Text style={styles.cardSubtitle}>Opcional - Aplica tu descuento</Text>
+                <Text style={styles.cardTitle}>Tengo un cupón</Text>
+                <Text style={styles.cardSubtitle}>Opcional</Text>
               </View>
-            </View>
-            <View style={styles.couponRow}>
-              <TextInput
-                style={styles.couponInput}
-                placeholder="CODIGO123"
-                placeholderTextColor="#9CA3AF"
-                value={couponCode}
-                onChangeText={setCouponCode}
-                autoCapitalize="characters"
-              />
-              <TouchableOpacity style={styles.couponButton} onPress={calculateBothPrices}>
-                <Text style={styles.couponButtonText}>Aplicar</Text>
-              </TouchableOpacity>
-            </View>
-            {((chatPricing && chatPricing.discount > 0) || (videoPricing && videoPricing.discount > 0)) && (
-              <View style={styles.discountBanner}>
-                <Ionicons name="checkmark-circle" size={20} color="#059669" />
-                <Text style={styles.discountText}>
-                  🎉 ¡Descuento aplicado! Chat: ${chatPricing?.discount || 0} | Video: ${videoPricing?.discount || 0}
-                </Text>
+              <Ionicons name={showCoupon ? 'chevron-up' : 'chevron-down'} size={22} color="#9CA3AF" />
+            </TouchableOpacity>
+            {showCoupon && (
+              <View>
+                <View style={styles.couponRow}>
+                  <TextInput
+                    style={styles.couponInput}
+                    placeholder="CODIGO123"
+                    placeholderTextColor="#9CA3AF"
+                    value={couponCode}
+                    onChangeText={setCouponCode}
+                    autoCapitalize="characters"
+                  />
+                  <TouchableOpacity style={styles.couponButton} onPress={calculateBothPrices}>
+                    <Text style={styles.couponButtonText}>Aplicar</Text>
+                  </TouchableOpacity>
+                </View>
+                {((chatPricing && chatPricing.discount > 0) || (videoPricing && videoPricing.discount > 0)) && (
+                  <View style={styles.discountBanner}>
+                    <Ionicons name="checkmark-circle" size={20} color="#059669" />
+                    <Text style={styles.discountText}>
+                      Descuento aplicado: Chat ${chatPricing?.discount || 0} | Video ${videoPricing?.discount || 0}
+                    </Text>
+                  </View>
+                )}
               </View>
             )}
           </View>
 
           {/* Resumen de precio */}
-          {(consultationType === 'chat' ? chatPricing : videoPricing) && (
+          {currentPricing && (
             <View style={styles.pricingSummary}>
+              <Text style={styles.pricingTitle}>Detalle de pago</Text>
               <View style={styles.pricingRow}>
                 <Text style={styles.pricingLabel}>Precio base:</Text>
-                <Text style={styles.pricingValue}>${(consultationType === 'chat' ? chatPricing : videoPricing).basePrice}</Text>
+                <Text style={styles.pricingValue}>${currentPricing.basePrice}</Text>
               </View>
-              {(consultationType === 'chat' ? chatPricing : videoPricing).discount > 0 && (
+              {currentPricing.discount > 0 && (
                 <View style={styles.pricingRow}>
                   <Text style={styles.pricingLabel}>Descuento:</Text>
-                  <Text style={[styles.pricingValue, { color: '#059669' }]}>-${(consultationType === 'chat' ? chatPricing : videoPricing).discount}</Text>
+                  <Text style={[styles.pricingValue, { color: '#059669' }]}>-${currentPricing.discount}</Text>
                 </View>
               )}
               <View style={[styles.pricingRow, styles.pricingTotal]}>
                 <Text style={styles.pricingLabelTotal}>Total a pagar:</Text>
-                <Text style={styles.pricingValueTotal}>${(consultationType === 'chat' ? chatPricing : videoPricing).finalPrice}</Text>
+                <Text style={styles.pricingValueTotal}>${currentPricing.finalPrice}</Text>
               </View>
             </View>
           )}
@@ -667,20 +760,31 @@ const ConsultationRequestScreen = () => {
               <View style={styles.validationTextContainer}>
                 <Text style={styles.validationText}>
                   {!selectedChild && '• Selecciona un hijo\n'}
-                  {description.trim().length < 20 && `• Descripción: ${20 - description.trim().length} caracteres más`}
+                  {description.trim().length < 20 && 'Agrega un poco más de contexto para que el especialista pueda ayudarte mejor.'}
                 </Text>
               </View>
             </View>
           )}
+        </ScrollView>
 
-          {/* Botón de enviar */}
+        <View style={[styles.stickyFooter, { paddingBottom: Math.max(insets.bottom, 12) }]}>
+          <View style={styles.footerSummary}>
+            <View>
+              <Text style={styles.footerLabel}>Total</Text>
+              <Text style={styles.footerReadyText}>
+                {isReadyToSubmit ? 'Listo para continuar' : 'Completa el motivo'}
+              </Text>
+            </View>
+            <Text style={styles.footerPrice}>${totalPrice}</Text>
+          </View>
+
           <TouchableOpacity
             style={[
-              styles.submitButton, 
-              (submitting || !selectedChild || description.trim().length < 20) && styles.submitButtonDisabled
+              styles.submitButton,
+              (submitting || !isReadyToSubmit) && styles.submitButtonDisabled
             ]}
             onPress={handleSubmit}
-            disabled={submitting || !selectedChild || description.trim().length < 20}
+            disabled={submitting || !isReadyToSubmit}
             activeOpacity={0.8}
           >
             {submitting ? (
@@ -690,18 +794,19 @@ const ConsultationRequestScreen = () => {
               </View>
             ) : (
               <View style={styles.submitButtonContent}>
-                <Text style={styles.submitButtonText}>Continuar al pago</Text>
+                <Text style={styles.submitButtonText}>
+                  {totalPrice > 0 ? 'Continuar al pago' : 'Enviar consulta'}
+                </Text>
                 <Ionicons name="arrow-forward" size={20} color="#FFFFFF" />
               </View>
             )}
           </TouchableOpacity>
 
-          <Text style={styles.securePaymentText}>
-            🔒 Pago seguro y encriptado
-          </Text>
-
-          <View style={{ height: 40 }} />
-        </ScrollView>
+          <View style={styles.securePaymentRow}>
+            <Ionicons name="lock-closed" size={13} color="#6B7280" />
+            <Text style={styles.securePaymentText}>Pago seguro y encriptado</Text>
+          </View>
+        </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -723,7 +828,7 @@ const styles = StyleSheet.create({
     padding: 4,
   },
   headerTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '700',
     color: '#FFFFFF',
     flex: 1,
@@ -731,7 +836,10 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    backgroundColor: '#F5F5F5',
+    backgroundColor: '#F8FAFC',
+  },
+  scrollContent: {
+    paddingBottom: 178,
   },
   loadingContainer: {
     flex: 1,
@@ -766,19 +874,123 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: '#FFFFFF',
     marginHorizontal: 16,
-    marginTop: 16,
-    borderRadius: 16,
+    marginTop: 12,
+    borderRadius: 14,
     padding: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
+    shadowOpacity: 0.05,
     shadowRadius: 8,
-    elevation: 3,
+    elevation: 2,
   },
   cardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 16,
+  },
+  cardHeaderCollapsed: {
+    marginBottom: 0,
+  },
+  consultationHero: {
+    marginHorizontal: 16,
+    marginTop: 14,
+    padding: 16,
+    borderRadius: 16,
+    backgroundColor: '#FFFFFF',
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#E5F4F3',
+  },
+  heroIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#EAF8F7',
+    marginRight: 12,
+  },
+  heroCopy: {
+    flex: 1,
+  },
+  heroTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: TEXT_PRIMARY,
+    marginBottom: 4,
+  },
+  heroText: {
+    fontSize: 14,
+    lineHeight: 20,
+    color: '#6B7280',
+  },
+  specialistSummaryCard: {
+    marginHorizontal: 16,
+    marginTop: 12,
+    padding: 14,
+    borderRadius: 16,
+    backgroundColor: '#FFFFFF',
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#DDF3F2',
+  },
+  specialistSummaryPhoto: {
+    width: 58,
+    height: 58,
+    borderRadius: 18,
+    backgroundColor: '#EAF8F7',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  specialistSummaryInitial: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: MUNPA_ACCENT,
+  },
+  specialistSummaryInfo: {
+    flex: 1,
+    minWidth: 0,
+  },
+  specialistSummaryLabel: {
+    fontSize: 12,
+    color: '#9CA3AF',
+    fontWeight: '600',
+    marginBottom: 2,
+  },
+  specialistSummaryName: {
+    fontSize: 17,
+    fontWeight: '800',
+    color: TEXT_PRIMARY,
+  },
+  specialistSummaryMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    marginTop: 6,
+  },
+  specialistSummaryMetaText: {
+    flex: 1,
+    fontSize: 13,
+    color: '#6B7280',
+    fontWeight: '600',
+  },
+  specialistSummaryPrice: {
+    alignItems: 'flex-end',
+    marginLeft: 10,
+  },
+  specialistPriceLabel: {
+    fontSize: 11,
+    color: '#9CA3AF',
+    fontWeight: '600',
+  },
+  specialistPriceValue: {
+    fontSize: 19,
+    color: MUNPA_ACCENT,
+    fontWeight: '900',
+    marginTop: 2,
   },
   cardIconContainer: {
     width: 40,
@@ -801,6 +1013,7 @@ const styles = StyleSheet.create({
   cardSubtitle: {
     fontSize: 13,
     color: '#6B7280',
+    lineHeight: 18,
   },
   childrenScroll: {
     marginHorizontal: -4,
@@ -862,8 +1075,28 @@ const styles = StyleSheet.create({
     padding: 14,
     fontSize: 15,
     color: '#1F2937',
-    minHeight: 140,
+    minHeight: 132,
     backgroundColor: '#FAFAFA',
+    lineHeight: 21,
+  },
+  quickConcernRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 12,
+  },
+  quickConcernChip: {
+    paddingVertical: 9,
+    paddingHorizontal: 12,
+    borderRadius: 999,
+    backgroundColor: '#F0FAF9',
+    borderWidth: 1,
+    borderColor: '#D5F0EF',
+  },
+  quickConcernText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#168F88',
   },
   textAreaFooter: {
     marginTop: 8,
@@ -962,17 +1195,17 @@ const styles = StyleSheet.create({
   },
   consultationTypeRow: {
     flexDirection: 'row',
-    gap: 12,
+    gap: 10,
   },
   consultationTypeCard: {
     flex: 1,
     alignItems: 'center',
-    padding: 16,
+    padding: 14,
     borderRadius: 12,
     borderWidth: 2,
     borderColor: '#E5E7EB',
     backgroundColor: '#FAFAFA',
-    minHeight: 240,
+    minHeight: 136,
     position: 'relative',
   },
   consultationTypeCardActive: {
@@ -981,9 +1214,9 @@ const styles = StyleSheet.create({
     borderWidth: 3,
   },
   consultationTypeIconBadge: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
@@ -1004,7 +1237,7 @@ const styles = StyleSheet.create({
     color: MUNPA_PRIMARY,
   },
   consultationTypePrice: {
-    fontSize: 28,
+    fontSize: 24,
     fontWeight: '800',
     color: '#1F2937',
     marginTop: 6,
@@ -1013,7 +1246,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#9CA3AF',
     marginTop: 4,
-    marginBottom: 8,
+    textAlign: 'center',
   },
   consultationTypeDescription: {
     marginTop: 8,
@@ -1030,15 +1263,14 @@ const styles = StyleSheet.create({
   },
   selectedBadge: {
     position: 'absolute',
-    top: 12,
-    right: 12,
+    top: 10,
+    right: 10,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
     backgroundColor: '#FFFFFF',
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-    borderRadius: 12,
+    padding: 3,
+    borderRadius: 999,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
@@ -1118,14 +1350,20 @@ const styles = StyleSheet.create({
   pricingSummary: {
     backgroundColor: '#FFFFFF',
     marginHorizontal: 16,
-    marginTop: 16,
-    padding: 20,
-    borderRadius: 16,
+    marginTop: 12,
+    padding: 16,
+    borderRadius: 14,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
+    shadowOpacity: 0.05,
     shadowRadius: 8,
-    elevation: 3,
+    elevation: 2,
+  },
+  pricingTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: TEXT_PRIMARY,
+    marginBottom: 12,
   },
   pricingRow: {
     flexDirection: 'row',
@@ -1179,9 +1417,7 @@ const styles = StyleSheet.create({
   },
   submitButton: {
     backgroundColor: MUNPA_PRIMARY,
-    marginHorizontal: 16,
-    marginTop: 20,
-    paddingVertical: 18,
+    paddingVertical: 15,
     borderRadius: 14,
     alignItems: 'center',
     shadowColor: MUNPA_PRIMARY,
@@ -1209,7 +1445,51 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#6B7280',
     textAlign: 'center',
-    marginTop: 12,
+  },
+  stickyFooter: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: '#FFFFFF',
+    paddingTop: 12,
+    paddingHorizontal: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#E5E7EB',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -3 },
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    elevation: 12,
+  },
+  footerSummary: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  footerLabel: {
+    fontSize: 12,
+    color: '#9CA3AF',
+    fontWeight: '700',
+    textTransform: 'uppercase',
+  },
+  footerReadyText: {
+    fontSize: 13,
+    color: '#6B7280',
+    marginTop: 2,
+  },
+  footerPrice: {
+    fontSize: 26,
+    fontWeight: '900',
+    color: TEXT_PRIMARY,
+  },
+  securePaymentRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 5,
+    marginTop: 9,
   },
 });
 

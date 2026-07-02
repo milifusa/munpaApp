@@ -141,6 +141,7 @@ const RecommendationDetailScreen = ({ route, navigation }: any) => {
   const [professionalProducts, setProfessionalProducts] = useState<any[]>([]);
   const [professional, setProfessional] = useState<any>(null);
   const [loadingProfProducts, setLoadingProfProducts] = useState(false);
+  const [imagePresentation, setImagePresentation] = useState<'hero' | 'logo' | 'none'>('none');
   const [refreshing, setRefreshing] = useState(false);
   
   // Modal de review
@@ -152,10 +153,40 @@ const RecommendationDetailScreen = ({ route, navigation }: any) => {
   const [reviewVisitedWith, setReviewVisitedWith] = useState<'Solo' | 'Pareja' | 'Familia' | 'Amigos' | ''>('');
   const [isSavingReview, setIsSavingReview] = useState(false);
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+  const [expandedImageUrl, setExpandedImageUrl] = useState<string | null>(null);
+  const [expandedImageTitle, setExpandedImageTitle] = useState('');
 
   useEffect(() => {
     loadData();
   }, [recommendationId]);
+
+  useEffect(() => {
+    if (!recommendation?.imageUrl) {
+      setImagePresentation('none');
+      return;
+    }
+
+    let isMounted = true;
+    setImagePresentation('logo');
+
+    Image.getSize(
+      recommendation.imageUrl,
+      (width, height) => {
+        if (!isMounted || !width || !height) return;
+
+        const ratio = width / height;
+        const isSquareLike = ratio > 0.78 && ratio < 1.28;
+        setImagePresentation(isSquareLike ? 'logo' : 'hero');
+      },
+      () => {
+        if (isMounted) setImagePresentation('logo');
+      }
+    );
+
+    return () => {
+      isMounted = false;
+    };
+  }, [recommendation?.imageUrl]);
 
   const loadData = async () => {
     setIsLoading(true);
@@ -560,6 +591,42 @@ const RecommendationDetailScreen = ({ route, navigation }: any) => {
     Linking.openURL(url).catch(err => console.error('Error abriendo mapa:', err));
   };
 
+  const getRecommendationLabel = () => {
+    const recommendations = calculateRecommendations(stats.totalReviews, stats.averageRating);
+
+    if (recommendations > 0) {
+      return `${recommendations} ${recommendations === 1 ? 'mamá lo recomienda' : 'mamás lo recomiendan'}`;
+    }
+
+    return stats.totalReviews > 0 ? `${stats.totalReviews} reseñas` : null;
+  };
+
+  const getLocationLabel = () => {
+    if (recommendation?.address) return recommendation.address;
+    return null;
+  };
+
+  const hasContactInfo = Boolean(
+    recommendation?.address ||
+    recommendation?.phone ||
+    recommendation?.email ||
+    recommendation?.website
+  );
+
+  const compactLogoSource = recommendation?.imageUrl
+    ? { uri: recommendation.imageUrl }
+    : require('../../assets/icon.png');
+
+  const openExpandedImage = (imageUrl: string, title: string = 'Imagen') => {
+    setExpandedImageUrl(imageUrl);
+    setExpandedImageTitle(title);
+  };
+
+  const closeExpandedImage = () => {
+    setExpandedImageUrl(null);
+    setExpandedImageTitle('');
+  };
+
   const renderStars = (rating: number, size: number = 16, color: string = '#FFD700') => {
     const stars = [];
     for (let i = 1; i <= 5; i++) {
@@ -744,6 +811,40 @@ const RecommendationDetailScreen = ({ route, navigation }: any) => {
     </Modal>
   );
 
+  const renderImageViewerModal = () => (
+    <Modal
+      visible={Boolean(expandedImageUrl)}
+      animationType="fade"
+      transparent={true}
+      onRequestClose={closeExpandedImage}
+    >
+      <View style={styles.imageViewerOverlay}>
+        <View style={styles.imageViewerHeader}>
+          <Text style={styles.imageViewerTitle} numberOfLines={1}>
+            {expandedImageTitle}
+          </Text>
+          <TouchableOpacity style={styles.imageViewerCloseButton} onPress={closeExpandedImage}>
+            <Ionicons name="close" size={28} color="#FFFFFF" />
+          </TouchableOpacity>
+        </View>
+
+        <TouchableOpacity
+          style={styles.imageViewerBody}
+          activeOpacity={1}
+          onPress={closeExpandedImage}
+        >
+          {expandedImageUrl && (
+            <Image
+              source={{ uri: expandedImageUrl }}
+              style={styles.expandedImage}
+              resizeMode="contain"
+            />
+          )}
+        </TouchableOpacity>
+      </View>
+    </Modal>
+  );
+
   if (isLoading) {
     return (
       <SafeAreaView style={styles.container} edges={['top']}>
@@ -825,44 +926,117 @@ const RecommendationDetailScreen = ({ route, navigation }: any) => {
           <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
         }
       >
-        {/* Imagen */}
-        {recommendation.imageUrl ? (
-          <Image source={{ uri: recommendation.imageUrl }} style={styles.image} />
-        ) : (
-          <View style={styles.imagePlaceholder}>
-            <Image 
-              source={require('../../assets/icon.png')} 
-              style={styles.defaultIcon}
-              resizeMode="contain"
-            />
-          </View>
+        {/* Imagen de portada: solo para fotos panorámicas o no cuadradas */}
+        {recommendation.imageUrl && imagePresentation === 'hero' && (
+          <TouchableOpacity
+            activeOpacity={0.9}
+            onPress={() => openExpandedImage(recommendation.imageUrl!, recommendation.name)}
+          >
+            <Image source={{ uri: recommendation.imageUrl }} style={styles.image} resizeMode="cover" />
+          </TouchableOpacity>
         )}
 
         {/* Contenido principal */}
         <View style={styles.content}>
-          {/* Título y categoría */}
-          <Text style={styles.title}>{recommendation.name}</Text>
-          
-          {recommendation.category && (
-            <View style={styles.categoryBadge}>
-              {recommendation.category.icon && (
-                <Ionicons name={recommendation.category.icon as any} size={16} color="#59C6C0" />
-              )}
-              <Text style={styles.categoryText}>{recommendation.category.name}</Text>
-            </View>
-          )}
+          {/* Resumen */}
+          <View style={styles.summaryCard}>
+            <View style={styles.summaryHeader}>
+              <TouchableOpacity
+                style={styles.brandImageFrame}
+                activeOpacity={recommendation.imageUrl ? 0.85 : 1}
+                onPress={() => recommendation.imageUrl && openExpandedImage(recommendation.imageUrl, recommendation.name)}
+              >
+                <Image
+                  source={compactLogoSource}
+                  style={styles.brandImage}
+                  resizeMode="contain"
+                />
+                {recommendation.imageUrl && (
+                  <View style={styles.brandImageExpandBadge}>
+                    <Ionicons name="expand-outline" size={12} color="#FFFFFF" />
+                  </View>
+                )}
+              </TouchableOpacity>
 
-          {/* Rating */}
-          <View style={styles.ratingSection}>
-            <Ionicons name="people" size={20} color="#59C6C0" />
-            <Text style={styles.ratingText}>
-              {(() => {
-                const recommendations = calculateRecommendations(stats.totalReviews, stats.averageRating);
-                return recommendations > 0
-                  ? `${recommendations} ${recommendations === 1 ? 'mamá lo recomienda' : 'mamás lo recomiendan'}`
-                  : 'Sin recomendaciones';
-              })()}
-            </Text>
+              <View style={styles.summaryTitleBlock}>
+                <Text style={styles.title}>{recommendation.name}</Text>
+
+                {recommendation.category && (
+                  <View style={styles.primaryCategoryBadge}>
+                    {recommendation.category.imageUrl ? (
+                      <Image source={{ uri: recommendation.category.imageUrl }} style={styles.categoryBadgeImage} />
+                    ) : recommendation.category.icon && Object.prototype.hasOwnProperty.call(Ionicons.glyphMap, recommendation.category.icon) ? (
+                      <Ionicons name={recommendation.category.icon as any} size={15} color="#59C6C0" />
+                    ) : (
+                      <Image source={require('../../assets/icon.png')} style={styles.categoryBadgeLogo} resizeMode="contain" />
+                    )}
+                    <Text style={styles.categoryText}>{recommendation.category.name}</Text>
+                  </View>
+                )}
+              </View>
+            </View>
+
+            <View style={styles.summaryMeta}>
+              {getRecommendationLabel() && (
+                <View style={styles.recommendationBadge}>
+                  <Ionicons name="people-outline" size={15} color="#59C6C0" />
+                  <Text style={styles.recommendationBadgeText}>{getRecommendationLabel()}</Text>
+                </View>
+              )}
+
+              {stats.totalReviews > 0 && (
+                <View style={styles.ratingBadge}>
+                  <Ionicons name="star" size={14} color="#FFB74D" />
+                  <Text style={styles.ratingBadgeText}>{stats.averageRating.toFixed(1)}</Text>
+                </View>
+              )}
+            </View>
+
+            {recommendation.description && (
+              <Text style={styles.description}>{recommendation.description}</Text>
+            )}
+
+            {getLocationLabel() && (
+              <View style={styles.summaryLocation}>
+                <Ionicons name="location-outline" size={16} color="#59C6C0" />
+                <Text style={styles.summaryLocationText} numberOfLines={2}>
+                  {getLocationLabel()}
+                </Text>
+              </View>
+            )}
+          </View>
+
+          {/* Acciones principales */}
+          <View style={styles.actionButtons}>
+            {recommendation.phone && (
+              <TouchableOpacity
+                style={styles.actionButton}
+                onPress={() => handleCall(recommendation.phone!)}
+              >
+                <Ionicons name="call" size={20} color="white" />
+                <Text style={styles.actionButtonText}>Llamar</Text>
+              </TouchableOpacity>
+            )}
+
+            {recommendation.whatsapp && (
+              <TouchableOpacity
+                style={[styles.actionButton, { backgroundColor: '#25D366' }]}
+                onPress={() => handleWhatsApp(recommendation.whatsapp!)}
+              >
+                <Ionicons name="logo-whatsapp" size={20} color="white" />
+                <Text style={styles.actionButtonText}>WhatsApp</Text>
+              </TouchableOpacity>
+            )}
+
+            {recommendation.latitude && recommendation.longitude && (
+              <TouchableOpacity
+                style={[styles.actionButton, { backgroundColor: '#4285F4' }]}
+                onPress={() => handleOpenMap(recommendation.latitude!, recommendation.longitude!)}
+              >
+                <Ionicons name="navigate" size={20} color="white" />
+                <Text style={styles.actionButtonText}>Mapa</Text>
+              </TouchableOpacity>
+            )}
           </View>
 
           {/* Banners del recomendado */}
@@ -942,89 +1116,123 @@ const RecommendationDetailScreen = ({ route, navigation }: any) => {
             </View>
           )}
 
-          {/* Descripción */}
-          {recommendation.description && (
+
+          {/* Productos del comercio */}
+          {loadingProfProducts ? (
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Descripción</Text>
-              <Text style={styles.description}>{recommendation.description}</Text>
+              <ActivityIndicator color="#59C6C0" style={{ marginVertical: 12 }} />
+            </View>
+          ) : professionalProducts.length > 0 && (
+            <View style={styles.section}>
+              <View style={styles.sectionHeaderRow}>
+                <Text style={styles.sectionTitle}>
+                  Productos de {recommendation.name}
+                </Text>
+                {professionalProducts.length > 3 && (
+                  <TouchableOpacity
+                    onPress={() => navigation.navigate('RecommendationProducts', {
+                      recommendationId: recommendation?.id,
+                      recommendationName: recommendation?.name,
+                    })}
+                  >
+                    <Text style={styles.seeAllLink}>Ver todos</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.profProductsList}
+              >
+                {professionalProducts.slice(0, 3).map((product: any) => (
+                  <TouchableOpacity
+                    key={product.id}
+                    style={styles.profProductCard}
+                    onPress={() => navigation.navigate('ProductDetail', { productId: product.id })}
+                    activeOpacity={0.85}
+                  >
+                    {product.imageUrls?.[0] ? (
+                      <Image source={{ uri: product.imageUrls[0] }} style={styles.profProductImage} />
+                    ) : (
+                      <View style={[styles.profProductImage, styles.profProductImagePlaceholder]}>
+                        <Ionicons name="cube-outline" size={28} color="#9CA3AF" />
+                      </View>
+                    )}
+                    <View style={styles.profProductInfo}>
+                      <Text style={styles.profProductTitle} numberOfLines={2}>{product.title}</Text>
+                      {product.price != null && (
+                        <Text style={styles.profProductPrice}>
+                          {product.currency || '$'}{Number(product.price).toLocaleString()}
+                        </Text>
+                      )}
+                    </View>
+                  </TouchableOpacity>
+                ))}
+
+                {professionalProducts.length > 3 && (
+                  <TouchableOpacity
+                    style={styles.seeMoreCard}
+                    onPress={() => navigation.navigate('RecommendationProducts', {
+                      recommendationId: recommendation?.id,
+                      recommendationName: recommendation?.name,
+                    })}
+                    activeOpacity={0.85}
+                  >
+                    <Ionicons name="grid-outline" size={28} color="#59C6C0" />
+                    <Text style={styles.seeMoreCardText}>Ver más</Text>
+                    <Text style={styles.seeMoreCardCount}>+{professionalProducts.length - 3}</Text>
+                  </TouchableOpacity>
+                )}
+              </ScrollView>
             </View>
           )}
 
           {/* Información de contacto */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Información de Contacto</Text>
-            
-            {recommendation.address && (
-              <TouchableOpacity 
-                style={styles.infoRow}
-                onPress={() => recommendation.latitude && recommendation.longitude && 
-                  handleOpenMap(recommendation.latitude, recommendation.longitude)}
-              >
-                <Ionicons name="location" size={20} color="#59C6C0" />
-                <Text style={styles.infoText}>{recommendation.address}</Text>
-              </TouchableOpacity>
-            )}
+          {hasContactInfo && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Contacto</Text>
+              <View style={styles.contactCard}>
+                {recommendation.address && (
+                  <TouchableOpacity
+                    style={styles.infoRow}
+                    onPress={() => recommendation.latitude && recommendation.longitude &&
+                      handleOpenMap(recommendation.latitude, recommendation.longitude)}
+                  >
+                    <Ionicons name="location" size={18} color="#59C6C0" />
+                    <Text style={styles.infoText}>{recommendation.address}</Text>
+                  </TouchableOpacity>
+                )}
 
-            {recommendation.phone && (
-              <TouchableOpacity style={styles.infoRow} onPress={() => handleCall(recommendation.phone!)}>
-                <Ionicons name="call" size={20} color="#59C6C0" />
-                <Text style={styles.infoText}>{recommendation.phone}</Text>
-              </TouchableOpacity>
-            )}
+                {recommendation.phone && (
+                  <TouchableOpacity style={styles.infoRow} onPress={() => handleCall(recommendation.phone!)}>
+                    <Ionicons name="call" size={18} color="#59C6C0" />
+                    <Text style={styles.infoText}>{recommendation.phone}</Text>
+                  </TouchableOpacity>
+                )}
 
-            {recommendation.email && (
-              <TouchableOpacity 
-                style={styles.infoRow}
-                onPress={() => handleOpenLink(`mailto:${recommendation.email}`)}
-              >
-                <Ionicons name="mail" size={20} color="#59C6C0" />
-                <Text style={styles.infoText}>{recommendation.email}</Text>
-              </TouchableOpacity>
-            )}
+                {recommendation.email && (
+                  <TouchableOpacity
+                    style={styles.infoRow}
+                    onPress={() => handleOpenLink(`mailto:${recommendation.email}`)}
+                  >
+                    <Ionicons name="mail" size={18} color="#59C6C0" />
+                    <Text style={styles.infoText}>{recommendation.email}</Text>
+                  </TouchableOpacity>
+                )}
 
-            {recommendation.website && (
-              <TouchableOpacity 
-                style={styles.infoRow}
-                onPress={() => handleOpenLink(recommendation.website!)}
-              >
-                <Ionicons name="globe" size={20} color="#59C6C0" />
-                <Text style={styles.infoText}>{recommendation.website}</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-
-          {/* Botones de acción */}
-          <View style={styles.actionButtons}>
-            {recommendation.phone && (
-              <TouchableOpacity 
-                style={styles.actionButton}
-                onPress={() => handleCall(recommendation.phone!)}
-              >
-                <Ionicons name="call" size={20} color="white" />
-                <Text style={styles.actionButtonText}>Llamar</Text>
-              </TouchableOpacity>
-            )}
-
-            {recommendation.whatsapp && (
-              <TouchableOpacity 
-                style={[styles.actionButton, { backgroundColor: '#25D366' }]}
-                onPress={() => handleWhatsApp(recommendation.whatsapp!)}
-              >
-                <Ionicons name="logo-whatsapp" size={20} color="white" />
-                <Text style={styles.actionButtonText}>WhatsApp</Text>
-              </TouchableOpacity>
-            )}
-
-            {recommendation.latitude && recommendation.longitude && (
-              <TouchableOpacity 
-                style={[styles.actionButton, { backgroundColor: '#4285F4' }]}
-                onPress={() => handleOpenMap(recommendation.latitude!, recommendation.longitude!)}
-              >
-                <Ionicons name="navigate" size={20} color="white" />
-                <Text style={styles.actionButtonText}>Mapa</Text>
-              </TouchableOpacity>
-            )}
-          </View>
+                {recommendation.website && (
+                  <TouchableOpacity
+                    style={styles.infoRow}
+                    onPress={() => handleOpenLink(recommendation.website!)}
+                  >
+                    <Ionicons name="globe" size={18} color="#59C6C0" />
+                    <Text style={styles.infoText}>{recommendation.website}</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            </View>
+          )}
 
           {/* Información Práctica para Padres */}
           {recommendation.practicalInfo && (
@@ -1186,75 +1394,6 @@ const RecommendationDetailScreen = ({ route, navigation }: any) => {
             </View>
           )}
 
-          {/* Productos del comercio */}
-          {loadingProfProducts ? (
-            <View style={styles.section}>
-              <ActivityIndicator color="#59C6C0" style={{ marginVertical: 12 }} />
-            </View>
-          ) : professionalProducts.length > 0 && (
-            <View style={styles.section}>
-              <View style={styles.sectionHeaderRow}>
-                <Text style={styles.sectionTitle}>Productos</Text>
-                {professionalProducts.length > 3 && (
-                  <TouchableOpacity
-                    onPress={() => navigation.navigate('RecommendationProducts', {
-                      recommendationId: recommendation?.id,
-                      recommendationName: recommendation?.name,
-                    })}
-                  >
-                    <Text style={styles.seeAllLink}>Ver todos</Text>
-                  </TouchableOpacity>
-                )}
-              </View>
-
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.profProductsList}
-              >
-                {professionalProducts.slice(0, 3).map((product: any) => (
-                  <TouchableOpacity
-                    key={product.id}
-                    style={styles.profProductCard}
-                    onPress={() => navigation.navigate('ProductDetail', { productId: product.id })}
-                    activeOpacity={0.85}
-                  >
-                    {product.imageUrls?.[0] ? (
-                      <Image source={{ uri: product.imageUrls[0] }} style={styles.profProductImage} />
-                    ) : (
-                      <View style={[styles.profProductImage, styles.profProductImagePlaceholder]}>
-                        <Ionicons name="cube-outline" size={28} color="#9CA3AF" />
-                      </View>
-                    )}
-                    <View style={styles.profProductInfo}>
-                      <Text style={styles.profProductTitle} numberOfLines={2}>{product.title}</Text>
-                      {product.price != null && (
-                        <Text style={styles.profProductPrice}>
-                          {product.currency || '$'}{Number(product.price).toLocaleString()}
-                        </Text>
-                      )}
-                    </View>
-                  </TouchableOpacity>
-                ))}
-
-                {professionalProducts.length > 3 && (
-                  <TouchableOpacity
-                    style={styles.seeMoreCard}
-                    onPress={() => navigation.navigate('RecommendationProducts', {
-                      recommendationId: recommendation?.id,
-                      recommendationName: recommendation?.name,
-                    })}
-                    activeOpacity={0.85}
-                  >
-                    <Ionicons name="grid-outline" size={28} color="#59C6C0" />
-                    <Text style={styles.seeMoreCardText}>Ver más</Text>
-                    <Text style={styles.seeMoreCardCount}>+{professionalProducts.length - 3}</Text>
-                  </TouchableOpacity>
-                )}
-              </ScrollView>
-            </View>
-          )}
-
           {/* Mi reseña */}
           <View style={styles.section}>
             <View style={styles.myReviewHeader}>
@@ -1360,9 +1499,8 @@ const RecommendationDetailScreen = ({ route, navigation }: any) => {
                       {review.photos.map((photo, index) => (
                         <TouchableOpacity 
                           key={index}
-                          onPress={() => {
-                            // TODO: Abrir modal de vista previa de foto
-                          }}
+                          activeOpacity={0.85}
+                          onPress={() => openExpandedImage(photo, `Foto de ${reviewUserName}`)}
                         >
                           <Image 
                             source={{ uri: photo }} 
@@ -1401,9 +1539,17 @@ const RecommendationDetailScreen = ({ route, navigation }: any) => {
               );
             })
             ) : (
-              <Text style={styles.noReviewsText}>
-                Aún no hay reseñas. ¡Sé el primero en escribir una!
-              </Text>
+              <View style={styles.emptyReviewsCard}>
+                <Ionicons name="chatbubble-ellipses-outline" size={28} color="#59C6C0" />
+                <Text style={styles.emptyReviewsTitle}>Sé la primera mamá en recomendarlo</Text>
+                <Text style={styles.emptyReviewsText}>
+                  Tu experiencia puede ayudar a otras familias.
+                </Text>
+                <TouchableOpacity style={styles.emptyReviewButton} onPress={handleOpenReviewModal}>
+                  <Ionicons name="add-circle" size={18} color="#FFFFFF" />
+                  <Text style={styles.emptyReviewButtonText}>Escribir reseña</Text>
+                </TouchableOpacity>
+              </View>
             )}
           </View>
 
@@ -1412,6 +1558,7 @@ const RecommendationDetailScreen = ({ route, navigation }: any) => {
       </ScrollView>
 
         {renderReviewModal()}
+        {renderImageViewerModal()}
       </View>
     </SafeAreaView>
   );
@@ -1466,73 +1613,163 @@ const styles = StyleSheet.create({
   // Image
   image: {
     width: '100%',
-    height: 250,
-    backgroundColor: '#F0F0F0',
-  },
-  imagePlaceholder: {
-    width: '100%',
-    height: 250,
-    backgroundColor: '#F0F0F0',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  defaultIcon: {
-    width: 120,
-    height: 120,
-    opacity: 0.6,
+    height: 230,
+    backgroundColor: '#FFFFFF',
   },
 
   // Content
   content: {
-    padding: 20,
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 10,
+  },
+  summaryCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 14,
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: '#E9EEF2',
+  },
+  summaryHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+    marginBottom: 12,
+  },
+  brandImageFrame: {
+    width: 76,
+    height: 76,
+    borderRadius: 18,
+    backgroundColor: '#F7FBFB',
+    borderWidth: 1,
+    borderColor: '#E6F4F3',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 8,
+  },
+  brandImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 12,
+  },
+  brandImageExpandBadge: {
+    position: 'absolute',
+    right: 5,
+    bottom: 5,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: 'rgba(45, 55, 72, 0.78)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  summaryTitleBlock: {
+    flex: 1,
+    minWidth: 0,
   },
   title: {
     fontSize: 24,
-    fontWeight: 'bold',
-    color: '#333',
+    lineHeight: 30,
+    fontWeight: '800',
+    color: '#2D3748',
+    marginBottom: 8,
+    fontFamily: 'Montserrat',
+  },
+  summaryMeta: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
     marginBottom: 10,
   },
-  categoryBadge: {
+  primaryCategoryBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#F0FDFC',
-    paddingHorizontal: 12,
+    paddingHorizontal: 10,
     paddingVertical: 6,
-    borderRadius: 20,
+    borderRadius: 18,
     alignSelf: 'flex-start',
     gap: 6,
-    marginBottom: 15,
+    maxWidth: '100%',
+  },
+  categoryBadgeImage: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+  },
+  categoryBadgeLogo: {
+    width: 18,
+    height: 18,
+    opacity: 0.8,
   },
   categoryText: {
-    fontSize: 14,
+    fontSize: 13,
     color: '#59C6C0',
-    fontWeight: '600',
+    fontWeight: '800',
+    fontFamily: 'Montserrat',
   },
-  ratingSection: {
+  recommendationBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    marginBottom: 20,
+    backgroundColor: '#F1FBFA',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 20,
+    gap: 5,
+  },
+  recommendationBadgeText: {
+    fontSize: 13,
+    color: '#178A84',
+    fontWeight: '800',
+    fontFamily: 'Montserrat',
+  },
+  ratingBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFF7E6',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 20,
+    gap: 4,
+  },
+  ratingBadgeText: {
+    fontSize: 13,
+    color: '#8A5A00',
+    fontWeight: '800',
+    fontFamily: 'Montserrat',
+  },
+  summaryLocation: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    marginTop: 10,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#E9EEF2',
+  },
+  summaryLocationText: {
+    flex: 1,
+    fontSize: 13,
+    lineHeight: 18,
+    color: '#526170',
+    fontFamily: 'Montserrat',
   },
   starsContainer: {
     flexDirection: 'row',
     gap: 2,
   },
-  ratingText: {
-    fontSize: 16,
-    color: '#666',
-    fontWeight: '600',
-  },
 
   // Sections
   section: {
-    marginBottom: 25,
+    marginBottom: 20,
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#2D3748',
     marginBottom: 12,
+    fontFamily: 'Montserrat',
   },
   sectionHeaderRow: {
     flexDirection: 'row',
@@ -1569,29 +1806,39 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   description: {
-    fontSize: 16,
-    color: '#666',
-    lineHeight: 24,
+    fontSize: 15,
+    color: '#526170',
+    lineHeight: 22,
+    fontFamily: 'Montserrat',
   },
 
   // Info rows
+  contactCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#E9EEF2',
+    gap: 12,
+  },
   infoRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    marginBottom: 12,
     gap: 10,
   },
   infoText: {
     flex: 1,
-    fontSize: 15,
-    color: '#666',
+    fontSize: 14,
+    lineHeight: 20,
+    color: '#526170',
+    fontFamily: 'Montserrat',
   },
 
   // Action buttons
   actionButtons: {
     flexDirection: 'row',
     gap: 10,
-    marginBottom: 25,
+    marginBottom: 18,
   },
   actionButton: {
     flex: 1,
@@ -1751,12 +1998,6 @@ const styles = StyleSheet.create({
   helpfulTextActive: {
     color: '#59C6C0',
     fontWeight: '600',
-  },
-  noReviewsText: {
-    fontSize: 14,
-    color: '#999',
-    textAlign: 'center',
-    paddingVertical: 20,
   },
 
   // Información Práctica
@@ -1951,6 +2192,46 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#333',
   },
+  imageViewerOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.94)',
+  },
+  imageViewerHeader: {
+    minHeight: 84,
+    paddingTop: 44,
+    paddingHorizontal: 18,
+    paddingBottom: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  imageViewerTitle: {
+    flex: 1,
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '800',
+    fontFamily: 'Montserrat',
+  },
+  imageViewerCloseButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.14)',
+  },
+  imageViewerBody: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 12,
+    paddingBottom: 34,
+  },
+  expandedImage: {
+    width: '100%',
+    height: '100%',
+  },
   ratingSelector: {
     marginBottom: 20,
   },
@@ -2140,7 +2421,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   finalSpacing: {
-    height: 30,
+    height: 120,
   },
 
   // Banners carousel
@@ -2255,18 +2536,19 @@ const styles = StyleSheet.create({
   profProductsList: {
     paddingVertical: 4,
     gap: 12,
+    paddingRight: 8,
   },
   profProductCard: {
-    width: 150,
+    width: 168,
     backgroundColor: '#FFFFFF',
-    borderRadius: 12,
+    borderRadius: 14,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: '#E9EEF2',
   },
   profProductImage: {
-    width: 150,
-    height: 100,
+    width: 168,
+    height: 118,
   },
   profProductImagePlaceholder: {
     backgroundColor: '#F3F4F6',
@@ -2274,19 +2556,60 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   profProductInfo: {
-    padding: 8,
+    padding: 10,
   },
   profProductTitle: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#374151',
-    lineHeight: 18,
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#2D3748',
+    lineHeight: 19,
+    fontFamily: 'Montserrat',
   },
   profProductPrice: {
-    fontSize: 13,
-    fontWeight: '700',
+    fontSize: 15,
+    fontWeight: '800',
     color: '#59C6C0',
-    marginTop: 4,
+    marginTop: 5,
+    fontFamily: 'Montserrat',
+  },
+  emptyReviewsCard: {
+    alignItems: 'center',
+    padding: 18,
+    borderRadius: 16,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E9EEF2',
+  },
+  emptyReviewsTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#2D3748',
+    marginTop: 10,
+    textAlign: 'center',
+    fontFamily: 'Montserrat',
+  },
+  emptyReviewsText: {
+    fontSize: 13,
+    color: '#6B7280',
+    marginTop: 5,
+    marginBottom: 14,
+    textAlign: 'center',
+    fontFamily: 'Montserrat',
+  },
+  emptyReviewButton: {
+    minHeight: 40,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 14,
+    borderRadius: 20,
+    backgroundColor: '#59C6C0',
+  },
+  emptyReviewButtonText: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    fontFamily: 'Montserrat',
   },
 });
 

@@ -22,6 +22,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '../contexts/AuthContext';
 import { childrenService, CreateChildData, profileService } from '../services/api';
 import MunpaLogo from '../components/MunpaLogo';
+import analyticsService from '../services/analyticsService';
 import {
   colors,
   typography,
@@ -50,6 +51,7 @@ interface RouteParams {
   isEditing?: boolean;
   childData?: any;
   childId?: string;
+  source?: 'signup' | 'add_child' | 'edit_child';
 }
 
 const ChildrenDataScreen: React.FC = () => {
@@ -73,6 +75,8 @@ const ChildrenDataScreen: React.FC = () => {
   const isEditing = routeParams?.isEditing || false;
   const childData = routeParams?.childData;
   const childId = routeParams?.childId;
+  const flowSource = routeParams?.source || (isEditing ? 'edit_child' : 'add_child');
+  const isSignupFlow = flowSource === 'signup';
 
   // Inicializar con datos del hijo si está en modo edición
   const getInitialChildrenData = () => {
@@ -128,6 +132,23 @@ const ChildrenDataScreen: React.FC = () => {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [selectedChildIndex, setSelectedChildIndex] = useState<number | null>(null);
 
+  const getChildrenAnalyticsParams = () => {
+    const unbornCount = childrenData.filter((child, index) => child.isUnborn ?? isUnbornChild(index)).length;
+
+    return {
+      source: flowSource,
+      children_count: childrenData.length,
+      born_children_count: childrenData.length - unbornCount,
+      unborn_children_count: unbornCount,
+      pregnancy_status: pregnancyStatus,
+      is_multiple_pregnancy: isMultiplePregnancy,
+    };
+  };
+
+  React.useEffect(() => {
+    analyticsService.logEvent(isSignupFlow ? 'signup_children_data_viewed' : 'children_data_viewed', getChildrenAnalyticsParams());
+  }, []);
+
   const updateChildData = (index: number, field: keyof ChildData, value: any) => {
     const newChildrenData = [...childrenData];
     newChildrenData[index] = { ...newChildrenData[index], [field]: value };
@@ -163,6 +184,12 @@ const ChildrenDataScreen: React.FC = () => {
     for (let i = 0; i < childrenData.length; i++) {
       const child = childrenData[i];
       if (!child.name.trim()) {
+        analyticsService.logEvent('children_data_validation_error', {
+          ...getChildrenAnalyticsParams(),
+          field: 'child_name',
+          reason: 'missing',
+          child_index: i + 1,
+        });
         Alert.alert('Error', `Por favor ingresa el nombre del hijo ${i + 1}`);
         return false;
       }
@@ -173,11 +200,23 @@ const ChildrenDataScreen: React.FC = () => {
         const hasValidWeeks = typeof weeks === 'number' && weeks >= 1 && weeks <= 42;
 
         if (!hasValidWeeks) {
+          analyticsService.logEvent('children_data_validation_error', {
+            ...getChildrenAnalyticsParams(),
+            field: 'gestation_weeks',
+            reason: 'missing_or_invalid',
+            child_index: i + 1,
+          });
           Alert.alert('Error', `Por favor ingresa las semanas de gestación para ${child.name}`);
           return false;
         }
 
         if (weeks !== undefined && (weeks < 1 || weeks > 42)) {
+          analyticsService.logEvent('children_data_validation_error', {
+            ...getChildrenAnalyticsParams(),
+            field: 'gestation_weeks',
+            reason: 'out_of_range',
+            child_index: i + 1,
+          });
           Alert.alert('Error', 'Las semanas de gestación deben estar entre 1 y 42');
           return false;
         }
@@ -190,6 +229,12 @@ const ChildrenDataScreen: React.FC = () => {
         twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14);
 
           if (dueDateToValidate < twoWeeksAgo) {
+          analyticsService.logEvent('children_data_validation_error', {
+            ...getChildrenAnalyticsParams(),
+            field: 'due_date',
+            reason: 'too_far_in_past',
+            child_index: i + 1,
+          });
           Alert.alert('Error', `La fecha de parto para ${child.name} no puede ser hace más de 2 semanas`);
           return false;
           }
@@ -197,6 +242,12 @@ const ChildrenDataScreen: React.FC = () => {
       } else {
         // Validar fecha de nacimiento
         if (!child.birthDate) {
+          analyticsService.logEvent('children_data_validation_error', {
+            ...getChildrenAnalyticsParams(),
+            field: 'birth_date',
+            reason: 'missing',
+            child_index: i + 1,
+          });
           Alert.alert('Error', `Por favor selecciona la fecha de nacimiento para ${child.name}`);
           return false;
         }
@@ -207,6 +258,12 @@ const ChildrenDataScreen: React.FC = () => {
         birthDate.setHours(0, 0, 0, 0);
 
         if (birthDate > today) {
+          analyticsService.logEvent('children_data_validation_error', {
+            ...getChildrenAnalyticsParams(),
+            field: 'birth_date',
+            reason: 'future_date',
+            child_index: i + 1,
+          });
           Alert.alert('Error', `La fecha de nacimiento de ${child.name} no puede ser en el futuro`);
           return false;
         }
@@ -215,6 +272,12 @@ const ChildrenDataScreen: React.FC = () => {
         eighteenYearsAgo.setFullYear(eighteenYearsAgo.getFullYear() - 18);
 
         if (birthDate < eighteenYearsAgo) {
+          analyticsService.logEvent('children_data_validation_error', {
+            ...getChildrenAnalyticsParams(),
+            field: 'birth_date',
+            reason: 'too_far_in_past',
+            child_index: i + 1,
+          });
           Alert.alert('Error', `La fecha de nacimiento de ${child.name} no puede ser hace más de 18 años`);
         return false;
         }
@@ -231,8 +294,10 @@ const ChildrenDataScreen: React.FC = () => {
   };
 
   const handleSave = async () => {
+    analyticsService.logEvent('children_data_submit_pressed', getChildrenAnalyticsParams());
     if (!validateData()) return;
 
+    analyticsService.logEvent('children_data_save_started', getChildrenAnalyticsParams());
     setIsLoading(true);
     try {
 
@@ -263,6 +328,7 @@ const ChildrenDataScreen: React.FC = () => {
         }
 
         await childrenService.updateChild(childId, updateData);
+        analyticsService.logEvent('children_data_updated', getChildrenAnalyticsParams());
 
         if (isUnborn) {
           await syncPregnancyProfile(hasValidWeeks ? weeks : undefined);
@@ -320,6 +386,7 @@ const ChildrenDataScreen: React.FC = () => {
 
       // Enviar cada hijo al backend
       await childrenService.addMultipleChildren(childrenToSave);
+      analyticsService.logEvent(isSignupFlow ? 'signup_children_data_completed' : 'children_data_created', getChildrenAnalyticsParams());
 
       // Si hay al menos un bebé por nacer, actualizar el perfil con estado de embarazo.
       const unbornChild = childrenToSave.find(child => child.isUnborn);
@@ -365,6 +432,13 @@ const ChildrenDataScreen: React.FC = () => {
       );
     } catch (error) {
       console.error('Error guardando hijos:', error);
+      const failedEventName = isEditing
+        ? 'children_data_update_failed'
+        : isSignupFlow ? 'signup_children_data_failed' : 'children_data_create_failed';
+      analyticsService.logEvent(failedEventName, {
+        ...getChildrenAnalyticsParams(),
+        error_code: error instanceof Error ? error.name : 'unknown',
+      });
       Alert.alert('Error', 'No se pudieron guardar los datos de los hijos. Por favor, intenta nuevamente.');
     } finally {
       setIsLoading(false);
@@ -380,6 +454,7 @@ const ChildrenDataScreen: React.FC = () => {
         {
           text: 'Omitir',
           onPress: async () => {
+            analyticsService.logEvent(isSignupFlow ? 'signup_children_data_skipped' : 'children_data_skipped', getChildrenAnalyticsParams());
             // Establecer el usuario como autenticado
             const userData = await AsyncStorage.getItem('userData');
             if (userData) {
