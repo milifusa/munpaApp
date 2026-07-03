@@ -12,6 +12,7 @@ import {
   Modal,
   Button,
   ActivityIndicator,
+  DeviceEventEmitter,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -153,6 +154,21 @@ const ChildrenDataScreen: React.FC = () => {
     const newChildrenData = [...childrenData];
     newChildrenData[index] = { ...newChildrenData[index], [field]: value };
     setChildrenData(newChildrenData);
+  };
+
+  const removeChildCard = (indexToRemove: number) => {
+    if (isEditing || childrenData.length <= 1) return;
+
+    setChildrenData((prevChildrenData) =>
+      prevChildrenData.filter((_, index) => index !== indexToRemove)
+    );
+
+    if (selectedChildIndex === indexToRemove) {
+      setShowDatePicker(false);
+      setSelectedChildIndex(null);
+    } else if (selectedChildIndex !== null && selectedChildIndex > indexToRemove) {
+      setSelectedChildIndex(selectedChildIndex - 1);
+    }
   };
 
   const syncPregnancyProfile = async (gestationWeeks?: number) => {
@@ -329,6 +345,7 @@ const ChildrenDataScreen: React.FC = () => {
 
         await childrenService.updateChild(childId, updateData);
         analyticsService.logEvent('children_data_updated', getChildrenAnalyticsParams());
+        DeviceEventEmitter.emit('childrenUpdated');
 
         if (isUnborn) {
           await syncPregnancyProfile(hasValidWeeks ? weeks : undefined);
@@ -387,6 +404,8 @@ const ChildrenDataScreen: React.FC = () => {
       // Enviar cada hijo al backend
       await childrenService.addMultipleChildren(childrenToSave);
       analyticsService.logEvent(isSignupFlow ? 'signup_children_data_completed' : 'children_data_created', getChildrenAnalyticsParams());
+      await AsyncStorage.setItem('hasChildren', 'true');
+      DeviceEventEmitter.emit('childrenUpdated');
 
       // Si hay al menos un bebé por nacer, actualizar el perfil con estado de embarazo.
       const unbornChild = childrenToSave.find(child => child.isUnborn);
@@ -624,21 +643,54 @@ const ChildrenDataScreen: React.FC = () => {
         </LinearGradient>
 
         <View style={styles.form}>
+          {!isEditing && (
+            <View style={styles.childListToolbar}>
+              <View>
+                <Text style={styles.childListToolbarTitle}>
+                  {childrenData.length === 1 ? '1 hijo por registrar' : `${childrenData.length} hijos por registrar`}
+                </Text>
+                <Text style={styles.childListToolbarSubtitle}>
+                  Agrega solo si quieres registrar otro perfil
+                </Text>
+              </View>
+              <TouchableOpacity
+                style={styles.addChildCompactButton}
+                onPress={addChildCard}
+                activeOpacity={0.85}
+              >
+                <Ionicons name="add" size={18} color="#59C6C0" />
+                <Text style={styles.addChildCompactText}>Agregar</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
           {childrenData.map((child, index) => {
             const isUnborn = child.isUnborn ?? isUnbornChild(index);
             return (
             <View key={index} style={styles.childCard}>
               <View style={styles.cardHeader}>
-                <View style={styles.iconContainer}>
-                  <Ionicons
-                    name={isUnborn ? "heart" : "person"}
-                    size={24}
-                    color="#59C6C0"
-                  />
+                <View style={styles.cardTitleRow}>
+                  <View style={styles.iconContainer}>
+                    <Ionicons
+                      name={isUnborn ? "heart" : "person"}
+                      size={24}
+                      color="#59C6C0"
+                    />
+                  </View>
+                  <Text style={styles.childTitle}>
+                    {getChildTitle(index, child)}
+                  </Text>
                 </View>
-              <Text style={styles.childTitle}>
-                {getChildTitle(index, child)}
-              </Text>
+                {!isEditing && childrenData.length > 1 && (
+                  <TouchableOpacity
+                    style={styles.removeChildButton}
+                    onPress={() => removeChildCard(index)}
+                    activeOpacity={0.85}
+                  >
+                    <Ionicons name="trash-outline" size={16} color="#D92D20" />
+                    <Text style={styles.removeChildButtonText}>Quitar</Text>
+                  </TouchableOpacity>
+                )}
               </View>
 
               <View style={styles.inputContainer}>
@@ -734,14 +786,6 @@ const ChildrenDataScreen: React.FC = () => {
               )}
             </View>
           )})}
-
-          <TouchableOpacity
-            style={styles.addAnotherChildButton}
-            onPress={addChildCard}
-          >
-            <Ionicons name="add-circle" size={20} color="#FFFFFF" />
-            <Text style={styles.addAnotherChildText}>Agregar otro hijo</Text>
-          </TouchableOpacity>
 
           <View style={styles.buttonContainer}>
             <TouchableOpacity
@@ -926,6 +970,48 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 20,
   },
+  childListToolbar: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 18,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    borderWidth: 1,
+    borderColor: '#E8F8F7',
+  },
+  childListToolbarTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#2c3e50',
+    fontFamily: 'Montserrat-Bold',
+  },
+  childListToolbarSubtitle: {
+    marginTop: 3,
+    fontSize: 12,
+    color: '#6B7280',
+    fontFamily: 'Montserrat',
+  },
+  addChildCompactButton: {
+    minHeight: 40,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingHorizontal: 14,
+    borderRadius: 999,
+    backgroundColor: '#F0FBFA',
+    borderWidth: 1,
+    borderColor: '#BCEFEB',
+  },
+  addChildCompactText: {
+    color: '#288E89',
+    fontSize: 13,
+    fontWeight: '700',
+    fontFamily: 'Montserrat-Bold',
+  },
   childCard: {
     backgroundColor: '#F7FAFC',
     borderRadius: 20,
@@ -945,8 +1031,15 @@ const styles = StyleSheet.create({
   cardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'space-between',
     marginBottom: 24,
+    gap: 12,
+  },
+  cardTitleRow: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
     gap: 12,
   },
   iconContainer: {
@@ -958,10 +1051,29 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   childTitle: {
+    flexShrink: 1,
     fontSize: 22,
     fontWeight: 'bold',
     color: '#2c3e50',
     fontFamily: 'Montserrat',
+  },
+  removeChildButton: {
+    minHeight: 34,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
+    paddingHorizontal: 10,
+    borderRadius: 999,
+    backgroundColor: '#FEF3F2',
+    borderWidth: 1,
+    borderColor: '#FECDCA',
+  },
+  removeChildButtonText: {
+    color: '#B42318',
+    fontSize: 12,
+    fontWeight: '700',
+    fontFamily: 'Montserrat-Bold',
   },
   inputContainer: {
     marginBottom: 20,
@@ -1086,23 +1198,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     fontFamily: 'Montserrat-Bold',
   },
-  addAnotherChildButton: {
-    marginTop: 8,
-    marginBottom: 16,
-    backgroundColor: '#59C6C0',
-    borderRadius: 12,
-    paddingVertical: 12,
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 8,
-  },
-  addAnotherChildText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '700',
-    fontFamily: 'Montserrat-Bold',
-  },
   gestationContainer: {
     marginTop: 12,
   },
@@ -1187,7 +1282,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   buttonContainer: {
-    marginTop: 30,
+    marginTop: 8,
     marginBottom: 20,
   },
   button: {

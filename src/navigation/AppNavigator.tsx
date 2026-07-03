@@ -18,6 +18,7 @@ import analyticsService from '../services/analyticsService';
 // Importar pantallas
 import LoginScreen from '../screens/LoginScreen';
 import SignupScreen from '../screens/SignupScreen';
+import IntroCarouselScreen from '../screens/IntroCarouselScreen';
 import HomeScreen from '../screens/HomeScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import ForgotPasswordScreen from '../screens/ForgotPasswordScreen';
@@ -200,7 +201,8 @@ const ChildrenHeaderTitle = () => {
     setShowSelector(false);
     navigation.navigate('ChildrenData', {
       childrenCount: 1,
-      gender: 'F',
+      gender: user?.gender || 'F',
+      source: 'add_child',
     });
   };
 
@@ -226,15 +228,48 @@ const ChildrenHeaderTitle = () => {
   const selectedChild = validChildren.find((child) => child.id === selectedChildId) || validChildren[0];
   if (!selectedChild) {
     return (
-      <View style={styles.childHeaderPill}>
-        <View style={styles.childHeaderPillPlaceholder}>
-          <Text style={styles.childHeaderEmoji}>👶</Text>
-        </View>
-        <Text style={styles.childHeaderPillName} numberOfLines={1}>
-          Tu bebé
-        </Text>
-        <Ionicons name="chevron-down" size={16} color="#4A5568" />
-      </View>
+      <>
+        <TouchableOpacity
+          style={styles.childHeaderPill}
+          onPress={() => setShowSelector(true)}
+          activeOpacity={0.8}
+        >
+          <View style={styles.childHeaderPillPlaceholder}>
+            <Text style={styles.childHeaderEmoji}>👶</Text>
+          </View>
+          <Text style={styles.childHeaderPillName} numberOfLines={1}>
+            Tu bebé
+          </Text>
+          <Ionicons name="chevron-down" size={16} color="#4A5568" />
+        </TouchableOpacity>
+
+        <Modal
+          visible={showSelector}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setShowSelector(false)}
+        >
+          <TouchableOpacity
+            style={styles.childHeaderModalOverlay}
+            activeOpacity={1}
+            onPressOut={() => setShowSelector(false)}
+          >
+            <TouchableOpacity
+              style={styles.childHeaderModalCard}
+              activeOpacity={1}
+            >
+              <Text style={styles.childHeaderModalTitle}>Aún no tienes bebé registrado</Text>
+              <Text style={styles.childHeaderModalEmptyText}>
+                Agrega un bebé para personalizar el plan de hoy, vacunas, crecimiento y más.
+              </Text>
+              <TouchableOpacity style={styles.childHeaderModalAdd} onPress={handleAddChild}>
+                <Ionicons name="add-circle" size={18} color="#6B5CA5" />
+                <Text style={styles.childHeaderModalAddText}>Agregar bebé</Text>
+              </TouchableOpacity>
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </Modal>
+      </>
     );
   }
 
@@ -1576,6 +1611,7 @@ const MainTabNavigator = () => {
 const AuthNavigator = () => {
   return (
     <Stack.Navigator
+      initialRouteName="Intro"
       screenOptions={{
         headerStyle: {
           backgroundColor: '#96d2d3',
@@ -1586,6 +1622,14 @@ const AuthNavigator = () => {
         },
       }}
     >
+      <Stack.Screen
+        name="Intro"
+        component={IntroCarouselScreen}
+        options={{
+          title: 'Munpa',
+          headerShown: false,
+        }}
+      />
       <Stack.Screen
         name="Login"
         component={LoginScreen}
@@ -2162,6 +2206,12 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#2D3748',
     marginBottom: 12,
+  },
+  childHeaderModalEmptyText: {
+    fontSize: 13,
+    color: '#6B7280',
+    lineHeight: 19,
+    marginBottom: 14,
   },
   childHeaderModalList: {
     marginBottom: 12,

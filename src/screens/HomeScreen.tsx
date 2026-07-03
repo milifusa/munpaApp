@@ -18,7 +18,6 @@ import {
 } from "react-native";
 import { useNavigation, useRoute, DrawerActions } from "@react-navigation/native";
 import { Ionicons, FontAwesome5 } from "@expo/vector-icons";
-import DateTimePicker from '@react-native-community/datetimepicker';
 import * as ImagePicker from "expo-image-picker";
 import * as Notifications from "expo-notifications";
 import { Audio } from "expo-av";
@@ -302,6 +301,10 @@ const PREGNANCY_SIZE_BY_WEEK: PregnancySizeComparison[] = [
 const PREGNANCY_WEEKS = Array.from({ length: 42 }, (_, index) => index + 1);
 const EARLY_PREGNANCY_IMAGELESS_WEEKS = new Set([1, 2, 3]);
 const SHARED_PREGNANCY_IMAGE_WEEKS = new Set([40, 41, 42]);
+const SHARED_HUMAN_PREGNANCY_IMAGE_WEEKS = new Set(
+  Array.from({ length: 13 }, (_, index) => index + 27)
+);
+const SHARED_HUMAN_POST_TERM_IMAGE_WEEKS = new Set([41, 42]);
 type PregnancyImageFolder = 'frutas' | 'animales' | 'dulces' | 'bebe';
 
 type PregnancyImageContext = {
@@ -345,6 +348,12 @@ const getPregnancySizeImage = (
 ) => {
   if (!week) return null;
   if (EARLY_PREGNANCY_IMAGELESS_WEEKS.has(week)) return null;
+  if (mode === 'human' && SHARED_HUMAN_PREGNANCY_IMAGE_WEEKS.has(week)) {
+    return PREGNANCY_SIZE_IMAGES_BY_MODE.human[27] || null;
+  }
+  if (mode === 'human' && SHARED_HUMAN_POST_TERM_IMAGE_WEEKS.has(week)) {
+    return PREGNANCY_SIZE_IMAGES_BY_MODE.human[40] || null;
+  }
   const imageMode = SHARED_PREGNANCY_IMAGE_WEEKS.has(week) ? 'fruits' : mode;
   return PREGNANCY_SIZE_IMAGES_BY_MODE[imageMode][week] || null;
 };
@@ -814,8 +823,6 @@ const HomeScreen: React.FC = () => {
   const [pregnancyContractions, setPregnancyContractions] = useState<PregnancyContractionRecord[]>([]);
   const [activeContractionStartedAt, setActiveContractionStartedAt] = useState<number | null>(null);
   const [contractionTick, setContractionTick] = useState(Date.now());
-  const [showPregnancyBirthDatePicker, setShowPregnancyBirthDatePicker] = useState(false);
-  const [pregnancyBirthDate, setPregnancyBirthDate] = useState(new Date());
   const [updatingPregnancyStatus, setUpdatingPregnancyStatus] = useState(false);
 
   const [showActivityDetailModal, setShowActivityDetailModal] = useState(false);
@@ -880,11 +887,21 @@ const HomeScreen: React.FC = () => {
   const activitySuggestionsInFlightChildRef = useRef<string | null>(null);
   const lastActivitySuggestionsChildRef = useRef<string | null>(null);
   const selectedChildIdRef = useRef<string | null>(null);
+  const selectedChildScopedLoadKeyRef = useRef<string | null>(null);
   const loadDataInFlightRef = useRef(false);
   const lastLoadDataAtRef = useRef(0);
   const loadProfileInFlightRef = useRef(false);
   const lastFocusReloadRef = useRef(0);
   const lastForceReloadRef = useRef<number | null>(null);
+
+  const getChildScopedLoadKey = (child: Child | null | undefined) => {
+    if (!child?.id) return 'no-child';
+    const stage = child.isUnborn ? 'pregnancy' : 'born';
+    const ageOrWeek = child.isUnborn
+      ? child.currentGestationWeeks ?? child.gestationWeeks ?? child.registeredGestationWeeks ?? 'na'
+      : child.currentAgeInMonths ?? child.ageInMonths ?? child.birthDate ?? 'na';
+    return `${child.id}|${stage}|${ageOrWeek}`;
+  };
 
   const resetChildScopedTodayData = useCallback(() => {
     setActivitySuggestions(null);
@@ -950,17 +967,26 @@ const HomeScreen: React.FC = () => {
   useEffect(() => {
     const subscription = DeviceEventEmitter.addListener(
       'selectedChildChanged',
-      ({ childId, child }: { childId?: string; child?: Child }) => {
-        if (!childId || selectedChild?.id === childId) return;
+      (payload: { childId?: string; child?: Child } | string | null) => {
+        const childId = typeof payload === 'string' ? payload : payload?.childId;
+        const child = typeof payload === 'object' && payload ? payload.child : undefined;
+        if (!childId) return;
 
         const childToSelect = children.find((item) => item.id === childId) || child;
         if (!childToSelect) return;
 
-        if (selectedChildIdRef.current !== childId) {
+        const currentScopedKey = getChildScopedLoadKey(selectedChild);
+        const nextScopedKey = getChildScopedLoadKey(childToSelect);
+        if (selectedChild?.id === childId && currentScopedKey === nextScopedKey) return;
+
+        if (selectedChildIdRef.current !== childId || currentScopedKey !== nextScopedKey) {
           resetChildScopedTodayData();
           lastTodayLoadKeyRef.current = null;
+          todayLoadInFlightRef.current = false;
+          todayLoadInFlightKeyRef.current = null;
         }
         selectedChildIdRef.current = childId;
+        selectedChildScopedLoadKeyRef.current = nextScopedKey;
         setSelectedChild(childToSelect);
       }
     );
@@ -972,12 +998,30 @@ const HomeScreen: React.FC = () => {
 
   useEffect(() => {
     const currentChildId = selectedChild?.id || null;
-    if (selectedChildIdRef.current && selectedChildIdRef.current !== currentChildId) {
+    const currentScopedKey = getChildScopedLoadKey(selectedChild);
+    if (
+      selectedChildIdRef.current &&
+      (selectedChildIdRef.current !== currentChildId ||
+        (lastTodayLoadKeyRef.current && !lastTodayLoadKeyRef.current.startsWith(currentScopedKey)))
+    ) {
       resetChildScopedTodayData();
       lastTodayLoadKeyRef.current = null;
+      todayLoadInFlightRef.current = false;
+      todayLoadInFlightKeyRef.current = null;
     }
     selectedChildIdRef.current = currentChildId;
-  }, [selectedChild?.id, resetChildScopedTodayData]);
+    selectedChildScopedLoadKeyRef.current = currentScopedKey;
+  }, [
+    selectedChild?.id,
+    selectedChild?.isUnborn,
+    selectedChild?.currentAgeInMonths,
+    selectedChild?.ageInMonths,
+    selectedChild?.birthDate,
+    selectedChild?.currentGestationWeeks,
+    selectedChild?.gestationWeeks,
+    selectedChild?.registeredGestationWeeks,
+    resetChildScopedTodayData,
+  ]);
 
   useEffect(() => {
     if (!selectedChild?.isUnborn) {
@@ -1051,6 +1095,8 @@ const HomeScreen: React.FC = () => {
 
       // Ejecutar cargas de forma no-bloqueante
       setTimeout(() => {
+        lastLoadDataAtRef.current = 0;
+        lastTodayLoadKeyRef.current = null;
         loadData();
       }, 0);
 
@@ -1182,7 +1228,7 @@ const HomeScreen: React.FC = () => {
 
   useEffect(() => {
     if (!selectedChild || !isLocationReady) return;
-    const loadKey = `${selectedChild.id}|${todayLat?.toFixed(4) || 'na'}|${todayLon?.toFixed(4) || 'na'}`;
+    const loadKey = `${getChildScopedLoadKey(selectedChild)}|${todayLat?.toFixed(4) || 'na'}|${todayLon?.toFixed(4) || 'na'}`;
     if (todayLoadInFlightRef.current && todayLoadInFlightKeyRef.current === loadKey) return;
     if (lastTodayLoadKeyRef.current === loadKey) return;
 
@@ -1445,6 +1491,7 @@ const HomeScreen: React.FC = () => {
 
   const loadTodayGuide = async (child: Child) => {
     const childId = child.id;
+    const childScopedKey = getChildScopedLoadKey(child);
     try {
       setLoadingTodayGuide(true);
       setTodayGuideError(null);
@@ -1458,7 +1505,10 @@ const HomeScreen: React.FC = () => {
 
       const response = await learningService.getTodayGuide({ childId });
 
-      if (selectedChildIdRef.current !== childId) return;
+      if (
+        selectedChildIdRef.current !== childId ||
+        selectedChildScopedLoadKeyRef.current !== childScopedKey
+      ) return;
 
       if (response?.success && response?.data) {
         setTodayGuide(response.data);
@@ -1467,12 +1517,18 @@ const HomeScreen: React.FC = () => {
       }
     } catch (error: any) {
       console.error('❌ [GUIDE] Error cargando guía de hoy:', error);
-      if (selectedChildIdRef.current === childId) {
+      if (
+        selectedChildIdRef.current === childId &&
+        selectedChildScopedLoadKeyRef.current === childScopedKey
+      ) {
         setTodayGuide(null);
         setTodayGuideError('No se pudo cargar la guía de hoy');
       }
     } finally {
-      if (selectedChildIdRef.current === childId) {
+      if (
+        selectedChildIdRef.current === childId &&
+        selectedChildScopedLoadKeyRef.current === childScopedKey
+      ) {
         setLoadingTodayGuide(false);
       }
     }
@@ -2197,10 +2253,15 @@ const HomeScreen: React.FC = () => {
     if (nextSelectedChild?.id) {
       await AsyncStorage.setItem('selectedChildId', nextSelectedChild.id);
       selectedChildIdRef.current = nextSelectedChild.id;
-      DeviceEventEmitter.emit('selectedChildChanged', nextSelectedChild.id);
+      selectedChildScopedLoadKeyRef.current = getChildScopedLoadKey(nextSelectedChild);
+      DeviceEventEmitter.emit('selectedChildChanged', {
+        childId: nextSelectedChild.id,
+        child: nextSelectedChild,
+      });
     } else {
       await AsyncStorage.removeItem('selectedChildId');
       selectedChildIdRef.current = null;
+      selectedChildScopedLoadKeyRef.current = null;
       DeviceEventEmitter.emit('selectedChildChanged', null);
     }
 
@@ -2208,11 +2269,22 @@ const HomeScreen: React.FC = () => {
     DeviceEventEmitter.emit('childrenUpdated');
   };
 
-  const handlePregnancyBorn = async (birthDate: Date) => {
+  const isGenericUnbornName = (name?: string | null) => {
+    const normalizedName = (name || '').trim().toLowerCase();
+    return normalizedName === 'bebé por nacer' ||
+      normalizedName === 'bebe por nacer' ||
+      normalizedName === 'bebé a por nacer' ||
+      normalizedName === 'bebe a por nacer' ||
+      normalizedName === 'bebé b por nacer' ||
+      normalizedName === 'bebe b por nacer';
+  };
+
+  const handlePregnancyBorn = async () => {
     if (!selectedChild?.id || !selectedChild.isUnborn || updatingPregnancyStatus) return;
 
     setUpdatingPregnancyStatus(true);
     try {
+      const birthDate = new Date();
       const birthDateText = formatDateForApi(birthDate);
       const response = await childrenService.updateChild(selectedChild.id, {
         isUnborn: false,
@@ -2236,11 +2308,25 @@ const HomeScreen: React.FC = () => {
       );
 
       await finishPregnancyStatusUpdate(nextChildren, bornChild);
-      setShowPregnancyBirthDatePicker(false);
+      resetChildScopedTodayData();
+      lastTodayLoadKeyRef.current = null;
+      todayLoadInFlightRef.current = false;
+      todayLoadInFlightKeyRef.current = null;
       setShowPregnancyDetailModal(false);
       setShowPregnancyImageModal(false);
       setShowPregnancyModuleModal(false);
-      Alert.alert('Listo', 'Actualizamos el perfil: ahora este bebé aparece como nacido.');
+
+      (navigation as any).navigate('ChildrenData', {
+        isEditing: true,
+        childId: bornChild.id,
+        childData: {
+          ...bornChild,
+          name: isGenericUnbornName(bornChild.name) ? '' : bornChild.name,
+          isUnborn: false,
+          birthDate: birthDateText,
+        },
+        source: 'edit_child',
+      });
     } catch (error) {
       console.error('❌ [PREGNANCY] Error marcando bebé como nacido:', error);
       Alert.alert('Error', 'No pudimos actualizar el estado. Intenta nuevamente.');
@@ -2259,7 +2345,6 @@ const HomeScreen: React.FC = () => {
       const nextSelectedChild = remainingChildren[0] || null;
 
       await finishPregnancyStatusUpdate(remainingChildren, nextSelectedChild);
-      setShowPregnancyBirthDatePicker(false);
       setShowPregnancyDetailModal(false);
       setShowPregnancyImageModal(false);
       setShowPregnancyModuleModal(false);
@@ -2287,9 +2372,18 @@ const HomeScreen: React.FC = () => {
     );
   };
 
-  const openPregnancyBirthDatePicker = () => {
-    setPregnancyBirthDate(new Date());
-    setShowPregnancyBirthDatePicker(true);
+  const confirmPregnancyBorn = () => {
+    Alert.alert(
+      '¿Ya nació?',
+      'Marcaremos a tu bebé como nacido, cerraremos el embarazo en tu perfil y abriremos la edición para completar su nombre y fecha de nacimiento.',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Continuar',
+          onPress: handlePregnancyBorn,
+        },
+      ]
+    );
   };
 
 
@@ -2477,25 +2571,42 @@ const HomeScreen: React.FC = () => {
         ? todayFaqQuestions
         : fallbackDouliQuestions
   ).slice(0, 4);
+  const todayGuideTextForStage = [
+    todayGuide?.title,
+    todayGuide?.subtitle,
+    todayGuide?.description,
+    todayGuide?.tip,
+  ].filter(Boolean).join(' ').toLowerCase();
+  const todayGuideLooksPregnancy = Boolean(
+    todayGuide?.isPregnant ||
+    todayGuide?.weeks ||
+    /^semana\s+\d+/i.test(todayGuide?.title || '') ||
+    todayGuideTextForStage.includes('embarazo') ||
+    todayGuideTextForStage.includes('gestación') ||
+    todayGuideTextForStage.includes('gestacion')
+  );
+  const currentStageTodayGuide = todayGuide && (
+    isPregnancyProfile || !todayGuideLooksPregnancy
+  ) ? todayGuide : null;
   const todayPlanTitle =
-    todayGuide?.title ||
+    currentStageTodayGuide?.title ||
     (isPregnancyProfile
       ? `Semana ${pregnancyWeekToShow || 1}: conexión y preparación`
       : `Plan de juego para ${childFirstName}`);
   const todayPlanFocus =
-    todayGuide?.subtitle ||
+    currentStageTodayGuide?.subtitle ||
     (isPregnancyProfile
       ? 'Un momento breve para observar cómo te sientes y preparar lo esencial.'
       : `${childFirstName} aprende mejor con experiencias simples, repetidas y tranquilas.`);
   const todayPlanAction =
-    todayGuide?.tip ||
+    currentStageTodayGuide?.tip ||
     activitySuggestions?.suggestions?.generalTip ||
     activitySuggestions?.suggestions?.warningIfTired ||
     (isPregnancyProfile
       ? 'Toma 5 minutos para respirar, hidratarte y anotar una pregunta para tu próxima consulta.'
       : `Prueba 5 minutos de juego con una textura, sonido suave u objeto de contraste.`);
   const todayPlanWhy =
-    todayGuide?.description ||
+    currentStageTodayGuide?.description ||
     (isPregnancyProfile
       ? 'Los pequeños registros diarios ayudan a notar cambios y llegar con más claridad a tus controles.'
       : 'Este tipo de interacción fortalece atención, coordinación, curiosidad y vínculo.');
@@ -3759,7 +3870,7 @@ const HomeScreen: React.FC = () => {
                           styles.pregnancyStatusButton,
                           updatingPregnancyStatus && styles.pregnancyStatusButtonDisabled,
                         ]}
-                        onPress={openPregnancyBirthDatePicker}
+                        onPress={confirmPregnancyBorn}
                         disabled={updatingPregnancyStatus}
                       >
                         {updatingPregnancyStatus ? (
@@ -3860,67 +3971,6 @@ const HomeScreen: React.FC = () => {
           </View>
         </View>
       </Modal>
-
-      {showPregnancyBirthDatePicker && Platform.OS === 'ios' && (
-        <Modal
-          visible={showPregnancyBirthDatePicker}
-          transparent={true}
-          animationType="slide"
-          onRequestClose={() => setShowPregnancyBirthDatePicker(false)}
-        >
-          <View style={styles.pregnancyDatePickerOverlay}>
-            <View style={styles.pregnancyDatePickerContent}>
-              <Text style={styles.pregnancyDatePickerTitle}>Fecha de nacimiento</Text>
-              <DateTimePicker
-                value={pregnancyBirthDate}
-                mode="date"
-                display="spinner"
-                maximumDate={new Date()}
-                locale="es-ES"
-                onChange={(_, selectedDate) => {
-                  if (selectedDate) setPregnancyBirthDate(selectedDate);
-                }}
-              />
-              <View style={styles.pregnancyDatePickerActions}>
-                <TouchableOpacity
-                  style={styles.pregnancyDatePickerCancel}
-                  onPress={() => setShowPregnancyBirthDatePicker(false)}
-                  disabled={updatingPregnancyStatus}
-                >
-                  <Text style={styles.pregnancyDatePickerCancelText}>Cancelar</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.pregnancyDatePickerConfirm}
-                  onPress={() => handlePregnancyBorn(pregnancyBirthDate)}
-                  disabled={updatingPregnancyStatus}
-                >
-                  {updatingPregnancyStatus ? (
-                    <ActivityIndicator size="small" color="#FFFFFF" />
-                  ) : (
-                    <Text style={styles.pregnancyDatePickerConfirmText}>Confirmar</Text>
-                  )}
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-        </Modal>
-      )}
-
-      {showPregnancyBirthDatePicker && Platform.OS !== 'ios' && (
-        <DateTimePicker
-          value={pregnancyBirthDate}
-          mode="date"
-          display="default"
-          maximumDate={new Date()}
-          onChange={(event, selectedDate) => {
-            setShowPregnancyBirthDatePicker(false);
-            if (event.type === 'dismissed') return;
-            const nextDate = selectedDate || pregnancyBirthDate;
-            setPregnancyBirthDate(nextDate);
-            handlePregnancyBorn(nextDate);
-          }}
-        />
-      )}
 
       {/* Modal de Ruido Blanco */}
       <Modal

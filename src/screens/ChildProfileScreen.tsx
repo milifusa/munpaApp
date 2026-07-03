@@ -43,6 +43,7 @@ interface Child {
   photoUrl?: string | null;
   createdAt: any; // Puede ser string o objeto de Firestore
   birthDate?: string | any; // Fecha de nacimiento (puede ser string o objeto de Firestore)
+  dueDate?: string | any;
   // Campos calculados por el backend
   currentAgeInMonths?: number | null;
   currentGestationWeeks?: number | null;
@@ -1049,6 +1050,43 @@ const ChildProfileScreen: React.FC = () => {
   };
 
   const ageInfo = getDetailedAge();
+  const childStageLabel = child.isUnborn ? 'En gestación' : 'Nacido';
+  const childAgeLabel = child.isUnborn
+    ? `${child.currentGestationWeeks || child.gestationWeeks || 0} semanas`
+    : ageInfo.primary;
+  const birthDateLabel = child.isUnborn
+    ? formatBirthDate(child.dueDate)
+    : formatBirthDate(child.birthDate);
+  const nextStep = child.isUnborn
+    ? {
+        icon: 'heart-outline' as const,
+        title: 'Mantén actualizado el embarazo',
+        text: 'Revisa semanas de gestación y fecha probable para personalizar el seguimiento.',
+        action: 'Editar datos',
+        onPress: handleEditChild,
+      }
+    : !profileImage
+      ? {
+          icon: 'camera-outline' as const,
+          title: 'Agrega su primera foto',
+          text: `Personaliza el perfil de ${child.name} con una imagen que puedas reconocer rápido.`,
+          action: 'Subir foto',
+          onPress: pickImage,
+        }
+      : {
+          icon: 'sparkles-outline' as const,
+          title: 'Sigue su desarrollo',
+          text: 'Consulta ideas y señales esperadas para acompañar esta etapa.',
+          action: 'Ver desarrollo',
+          onPress: () => setActiveTab('development'),
+        };
+
+  const handleShareChild = () => {
+    (navigation as any).navigate('ShareChild', {
+      childId: child.id,
+      childName: child.name,
+    });
+  };
 
   return (
     <View style={styles.container}>
@@ -1105,6 +1143,16 @@ const ChildProfileScreen: React.FC = () => {
                 )}
               </View>
             </View>
+            <View style={styles.headerActions}>
+              <TouchableOpacity style={styles.headerActionButton} onPress={handleEditChild}>
+                <Ionicons name="create-outline" size={16} color="#2c3e50" />
+                <Text style={styles.headerActionText}>Editar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.headerActionButton} onPress={handleShareChild}>
+                <Ionicons name="share-outline" size={16} color="#2c3e50" />
+                <Text style={styles.headerActionText}>Compartir</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </View>
@@ -1121,7 +1169,7 @@ const ChildProfileScreen: React.FC = () => {
           onPress={() => setActiveTab('info')}
         >
           <Text style={[styles.tabText, activeTab === 'info' && styles.activeTabText]}>
-            ℹ️ Info
+            Resumen
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
@@ -1129,7 +1177,7 @@ const ChildProfileScreen: React.FC = () => {
           onPress={() => setActiveTab('development')}
         >
           <Text style={[styles.tabText, activeTab === 'development' && styles.activeTabText]}>
-            🧠 Desarrollo
+            Desarrollo
           </Text>
         </TouchableOpacity>
         {/* <TouchableOpacity
@@ -1170,7 +1218,7 @@ const ChildProfileScreen: React.FC = () => {
           onPress={() => setActiveTab('photos')}
         >
           <Text style={[styles.tabText, activeTab === 'photos' && styles.activeTabText]}>
-            📸 Fotos
+            Recuerdos
           </Text>
         </TouchableOpacity>
       </ScrollView>
@@ -1180,60 +1228,47 @@ const ChildProfileScreen: React.FC = () => {
         {/* TAB: Información básica */}
         {activeTab === 'info' && (
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Información básica</Text>
+          <Text style={styles.sectionTitle}>Resumen</Text>
+          <View style={styles.summaryGrid}>
+            <View style={styles.summaryChip}>
+              <Ionicons name={child.isUnborn ? 'heart-outline' : 'happy-outline'} size={18} color="#288E89" />
+              <Text style={styles.summaryChipLabel}>Estado</Text>
+              <Text style={styles.summaryChipValue}>{childStageLabel}</Text>
+            </View>
+            <View style={styles.summaryChip}>
+              <Ionicons name="time-outline" size={18} color="#288E89" />
+              <Text style={styles.summaryChipLabel}>Edad</Text>
+              <Text style={styles.summaryChipValue}>{childAgeLabel}</Text>
+            </View>
+          </View>
+
+          <View style={styles.nextStepCard}>
+            <View style={styles.nextStepIcon}>
+              <Ionicons name={nextStep.icon} size={22} color="#59C6C0" />
+            </View>
+            <View style={styles.nextStepCopy}>
+              <Text style={styles.nextStepTitle}>{nextStep.title}</Text>
+              <Text style={styles.nextStepText}>{nextStep.text}</Text>
+            </View>
+            <TouchableOpacity style={styles.nextStepButton} onPress={nextStep.onPress}>
+              <Text style={styles.nextStepButtonText}>{nextStep.action}</Text>
+            </TouchableOpacity>
+          </View>
+
           <View style={styles.infoCard}>
+            <Text style={styles.cardTitle}>Detalles</Text>
             <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>Nombre:</Text>
+              <Text style={styles.infoLabel}>Nombre</Text>
               <Text style={styles.infoValue}>{child.name}</Text>
             </View>
             <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>Estado:</Text>
-              <Text style={styles.infoValue}>
-                {child.isUnborn ? 'En gestación' : 'Nacido'}
-              </Text>
+              <Text style={styles.infoLabel}>{child.isUnborn ? 'Fecha probable' : 'Nacimiento'}</Text>
+              <Text style={styles.infoValue}>{birthDateLabel}</Text>
             </View>
-            <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>Edad:</Text>
-              <Text style={styles.infoValue}>
-                {child.isUnborn 
-                  ? `${child.currentGestationWeeks || child.gestationWeeks} semanas`
-                  : `${child.currentAgeInMonths || calculateCurrentAge()} meses`
-                }
-              </Text>
+            <View style={styles.infoRowLast}>
+              <Text style={styles.infoLabel}>Registro</Text>
+              <Text style={styles.infoValue}>{formatFirestoreDate(child.createdAt)}</Text>
             </View>
-            {!child.isUnborn && child.birthDate && (
-              <View style={styles.infoRow}>
-                <Text style={styles.infoLabel}>Fecha de nacimiento:</Text>
-                <Text style={styles.infoValue}>
-                  {formatBirthDate(child.birthDate)}
-                </Text>
-              </View>
-            )}
-            <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>Fecha de registro:</Text>
-              <Text style={styles.infoValue}>
-                {formatFirestoreDate(child.createdAt)}
-              </Text>
-            </View>
-          </View>
-          
-          {/* Botones de acción */}
-          <View style={styles.actionButtonsContainer}>
-            <TouchableOpacity style={styles.actionButton} onPress={handleEditChild}>
-              <Ionicons name="create-outline" size={20} color="#FFF" />
-              <Text style={styles.actionButtonText}>Editar información</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={[styles.actionButton, styles.sleepButton]} 
-              onPress={() => {
-                // @ts-ignore
-                navigation.navigate('SleepTracker', { childId: child.id });
-              }}
-            >
-              <Ionicons name="moon" size={20} color="#FFF" />
-              <Text style={styles.actionButtonText}>💤 Seguimiento de Sueño</Text>
-            </TouchableOpacity>
           </View>
         </View>
         )}
@@ -1625,7 +1660,7 @@ const ChildProfileScreen: React.FC = () => {
         {/* TAB: Gestión de fotos */}
         {activeTab === 'photos' && (
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>📸 Galería de fotos</Text>
+          <Text style={styles.sectionTitle}>Recuerdos</Text>
           
           {/* Botones de acción */}
           <View style={styles.actionsContainer}>
@@ -1660,7 +1695,7 @@ const ChildProfileScreen: React.FC = () => {
           </View>
 
           {/* Vista previa de foto actual */}
-          {profileImage && (
+          {profileImage ? (
             <View style={styles.photoPreviewSection}>
               <Text style={styles.photoPreviewTitle}>Foto de perfil actual:</Text>
               <View style={styles.photoPreviewContainer}>
@@ -1670,6 +1705,17 @@ const ChildProfileScreen: React.FC = () => {
                   resizeMode="cover"
                 />
         </View>
+            </View>
+          ) : (
+            <View style={styles.photoEmptyState}>
+              <Ionicons name="images-outline" size={34} color="#59C6C0" />
+              <Text style={styles.photoEmptyTitle}>Todavía no hay foto principal</Text>
+              <Text style={styles.photoEmptyText}>
+                Sube una imagen para reconocer este perfil y guardar su primer recuerdo.
+              </Text>
+              <TouchableOpacity style={styles.photoEmptyButton} onPress={pickImage} disabled={loading}>
+                <Text style={styles.photoEmptyButtonText}>Subir primera foto</Text>
+              </TouchableOpacity>
             </View>
           )}
 
@@ -1698,27 +1744,6 @@ const ChildProfileScreen: React.FC = () => {
         )}
       </View>
     </ScrollView>
-
-    {/* Botones flotantes de acciones rápidas */}
-    <View style={styles.fabContainer}>
-      <TouchableOpacity 
-        style={[styles.fab, styles.fabSecondary]}
-        onPress={() => {
-          (navigation as any).navigate('ShareChild', {
-            childId: child.id,
-            childName: child.name,
-          });
-        }}
-      >
-        <Ionicons name="share-outline" size={24} color="#FFFFFF" />
-            </TouchableOpacity>
-      <TouchableOpacity 
-        style={styles.fab}
-        onPress={handleEditChild}
-      >
-        <Ionicons name="create-outline" size={24} color="#FFFFFF" />
-            </TouchableOpacity>
-    </View>
 
     {/* Date Picker Modal para vacunas */}
     {showDatePicker && pendingVaccine && (
@@ -1852,7 +1877,7 @@ const ChildProfileScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#8fd8d3',
+    backgroundColor: '#F6FBFB',
   },
   scrollView: {
     flex: 1,
@@ -1982,6 +2007,42 @@ const styles = StyleSheet.create({
     height: 200,
     borderRadius: borderRadius.xl,
     ...shadows.base,
+  },
+  photoEmptyState: {
+    alignItems: 'center',
+    backgroundColor: colors.white,
+    borderRadius: borderRadius.lg,
+    padding: spacing.xl,
+    marginTop: spacing.lg,
+    borderWidth: 1,
+    borderColor: '#DDF3F1',
+    ...shadows.sm,
+  },
+  photoEmptyTitle: {
+    marginTop: spacing.md,
+    fontSize: typography.sizes.lg,
+    fontWeight: typography.weights.bold,
+    color: '#2c3e50',
+    textAlign: 'center',
+  },
+  photoEmptyText: {
+    marginTop: spacing.sm,
+    fontSize: typography.sizes.sm,
+    color: colors.text.secondary,
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  photoEmptyButton: {
+    marginTop: spacing.lg,
+    borderRadius: 999,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    backgroundColor: '#59C6C0',
+  },
+  photoEmptyButtonText: {
+    fontSize: typography.sizes.sm,
+    fontWeight: typography.weights.bold,
+    color: colors.white,
   },
   albumsSection: {
     marginTop: spacing.xl,
@@ -2173,6 +2234,29 @@ const styles = StyleSheet.create({
     color: '#34495e', // Color oscuro para que sea visible sobre fondo claro
     marginTop: 2,
   },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginTop: spacing.md,
+  },
+  headerActionButton: {
+    minHeight: 38,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingHorizontal: spacing.md,
+    borderRadius: 999,
+    backgroundColor: 'rgba(255, 255, 255, 0.55)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.8)',
+  },
+  headerActionText: {
+    fontSize: typography.sizes.sm,
+    fontWeight: typography.weights.semibold,
+    color: '#2c3e50',
+  },
   tabsContainer: {
     backgroundColor: colors.white,
     borderRadius: 15,
@@ -2219,14 +2303,90 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: typography.sizes.xl,
     fontWeight: typography.weights.bold,
-    color: colors.white,
+    color: '#2c3e50',
     marginBottom: spacing.md,
+  },
+  summaryGrid: {
+    flexDirection: 'row',
+    gap: spacing.md,
+    marginBottom: spacing.md,
+  },
+  summaryChip: {
+    flex: 1,
+    backgroundColor: colors.white,
+    borderRadius: borderRadius.lg,
+    padding: spacing.md,
+    borderWidth: 1,
+    borderColor: '#DDF3F1',
+    ...shadows.sm,
+  },
+  summaryChipLabel: {
+    marginTop: spacing.sm,
+    fontSize: typography.sizes.xs,
+    color: colors.text.secondary,
+    fontWeight: typography.weights.medium,
+  },
+  summaryChipValue: {
+    marginTop: 2,
+    fontSize: typography.sizes.base,
+    color: '#2c3e50',
+    fontWeight: typography.weights.bold,
+  },
+  nextStepCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: borderRadius.lg,
+    padding: spacing.lg,
+    marginBottom: spacing.md,
+    borderWidth: 1,
+    borderColor: '#DDF3F1',
+    ...shadows.base,
+  },
+  nextStepIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#E8F8F7',
+    marginBottom: spacing.sm,
+  },
+  nextStepCopy: {
+    marginBottom: spacing.md,
+  },
+  nextStepTitle: {
+    fontSize: typography.sizes.lg,
+    fontWeight: typography.weights.bold,
+    color: '#2c3e50',
+    marginBottom: spacing.xs,
+  },
+  nextStepText: {
+    fontSize: typography.sizes.sm,
+    color: colors.text.secondary,
+    lineHeight: 20,
+  },
+  nextStepButton: {
+    alignSelf: 'flex-start',
+    borderRadius: 999,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    backgroundColor: '#59C6C0',
+  },
+  nextStepButtonText: {
+    fontSize: typography.sizes.sm,
+    fontWeight: typography.weights.bold,
+    color: colors.white,
   },
   infoCard: {
     backgroundColor: colors.white,
     borderRadius: borderRadius.lg,
     padding: spacing.lg,
     ...shadows.base,
+  },
+  cardTitle: {
+    fontSize: typography.sizes.base,
+    fontWeight: typography.weights.bold,
+    color: '#2c3e50',
+    marginBottom: spacing.sm,
   },
   infoRow: {
     flexDirection: 'row',
@@ -2236,6 +2396,12 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#F0F0F0',
   },
+  infoRowLast: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: spacing.sm,
+  },
   infoLabel: {
     fontSize: typography.sizes.base,
     fontWeight: typography.weights.medium,
@@ -2244,6 +2410,9 @@ const styles = StyleSheet.create({
   infoValue: {
     fontSize: typography.sizes.base,
     color: colors.text.secondary,
+    flex: 1,
+    textAlign: 'right',
+    marginLeft: spacing.md,
   },
   developmentText: {
     fontSize: typography.sizes.base,
@@ -2304,9 +2473,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: spacing.sm,
     ...shadows.base,
-  },
-  sleepButton: {
-    backgroundColor: '#96d2d3',
   },
   actionButtonText: {
     fontSize: typography.sizes.base,
